@@ -1,13 +1,35 @@
 import requests
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.models import User
 from .client import OnaClient
 from .hardware import get_hardware_fingerprint
 from .models import LicenseState
+from .serializers import ActivateSerializer
+
+
+def _provision_admin_user(admin_data):
+    """
+    Ona'dan aktivatsiya javobi orqali kelgan bosh menejer hisobini lokal
+    bazaga yaratadi/yangilaydi. `password_hash` allaqachon Django-mos xesh
+    (Ona'da make_password() bilan yaratilgan) - shuning uchun to'g'ridan-to'g'ri
+    `password` maydoniga yoziladi, qayta xeshланмайди.
+    """
+    User.objects.update_or_create(
+        username=admin_data['phone'],
+        defaults={
+            'role': 'manager',
+            'is_staff': True,
+            'is_superuser': True,
+            'first_name': admin_data.get('full_name', ''),
+            'password': admin_data['password_hash'],
+        },
+    )
 
 
 class ActivateView(APIView):
@@ -19,13 +41,11 @@ class ActivateView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(request=ActivateSerializer)
     def post(self, request):
-        license_key = request.data.get('license_key', '').strip()
-        if not license_key:
-            return Response(
-                {"detail": "Litsenziya kaliti kiritilmadi."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = ActivateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        license_key = serializer.validated_data['license_key'].strip()
 
         try:
             hardware_hash = get_hardware_fingerprint()
@@ -58,7 +78,17 @@ class ActivateView(APIView):
         state.blocked_reason = ''
         state.save()
 
-        return Response(data, status=status.HTTP_200_OK)
+        admin_data = data.get('admin')
+        response_data = {k: v for k, v in data.items() if k != 'admin'}
+        if admin_data:
+            _provision_admin_user(admin_data)
+            # password_hash faqat ichki provisioning uchun - javobda qaytarilmaydi.
+            response_data['admin'] = {
+                "phone": admin_data['phone'],
+                "full_name": admin_data.get('full_name', ''),
+            }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class StatusView(APIView):

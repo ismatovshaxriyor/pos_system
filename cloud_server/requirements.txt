@@ -1,4 +1,4 @@
-Django>=5.0,<5.1
+Django==5.2
 djangorestframework
 drf-spectacular
 psycopg2-binary
@@ -7,6 +7,6 @@ redis
 python-dotenv
 gunicorn
 django-cors-headers
-django-jazzmin
+django-jazzmin==3.0.1
 PyJWT
 cryptography

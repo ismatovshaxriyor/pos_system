@@ -1,5 +1,6 @@
 import uuid
 import secrets
+from django.core.validators import RegexValidator
 from django.db import models
 
 class Restaurant(models.Model):
@@ -48,6 +49,38 @@ class License(models.Model):
 
     def __str__(self):
         return f"License for {self.restaurant.name}"
+
+
+class RestaurantAdminAccount(models.Model):
+    """
+    Restoranning bosh menejer hisobi - Ona tomonda yaratiladi va Bola
+    birinchi marta faollashtirilganda (ActivationView javobi orqali)
+    lokal core.User sifatida avtomatik ko'chiriladi. Shu orqali Ona
+    markazdan "qaysi restoranda kim admin" ekanligini bilib turadi.
+
+    Parol HECH QACHON ochiq holda saqlanmaydi yoki tarmoq orqali
+    yuborilmaydi - faqat Django-mos xesh (`password_hash`) uzatiladi,
+    Bola uni qayta xeshламай to'g'ridan-to'g'ri ishlatadi.
+    """
+    phone_regex = RegexValidator(
+        regex=r'^\+?(998)?\d{9}$',
+        message="Telefon raqami +998xxxxxxxxx, 998xxxxxxxxx yoki xxxxxxxxx formatida bo'lishi kerak.",
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant = models.OneToOneField(Restaurant, related_name='admin_account', on_delete=models.CASCADE)
+    phone = models.CharField(max_length=15, unique=True, validators=[phone_regex])
+    full_name = models.CharField(max_length=200, blank=True, default='')
+    password_hash = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def set_password(self, raw_password):
+        from django.contrib.auth.hashers import make_password
+        self.password_hash = make_password(raw_password)
+
+    def __str__(self):
+        return f"{self.full_name or self.phone} ({self.restaurant.name})"
 
 
 class RemoteCommand(models.Model):

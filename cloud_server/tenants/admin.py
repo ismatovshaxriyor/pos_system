@@ -1,6 +1,7 @@
+from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Restaurant, License, RestaurantStatus, RemoteCommand
+from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
 
 
 class RestaurantStatusInline(admin.StackedInline):
@@ -10,6 +11,39 @@ class RestaurantStatusInline(admin.StackedInline):
         'cpu_percent', 'ram_percent', 'disk_percent',
         'app_version', 'unsynced_count', 'last_order_at', 'updated_at',
     )
+
+
+class RestaurantAdminAccountForm(forms.ModelForm):
+    password = forms.CharField(
+        widget=forms.PasswordInput, required=False,
+        help_text="Bo'sh qoldirilsa mavjud parol o'zgarmaydi. Faollashtirish "
+                   "paytida shu parolning XESHI Bolaga ko'chiriladi - ochiq "
+                   "parol hech qachon tarmoq orqali yuborilmaydi.",
+    )
+
+    class Meta:
+        model = RestaurantAdminAccount
+        fields = ('restaurant', 'phone', 'full_name', 'password')
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        raw_password = self.cleaned_data.get('password')
+        if raw_password:
+            instance.set_password(raw_password)
+        elif not instance.password_hash and not instance.pk:
+            raise forms.ValidationError("Yangi admin uchun parol kiritish shart.")
+        if commit:
+            instance.save()
+        return instance
+
+
+class RestaurantAdminAccountInline(admin.StackedInline):
+    model = RestaurantAdminAccount
+    form = RestaurantAdminAccountForm
+    can_delete = False
+    extra = 0
+    max_num = 1
+    fields = ('phone', 'full_name', 'password')
 
 
 def _enqueue_command(modeladmin, request, queryset, command_type, success_message):
@@ -23,13 +57,13 @@ def _enqueue_command(modeladmin, request, queryset, command_type, success_messag
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'online_badge', 'contact_info', 'is_active',
+        'name', 'online_badge', 'admin_display', 'contact_info', 'is_active',
         'app_version_display', 'desired_version', 'last_seen', 'created_at',
     )
     list_filter = ('is_active', 'is_online')
     search_fields = ('name', 'address', 'contact_info')
     readonly_fields = ('is_online',)
-    inlines = [RestaurantStatusInline]
+    inlines = [RestaurantAdminAccountInline, RestaurantStatusInline]
     actions = [
         'action_block_system', 'action_unblock_system',
         'action_force_license_renew', 'action_update_app',
@@ -46,6 +80,14 @@ class RestaurantAdmin(admin.ModelAdmin):
             '<span style="color:#fff;background:#b3261e;padding:2px 8px;'
             'border-radius:8px;font-size:11px">Oflayn</span>'
         )
+
+    @admin.display(description="Admin")
+    def admin_display(self, obj):
+        try:
+            account = obj.admin_account
+        except RestaurantAdminAccount.DoesNotExist:
+            return "-"
+        return account.full_name or account.phone
 
     @admin.display(description="Versiya")
     def app_version_display(self, obj):
@@ -87,6 +129,14 @@ class RestaurantAdmin(admin.ModelAdmin):
             f"{count} ta restoranga yangilanish yuborildi "
             "(desired_version maydoni bo'sh bo'lganlar o'tkazib yuborildi).",
         )
+
+
+@admin.register(RestaurantAdminAccount)
+class RestaurantAdminAccountAdmin(admin.ModelAdmin):
+    form = RestaurantAdminAccountForm
+    list_display = ('restaurant', 'phone', 'full_name', 'created_at')
+    search_fields = ('restaurant__name', 'phone', 'full_name')
+    readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(License)

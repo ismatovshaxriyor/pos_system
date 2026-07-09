@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand
+from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
 from tenants.tasks import mark_offline_restaurants
 
 
@@ -267,3 +267,54 @@ class RemoteCommandLifecycleTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+@override_settings(LICENSE_PRIVATE_KEY=PRIVATE_PEM, LICENSE_TOKEN_TTL_DAYS=7)
+class ActivationAdminProvisioningTests(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name="Test Restoran")
+        self.license = License.objects.create(
+            restaurant=self.restaurant,
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        self.url = reverse('sync-activate')
+
+    def test_activation_includes_admin_hash_when_account_exists(self):
+        admin_account = RestaurantAdminAccount(
+            restaurant=self.restaurant, phone="+998901112233", full_name="Aziz Aliyev",
+        )
+        admin_account.set_password("Kuchli-Parol-1")
+        admin_account.save()
+
+        response = self.client.post(self.url, {
+            "license_key": self.license.key, "hardware_hash": "a" * 64,
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('admin', response.data)
+        self.assertEqual(response.data['admin']['phone'], "+998901112233")
+        self.assertEqual(response.data['admin']['full_name'], "Aziz Aliyev")
+        # Hash must be a real Django hash, never the raw password.
+        self.assertNotEqual(response.data['admin']['password_hash'], "Kuchli-Parol-1")
+        self.assertTrue(response.data['admin']['password_hash'].startswith('pbkdf2_'))
+
+    def test_activation_omits_admin_block_when_no_account(self):
+        response = self.client.post(self.url, {
+            "license_key": self.license.key, "hardware_hash": "a" * 64,
+        }, content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('admin', response.data)
+
+    def test_activation_omits_admin_block_when_password_never_set(self):
+        # An admin row created without ever setting a password shouldn't be
+        # copied down - Bola would end up with an unusable empty-hash account.
+        RestaurantAdminAccount.objects.create(
+            restaurant=self.restaurant, phone="+998901112233",
+        )
+
+        response = self.client.post(self.url, {
+            "license_key": self.license.key, "hardware_hash": "a" * 64,
+        }, content_type='application/json')
+
+        self.assertNotIn('admin', response.data)

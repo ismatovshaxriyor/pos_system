@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.utils import timezone
-from tenants.models import License, RestaurantStatus, RemoteCommand
+from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token
 from .serializers import (
@@ -65,12 +65,29 @@ class ActivationView(APIView):
         restaurant.last_seen = timezone.now()
         restaurant.save(update_fields=['last_seen'])
 
-        return Response({
+        response_data = {
             "token": token,
             "expires_at": expires_at.isoformat(),
             "restaurant": {"id": str(restaurant.id), "name": restaurant.name},
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
-        }, status=status.HTTP_200_OK)
+        }
+
+        # Ona'da oldindan yaratilgan bosh menejer hisobi bo'lsa, uni Bolaga
+        # ko'chirish uchun javobga qo'shamiz. Faqat XESH uzatiladi - ochiq
+        # parol hech qachon tarmoq orqali yubormaymiz.
+        try:
+            admin_account = restaurant.admin_account
+        except RestaurantAdminAccount.DoesNotExist:
+            admin_account = None
+
+        if admin_account and admin_account.password_hash:
+            response_data["admin"] = {
+                "phone": admin_account.phone,
+                "full_name": admin_account.full_name,
+                "password_hash": admin_account.password_hash,
+            }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class RenewView(APIView):
