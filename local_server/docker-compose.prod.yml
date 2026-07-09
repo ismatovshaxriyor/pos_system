@@ -1,0 +1,107 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DB_NAME:-pos_local_db}
+      - POSTGRES_USER=${DB_USER:-pos_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    restart: unless-stopped
+
+  db_backup:
+    image: prodrigestivill/postgres-backup-local
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=${DB_NAME:-pos_local_db}
+      - POSTGRES_USER=${DB_USER:-pos_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+    volumes:
+      - ./backups:/backups
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  web:
+    image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2
+    env_file: .env
+    environment:
+      - RUN_MIGRATIONS=1
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./keys:/app/keys:ro
+      - media_data:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  celery_worker:
+    image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
+    command: celery -A config worker --loglevel=info --concurrency=2
+    env_file: .env
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./keys:/app/keys:ro
+      - media_data:/app/media
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  celery_beat:
+    image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
+    command: celery -A config beat --loglevel=info
+    env_file: .env
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./keys:/app/keys:ro
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Faqat ichki tarmoqda ishlaydi (port ochilmagan) - update_app buyrug'i
+  # licensing.tasks orqali http://watchtower:8080/v1/update ga so'rov yuboradi.
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_CLEANUP=true
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+
+volumes:
+  postgres_data:
+  media_data:

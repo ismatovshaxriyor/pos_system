@@ -1,0 +1,15 @@
+Django>=5.0,<=5.2
+djangorestframework
+drf-spectacular
+psycopg2-binary
+celery
+redis
+Pillow
+python-dotenv
+gunicorn
+django-cors-headers
+django-jazzmin
+PyJWT
+cryptography
+psutil
+requests

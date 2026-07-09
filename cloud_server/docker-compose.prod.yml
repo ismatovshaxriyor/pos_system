@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - cloud_postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DB_NAME:-pos_cloud_db}
+      - POSTGRES_USER=${DB_USER:-cloud_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  web:
+    build: .
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8001 --workers 2
+    env_file: .env
+    environment:
+      - RUN_MIGRATIONS=1
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./keys:/app/keys:ro
+      - media_data:/app/media
+    ports:
+      - "8001:8001"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    command: celery -A config worker --loglevel=info --concurrency=2
+    env_file: .env
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./keys:/app/keys:ro
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+
+  celery_beat:
+    build: .
+    command: celery -A config beat --loglevel=info
+    env_file: .env
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./keys:/app/keys:ro
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+
+volumes:
+  cloud_postgres_data:
+  media_data:

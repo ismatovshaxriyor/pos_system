@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=pos_local_db
+      - POSTGRES_USER=pos_user
+      - POSTGRES_PASSWORD=pos_password
+    ports:
+      - "127.0.0.1:15432:5432"
+    restart: unless-stopped
+
+  db_backup:
+    image: prodrigestivill/postgres-backup-local
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=pos_local_db
+      - POSTGRES_USER=pos_user
+      - POSTGRES_PASSWORD=pos_password
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+    volumes:
+      - ./backups:/backups
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:16379:6379"
+    restart: unless-stopped
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+      - ./keys:/app/keys:ro
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - DEBUG=1
+      - DB_NAME=pos_local_db
+      - DB_USER=pos_user
+      - DB_PASSWORD=pos_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - ONA_SERVER_URL=http://host.docker.internal:8001
+      - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
+      - LICENSE_ENFORCEMENT=0
+      - HARDWARE_ID_OVERRIDE=dev-local-machine
+      - APP_VERSION=0.1.0
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    command: celery -A config worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/app
+      - ./keys:/app/keys:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - DEBUG=1
+      - DB_NAME=pos_local_db
+      - DB_USER=pos_user
+      - DB_PASSWORD=pos_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - ONA_SERVER_URL=http://host.docker.internal:8001
+      - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
+      - LICENSE_ENFORCEMENT=0
+      - HARDWARE_ID_OVERRIDE=dev-local-machine
+      - APP_VERSION=0.1.0
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+
+  celery_beat:
+    build: .
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+      - ./keys:/app/keys:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - DEBUG=1
+      - DB_NAME=pos_local_db
+      - DB_USER=pos_user
+      - DB_PASSWORD=pos_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - ONA_SERVER_URL=http://host.docker.internal:8001
+      - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
+      - LICENSE_ENFORCEMENT=0
+      - HARDWARE_ID_OVERRIDE=dev-local-machine
+      - APP_VERSION=0.1.0
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,187 @@
+import logging
+from datetime import timedelta
+
+import requests
+from celery import shared_task
+from django.conf import settings
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+from .client import OnaClient
+from .hardware import get_hardware_fingerprint
+from .metrics import collect_metrics
+from .models import LicenseState
+
+logger = logging.getLogger(__name__)
+
+RENEWAL_LEAD_TIME = timedelta(days=2)
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError, requests.Timeout),
+    retry_backoff=True,
+    max_retries=3,
+)
+def renew_license_token(self):
+    """
+    Litsenziya tokenini Ona serverdan yangilaydi. Muvaffaqiyatsizlik halokatli
+    emas - offline kunlarda tabiiy holat, keyingi urinish (kunlik jadval yoki
+    heartbeat javobi) davom etadi.
+    """
+    state = LicenseState.load()
+    if not state or not state.activated_at:
+        logger.info("Litsenziya faollashtirilmagan - yangilash o'tkazib yuborildi.")
+        return
+
+    hardware_hash = get_hardware_fingerprint()
+    client = OnaClient()
+    response = client.renew(state.license_key, hardware_hash)
+
+    if response.status_code != 200:
+        logger.warning("Litsenziyani yangilash rad etildi: %s", response.text)
+        return
+
+    data = response.json()
+    state.jwt_token = data['token']
+    state.token_expires_at = parse_datetime(data['expires_at'])
+    state.last_renewed_at = timezone.now()
+    state.save()
+    logger.info("Litsenziya tokeni muvaffaqiyatli yangilandi.")
+
+
+@shared_task
+def send_heartbeat():
+    """
+    Har 60 soniyada Ona serverga tizim metrikalarini yuboradi. Javobdagi
+    license_active bayrog'iga qarab lokal blokni qo'yadi/olib tashlaydi va
+    navbatdagi masofaviy buyruqlarni bajarish uchun tarqatadi. Tarmoq
+    xatolari kutilgan holat (restoran oflayn kunlar davomida ishlaydi) -
+    shovqin qilmasdan faqat log darajasida qayd etiladi.
+    """
+    state = LicenseState.load()
+    if not state or not state.activated_at:
+        return
+
+    hardware_hash = get_hardware_fingerprint()
+    client = OnaClient()
+
+    try:
+        response = client.heartbeat(state.license_key, collect_metrics())
+    except requests.RequestException as exc:
+        logger.info("Heartbeat yuborilmadi (oflayn bo'lishi mumkin): %s", exc)
+        return
+
+    if response.status_code != 200:
+        logger.warning("Heartbeat rad etildi: %s", response.text)
+        return
+
+    data = response.json()
+
+    if data.get('license_active') is False:
+        if state.blocked_reason != 'remote_command':
+            state.is_blocked = True
+            state.blocked_reason = 'license_inactive'
+            state.save()
+    elif state.blocked_reason == 'license_inactive':
+        state.is_blocked = False
+        state.blocked_reason = ''
+        state.save()
+
+    if state.token_expires_at and state.token_expires_at - timezone.now() < RENEWAL_LEAD_TIME:
+        renew_license_token.delay()
+
+    for command in data.get('commands', []):
+        # execute_remote_command is defined further down in this module.
+        execute_remote_command.delay(command)
+
+
+def _handle_block_system(payload):
+    state = LicenseState.load()
+    state.is_blocked = True
+    state.blocked_reason = 'remote_command'
+    state.save()
+    return 'completed', {"detail": "Tizim bloklandi."}
+
+
+def _handle_unblock_system(payload):
+    state = LicenseState.load()
+    state.is_blocked = False
+    state.blocked_reason = ''
+    state.save()
+    return 'completed', {"detail": "Tizim blokdan chiqarildi."}
+
+
+def _handle_force_license_renew(payload):
+    try:
+        renew_license_token.apply()
+    except Exception as exc:  # noqa: BLE001 - report any renewal failure back to Ona
+        return 'failed', {"detail": str(exc)}
+    return 'completed', {"detail": "Litsenziya yangilandi."}
+
+
+def _handle_force_sync(payload):
+    return 'completed', {"detail": "Sinxronizatsiya hali joriy qilinmagan (MVP)."}
+
+
+def _handle_restart_services(payload):
+    return 'failed', {"detail": "Qo'llab-quvvatlanmaydi (docker.sock ataylab berilmagan)."}
+
+
+def _trigger_watchtower_update():
+    return requests.post(
+        f"{settings.WATCHTOWER_URL}/v1/update",
+        headers={"Authorization": f"Bearer {settings.WATCHTOWER_TOKEN}"},
+        timeout=300,
+    )
+
+
+COMMAND_HANDLERS = {
+    'block_system': _handle_block_system,
+    'unblock_system': _handle_unblock_system,
+    'force_license_renew': _handle_force_license_renew,
+    'force_sync': _handle_force_sync,
+    'restart_services': _handle_restart_services,
+}
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError, requests.Timeout),
+    retry_backoff=True,
+    max_retries=3,
+)
+def execute_remote_command(self, command):
+    """
+    Ona'dan heartbeat javobi orqali kelgan bitta buyruqni bajaradi va
+    natijasini Onaga qaytaradi. `command` = {"id", "command_type", "payload"}.
+    """
+    command_type = command.get('command_type')
+
+    state = LicenseState.load()
+    if not state:
+        return
+    client = OnaClient()
+
+    if command_type == 'update_app':
+        # Watchtower ushbu buyruqni bajarayotgan worker konteynerining
+        # o'zini qayta yaratadi - shuning uchun natija AVVAL yuboriladi,
+        # muvaffaqiyat tasdig'i esa keyingi heartbeat'dagi app_version
+        # orqali tekshiriladi (Ona tomonda).
+        client.post_command_result(
+            state.license_key, command['id'], 'completed',
+            {"detail": "Yangilanish boshlandi (Watchtower)."},
+        )
+        try:
+            _trigger_watchtower_update()
+        except requests.RequestException as exc:
+            logger.warning("Watchtower so'rovi muvaffaqiyatsiz: %s", exc)
+        return
+
+    handler = COMMAND_HANDLERS.get(command_type)
+    if handler is None:
+        result_status, result = 'failed', {"detail": f"Noma'lum buyruq turi: {command_type}"}
+    else:
+        result_status, result = handler(command.get('payload') or {})
+
+    client.post_command_result(state.license_key, command['id'], result_status, result)

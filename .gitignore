@@ -1,0 +1,32 @@
+# Environment files (contain secrets - never commit)
+.env
+.env.*
+!.env.example
+
+# Litsenziya imzo kalitlari (RSA private/public PEM)
+keys/
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# Django
+*.sqlite3
+staticfiles/
+media/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Backups
+backups/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

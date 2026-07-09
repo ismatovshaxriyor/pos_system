@@ -1,0 +1,85 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - cloud_postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=pos_cloud_db
+      - POSTGRES_USER=cloud_user
+      - POSTGRES_PASSWORD=cloud_password
+    ports:
+      - "127.0.0.1:25432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:26379:6379"
+    restart: unless-stopped
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8001
+    volumes:
+      - .:/app
+      - ./keys:/app/keys:ro
+    ports:
+      - "8001:8001"
+    environment:
+      - DEBUG=1
+      - DB_NAME=pos_cloud_db
+      - DB_USER=cloud_user
+      - DB_PASSWORD=cloud_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - LICENSE_PRIVATE_KEY_FILE=/app/keys/license_private.pem
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    command: celery -A config worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/app
+      - ./keys:/app/keys:ro
+    environment:
+      - DEBUG=1
+      - DB_NAME=pos_cloud_db
+      - DB_USER=cloud_user
+      - DB_PASSWORD=cloud_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - LICENSE_PRIVATE_KEY_FILE=/app/keys/license_private.pem
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+
+  celery_beat:
+    build: .
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+      - ./keys:/app/keys:ro
+    environment:
+      - DEBUG=1
+      - DB_NAME=pos_cloud_db
+      - DB_USER=cloud_user
+      - DB_PASSWORD=cloud_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - LICENSE_PRIVATE_KEY_FILE=/app/keys/license_private.pem
+    depends_on:
+      - db
+      - redis
+      - web
+    restart: unless-stopped
+
+volumes:
+  cloud_postgres_data:
