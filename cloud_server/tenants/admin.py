@@ -1,7 +1,9 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.utils import timezone
 from django.utils.html import format_html
 from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
+from sync.jwt_utils import issue_license_token
 
 
 class RestaurantStatusInline(admin.StackedInline):
@@ -25,23 +27,34 @@ class RestaurantAdminAccountForm(forms.ModelForm):
         model = RestaurantAdminAccount
         fields = ('restaurant', 'phone', 'full_name', 'password')
 
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get('password') and not self.instance.pk:
+            raise forms.ValidationError("Yangi admin uchun parol kiritish shart.")
+        return cleaned_data
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         raw_password = self.cleaned_data.get('password')
         if raw_password:
             instance.set_password(raw_password)
-        elif not instance.password_hash and not instance.pk:
-            raise forms.ValidationError("Yangi admin uchun parol kiritish shart.")
         if commit:
             instance.save()
         return instance
 
 
 class RestaurantAdminAccountInline(admin.StackedInline):
+    """
+    Restoran yaratilganda bosh menejer hisobi ham majburiy kiritiladi
+    (min_num=1 + validate_min) - adminsiz restoran qoldirilmasin, aks holda
+    Bola faollashtirilganda hech kim tizimga kira olmay qoladi.
+    """
     model = RestaurantAdminAccount
     form = RestaurantAdminAccountForm
     can_delete = False
-    extra = 0
+    extra = 1
+    min_num = 1
+    validate_min = True
     max_num = 1
     fields = ('phone', 'full_name', 'password')
 
@@ -145,7 +158,7 @@ class LicenseAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'expires_at')
     search_fields = ('restaurant__name', 'key')
     readonly_fields = ('key', 'hardware_hash')
-    actions = ['reset_hardware_hash']
+    actions = ['reset_hardware_hash', 'generate_offline_token']
 
     @admin.action(description="Qurilma bog'lanishini tozalash (kompyuter almashtirilganda)")
     def reset_hardware_hash(self, request, queryset):
@@ -155,6 +168,45 @@ class LicenseAdmin(admin.ModelAdmin):
             f"{updated} ta litsenziya uchun qurilma bog'lanishi tozalandi. "
             "Keyingi faollashtirish yangi qurilmani bog'laydi.",
         )
+
+    @admin.action(description="Oflayn yangilash kodi yaratish (internet yo'q paytda qo'lda kiritish uchun)")
+    def generate_offline_token(self, request, queryset):
+        """
+        Restoranda internet uzilgan paytda ham litsenziyani yangilash uchun:
+        shu yerda generatsiya qilingan tokenni istalgan tashqi kanal orqali
+        (Telegram, SMS, telefon orqali diktovka emas - nusxalab yuborish
+        ma'qul, token uzun) restoranga yuboring. Ular buni Bola'dagi
+        `/api/license/apply-offline-token/` ga kiritishlari bilan tizim
+        internetga hech qanday so'rov yubormasdan yana ishlay boshlaydi -
+        chunki token butunlay oflayn (faqat public key bilan) tekshiriladi.
+        """
+        for license_obj in queryset:
+            if not license_obj.hardware_hash:
+                self.message_user(
+                    request,
+                    f"{license_obj.restaurant.name}: qurilma hali bog'lanmagan - "
+                    "birinchi faollashtirish oddiy litsenziya kaliti orqali "
+                    "amalga oshirilishi kerak (oflayn kod faqat YANGILASH uchun).",
+                    level=messages.WARNING,
+                )
+                continue
+
+            if not license_obj.is_active or license_obj.expires_at < timezone.now():
+                self.message_user(
+                    request,
+                    f"{license_obj.restaurant.name}: litsenziya nofaol yoki muddati "
+                    "tugagan - avval uni faollashtiring/muddatini uzaytiring.",
+                    level=messages.ERROR,
+                )
+                continue
+
+            token, expires_at = issue_license_token(license_obj)
+            self.message_user(
+                request,
+                f"{license_obj.restaurant.name} uchun oflayn kod "
+                f"({expires_at:%Y-%m-%d %H:%M} gacha amal qiladi):\n{token}",
+                level=messages.SUCCESS,
+            )
 
 
 @admin.register(RemoteCommand)

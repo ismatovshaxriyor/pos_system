@@ -8,6 +8,8 @@ from django.utils import timezone
 
 from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
 from tenants.tasks import mark_offline_restaurants
+from tenants.signals import compute_default_license_expiry
+from .jwt_utils import issue_license_token
 
 
 def _generate_keypair():
@@ -31,10 +33,9 @@ PRIVATE_PEM, PUBLIC_PEM = _generate_keypair()
 class ActivationTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
-        self.license = License.objects.create(
-            restaurant=self.restaurant,
-            expires_at=timezone.now() + timedelta(days=30),
-        )
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
         self.url = reverse('sync-activate')
 
     def test_first_activation_binds_hardware(self):
@@ -83,14 +84,46 @@ class ActivationTests(TestCase):
 
 
 @override_settings(LICENSE_PRIVATE_KEY=PRIVATE_PEM, LICENSE_TOKEN_TTL_DAYS=7)
+@override_settings(LICENSE_PRIVATE_KEY=PRIVATE_PEM, LICENSE_TOKEN_TTL_DAYS=7)
+class TokenExpiryCapTests(TestCase):
+    """
+    Token muddati litsenziyaning expires_at'idan uzoqroq bo'lmasligini
+    tekshiradi - aks holda litsenziya tugagandan keyin ham Bola bir necha
+    kun ishlab qolishi mumkin edi.
+    """
+
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name="Test Restoran")
+        self.license = self.restaurant.license  # auto-created by post_save signal
+
+    def test_token_capped_when_license_expires_sooner_than_ttl(self):
+        # Litsenziya atigi 2 kundan keyin tugaydi - TTL (7 kun)dan qisqaroq.
+        self.license.expires_at = timezone.now() + timedelta(days=2)
+        self.license.save()
+
+        token, exp = issue_license_token(self.license)
+
+        self.assertEqual(exp, self.license.expires_at)
+
+    def test_token_uses_full_ttl_when_license_expires_later(self):
+        # Litsenziya 30 kundan keyin tugaydi - TTL (7 kun)dan uzoqroq,
+        # shuning uchun standart 7 kunlik token beriladi.
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
+
+        token, exp = issue_license_token(self.license)
+
+        expected_max = timezone.now() + timedelta(days=7)
+        self.assertLess(abs((exp - expected_max).total_seconds()), 5)
+
+
 class RenewTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
-        self.license = License.objects.create(
-            restaurant=self.restaurant,
-            hardware_hash="a" * 64,
-            expires_at=timezone.now() + timedelta(days=30),
-        )
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.hardware_hash = "a" * 64
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
         self.url = reverse('sync-renew')
 
     def _auth(self):
@@ -126,11 +159,10 @@ class RenewTests(TestCase):
 class HeartbeatTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
-        self.license = License.objects.create(
-            restaurant=self.restaurant,
-            hardware_hash="a" * 64,
-            expires_at=timezone.now() + timedelta(days=30),
-        )
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.hardware_hash = "a" * 64
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
         self.url = reverse('sync-heartbeat')
 
     def _auth(self, key=None):
@@ -191,17 +223,16 @@ class MarkOfflineRestaurantsTests(TestCase):
 class RemoteCommandLifecycleTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
-        self.license = License.objects.create(
-            restaurant=self.restaurant,
-            hardware_hash="a" * 64,
-            expires_at=timezone.now() + timedelta(days=30),
-        )
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.hardware_hash = "a" * 64
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
+
         self.other_restaurant = Restaurant.objects.create(name="Boshqa Restoran")
-        self.other_license = License.objects.create(
-            restaurant=self.other_restaurant,
-            hardware_hash="b" * 64,
-            expires_at=timezone.now() + timedelta(days=30),
-        )
+        self.other_license = self.other_restaurant.license  # auto-created by post_save signal
+        self.other_license.hardware_hash = "b" * 64
+        self.other_license.expires_at = timezone.now() + timedelta(days=30)
+        self.other_license.save()
 
     def _auth(self, license_obj):
         return {"HTTP_AUTHORIZATION": f"Token {license_obj.key}"}
@@ -273,10 +304,9 @@ class RemoteCommandLifecycleTests(TestCase):
 class ActivationAdminProvisioningTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
-        self.license = License.objects.create(
-            restaurant=self.restaurant,
-            expires_at=timezone.now() + timedelta(days=30),
-        )
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
         self.url = reverse('sync-activate')
 
     def test_activation_includes_admin_hash_when_account_exists(self):
@@ -318,3 +348,37 @@ class ActivationAdminProvisioningTests(TestCase):
         }, content_type='application/json')
 
         self.assertNotIn('admin', response.data)
+
+
+class AutoLicenseCreationTests(TestCase):
+    def test_creating_restaurant_auto_creates_license(self):
+        restaurant = Restaurant.objects.create(name="Yangi Restoran")
+
+        self.assertTrue(License.objects.filter(restaurant=restaurant).exists())
+        license_obj = restaurant.license
+        self.assertTrue(license_obj.is_active)
+        self.assertTrue(license_obj.key)
+
+    def test_expiry_is_end_of_month_plus_two_days(self):
+        from_dt = timezone.datetime(2026, 7, 10, 12, 0, 0, tzinfo=timezone.get_current_timezone())
+        expiry = compute_default_license_expiry(from_dt)
+        # 2026-07-31 23:59:59 + 2 days = 2026-08-02 23:59:59
+        self.assertEqual(expiry.year, 2026)
+        self.assertEqual(expiry.month, 8)
+        self.assertEqual(expiry.day, 2)
+        self.assertEqual(expiry.hour, 23)
+        self.assertEqual(expiry.minute, 59)
+
+    def test_expiry_handles_february_correctly(self):
+        from_dt = timezone.datetime(2026, 2, 15, 9, 0, 0, tzinfo=timezone.get_current_timezone())
+        expiry = compute_default_license_expiry(from_dt)
+        # 2026 is not a leap year: Feb has 28 days -> 2026-02-28 + 2 days = 2026-03-02
+        self.assertEqual(expiry.month, 3)
+        self.assertEqual(expiry.day, 2)
+
+    def test_only_one_license_per_restaurant_even_on_resave(self):
+        restaurant = Restaurant.objects.create(name="Yangi Restoran")
+        restaurant.name = "Yangilangan Nomi"
+        restaurant.save()  # created=False this time - must not create a 2nd license
+
+        self.assertEqual(License.objects.filter(restaurant=restaurant).count(), 1)

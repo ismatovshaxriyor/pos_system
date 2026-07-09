@@ -1,3 +1,5 @@
+from datetime import datetime, UTC
+
 import requests
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -9,8 +11,9 @@ from rest_framework.views import APIView
 from core.models import User
 from .client import OnaClient
 from .hardware import get_hardware_fingerprint
+from .jwt_utils import verify_token, LicenseTokenError
 from .models import LicenseState
-from .serializers import ActivateSerializer
+from .serializers import ActivateSerializer, ApplyOfflineTokenSerializer
 
 
 def _provision_admin_user(admin_data):
@@ -89,6 +92,54 @@ class ActivateView(APIView):
             }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class ApplyOfflineTokenView(APIView):
+    """
+    Internet uzilgan paytda ham litsenziyani yangilash uchun: operator Ona
+    admin panelida generatsiya qilgan JWT tokenni (masalan Telegram/SMS
+    orqali yuborilgan) shu yerga qo'lda kiritish mumkin. Token butunlay
+    OFLAYN tekshiriladi (faqat mahalliy public key bilan) - Ona serverga
+    hech qanday so'rov yuborilmaydi.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=ApplyOfflineTokenSerializer)
+    def post(self, request):
+        serializer = ApplyOfflineTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data['token'].strip()
+
+        state = LicenseState.load()
+        if not state or not state.activated_at:
+            return Response(
+                {"detail": "Tizim hali faollashtirilmagan. Avval litsenziya kaliti bilan faollashtiring."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            hardware_hash = get_hardware_fingerprint()
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            payload = verify_token(token, hardware_hash)
+        except LicenseTokenError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        state.jwt_token = token
+        state.token_expires_at = datetime.fromtimestamp(payload['exp'], tz=UTC)
+        state.last_renewed_at = timezone.now()
+        if state.blocked_reason == 'license_inactive':
+            state.is_blocked = False
+            state.blocked_reason = ''
+        state.save()
+
+        return Response({
+            "detail": "Oflayn kod muvaffaqiyatli qabul qilindi. Tizim ishlashda davom etadi.",
+            "token_expires_at": state.token_expires_at,
+        }, status=status.HTTP_200_OK)
 
 
 class StatusView(APIView):

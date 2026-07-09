@@ -10,9 +10,15 @@ def issue_license_token(license_obj):
     License obyekti uchun RS256 bilan imzolangan JWT token yasaydi.
     Faqat Ona serverda ishlaydi (private key shu yerda).
     Qaytaradi: (token_str, expires_at_datetime)
+
+    Token muddati HECH QACHON license.expires_at'dan uzoqroq bo'lmaydi -
+    aks holda litsenziya muddati tugagandan keyin ham (oxirgi yangilashda
+    olingan uzoq muddatli token tufayli) Bola bir necha kun ishlab qolishi
+    mumkin edi. Shu bilan litsenziya muddati = amaldagi bloklash muddati.
     """
     now = timezone.now()
-    exp = now + timedelta(days=settings.LICENSE_TOKEN_TTL_DAYS)
+    max_exp = now + timedelta(days=settings.LICENSE_TOKEN_TTL_DAYS)
+    exp = min(max_exp, license_obj.expires_at)
 
     claims = {
         "iss": "pos-ona",
