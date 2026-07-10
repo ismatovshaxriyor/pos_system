@@ -25,7 +25,10 @@ services:
       - ./keys:/app/keys:ro
       - media_data:/app/media
     ports:
-      - "8001:8001"
+      # 127.0.0.1 only - public traffic comes in through the cloudflared
+      # tunnel below (Cloudflare terminates TLS at their edge), this port
+      # stays reachable just for host-level debugging (curl over SSH).
+      - "127.0.0.1:8001:8001"
     depends_on:
       - db
       - redis
@@ -60,6 +63,19 @@ services:
       - redis
       - web
     restart: unless-stopped
+
+  # Ona serverni Cloudflare edge orqali ochadi - hech qanday port ochish
+  # yoki DNS A-record'ni to'g'ridan-to'g'ri EC2 IP'ga bog'lash shart emas
+  # (local_server'dagi Bola tunnel pattern bilan bir xil - docs/4).
+  # SSL Cloudflare tomonida - bu instance sertifikat boshqarishi shart
+  # emas. Ingress qoidasi (ona.ismatov.uz -> http://web:8001) Cloudflare
+  # Zero Trust dashboardida sozlanadi, token faqat autentifikatsiya qiladi.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - web
 
 volumes:
   cloud_postgres_data:
