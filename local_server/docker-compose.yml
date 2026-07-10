@@ -52,7 +52,7 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
-      - ONA_SERVER_URL=http://host.docker.internal:8001
+      - ONA_SERVER_URL=https://ona.ismatov.uz
       - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
       - LICENSE_ENFORCEMENT=0
       - HARDWARE_ID_OVERRIDE=dev-local-machine
@@ -78,7 +78,7 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
-      - ONA_SERVER_URL=http://host.docker.internal:8001
+      - ONA_SERVER_URL=https://ona.ismatov.uz
       - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
       - LICENSE_ENFORCEMENT=0
       - HARDWARE_ID_OVERRIDE=dev-local-machine
@@ -105,7 +105,7 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
-      - ONA_SERVER_URL=http://host.docker.internal:8001
+      - ONA_SERVER_URL=https://ona.ismatov.uz
       - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
       - LICENSE_ENFORCEMENT=0
       - HARDWARE_ID_OVERRIDE=dev-local-machine
