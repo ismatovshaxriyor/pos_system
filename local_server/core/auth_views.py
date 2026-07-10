@@ -1,9 +1,13 @@
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
-from .serializers import DeviceRegisterSerializer, PinLoginSerializer, UserSerializer
+from .serializers import (
+    AuthTokenResponseSerializer, DeviceRegisterSerializer, ErrorDetailSerializer,
+    PinLoginSerializer, UserSerializer,
+)
 
 
 class DeviceRegisterView(APIView):
@@ -15,6 +19,13 @@ class DeviceRegisterView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=DeviceRegisterSerializer,
+        responses={
+            201: AuthTokenResponseSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Kod noto'g'ri/muddati tugagan yoki PIN formati xato."),
+        },
+    )
     def post(self, request):
         serializer = DeviceRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -39,6 +50,14 @@ class PinLoginView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=PinLoginSerializer,
+        responses={
+            200: AuthTokenResponseSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Qurilma yoki PIN noto'g'ri (bir xil umumiy xabar)."),
+            429: OpenApiResponse(ErrorDetailSerializer, description="Juda ko'p noto'g'ri urinish - 5 daqiqaga qulflangan."),
+        },
+    )
     def post(self, request):
         serializer = PinLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

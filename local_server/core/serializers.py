@@ -1,8 +1,11 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     User, Table, Category, Product, Order, OrderItem,
     StaffDevice, Notification,
 )
+
+TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,6 +19,7 @@ class TableSerializer(serializers.ModelSerializer):
         model = Table
         fields = ('id', 'name', 'capacity', 'is_active', 'status', 'created_at', 'updated_at')
 
+    @extend_schema_field(serializers.ChoiceField(choices=TABLE_STATUS_CHOICES))
     def get_status(self, obj):
         """
         `free`/`occupied_by_me`/`occupied` - so'rovchi kimligiga qarab
@@ -56,6 +60,25 @@ class DeviceRegisterSerializer(serializers.Serializer):
 class PinLoginSerializer(serializers.Serializer):
     device_id = serializers.CharField(max_length=255)
     pin = serializers.CharField(max_length=6)
+
+class AuthTokenResponseSerializer(serializers.Serializer):
+    """`DeviceRegisterView`/`PinLoginView` javobi - faqat OpenAPI hujjatlash uchun."""
+    token = serializers.CharField()
+    user = UserSerializer()
+
+class RegistrationCodeResponseSerializer(serializers.Serializer):
+    """`generate-registration-code` action javobi - faqat OpenAPI hujjatlash uchun."""
+    code = serializers.CharField()
+    expires_at = serializers.DateTimeField()
+    user = UserSerializer()
+
+class ErrorDetailSerializer(serializers.Serializer):
+    """Xatolik javoblari (`{"detail": "..."}`) - faqat OpenAPI hujjatlash uchun."""
+    detail = serializers.CharField()
+
+class StatusMessageSerializer(serializers.Serializer):
+    """Oddiy `{"status": "..."}` javoblari (masalan `close`) - faqat OpenAPI hujjatlash uchun."""
+    status = serializers.CharField()
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:

@@ -1,5 +1,6 @@
 from django.db.models import Q
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import viewsets, permissions, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from .serializers import (
     UserSerializer, TableSerializer, CategorySerializer,
     ProductSerializer, OrderSerializer, OrderItemSerializer,
     StaffDeviceSerializer, NotificationSerializer,
+    RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
 )
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -28,6 +30,13 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
+    @extend_schema(
+        request=None,
+        responses={
+            201: RegistrationCodeResponseSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Admin foydalanuvchi uchun kod yaratib bo'lmaydi."),
+        },
+    )
     @action(detail=True, methods=['post'], url_path='generate-registration-code')
     def generate_registration_code(self, request, pk=None):
         user = self.get_object()
@@ -74,6 +83,9 @@ class ProductViewSet(viewsets.ModelViewSet):
             broadcast_event('price_changed', {'product_id': product.id, 'message': message})
 
 class OrderViewSet(viewsets.ModelViewSet):
+    # OpenAPI sxema-introspeksiyasi uchun (masalan path parametr turini
+    # aniqlash) - haqiqiy runtime filtrlash get_queryset() orqali bo'ladi.
+    queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -89,6 +101,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
 
+    @extend_schema(
+        request=None,
+        responses={
+            200: StatusMessageSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Buyurtma allaqachon yopilgan."),
+        },
+    )
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
         order = self.get_object()
@@ -104,6 +123,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         return Response({'status': 'Order closed successfully'})
 
+    @extend_schema(
+        request=OrderItemSerializer,
+        responses={
+            201: StatusMessageSerializer,
+            400: OpenApiResponse(description="Validatsiya xatosi (masalan noto'g'ri product_id)."),
+        },
+    )
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
         order = self.get_object()
@@ -137,6 +163,7 @@ class StaffDeviceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = StaffDeviceSerializer
     permission_classes = [IsAdminStaff]
 
+    @extend_schema(request=None, responses={200: ErrorDetailSerializer})
     @action(detail=True, methods=['post'])
     def revoke(self, request, pk=None):
         device = self.get_object()
@@ -144,6 +171,9 @@ class StaffDeviceViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({'detail': "Qurilma chetlashtirildi."})
 
 class NotificationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    # OpenAPI sxema-introspeksiyasi uchun - haqiqiy runtime filtrlash
+    # get_queryset() orqali bo'ladi.
+    queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -154,6 +184,7 @@ class NotificationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
             qs |= Q(recipient__isnull=True)
         return Notification.objects.filter(qs).order_by('-created_at')
 
+    @extend_schema(request=None, responses={200: StatusMessageSerializer})
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
         notification = self.get_object()
