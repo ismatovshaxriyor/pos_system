@@ -7,6 +7,28 @@ class LicenseTokenError(Exception):
     """Token yaroqsiz, muddati o'tgan yoki qurilmaga mos kelmaydi."""
 
 
+def _get_public_key():
+    """
+    Faollashtirishda Ona'dan olingan kalit (LicenseState.public_key)
+    ustunlik qiladi - shu bilan har bir Bola qurilmasiga
+    LICENSE_PUBLIC_KEY_FILE'ni qo'lda nusxalash shart emas. Hali
+    faollashmagan yoki eski Ona javob bermagan bo'lsa, statik
+    fayl/env sozlamasiga (settings.LICENSE_PUBLIC_KEY) qaytadi - masalan
+    birinchi marta o'rnatishda yoki bazasi bo'sh disaster-recovery
+    holatida.
+
+    Lazy import - modul darajasida import qilinsa AppRegistryNotReady
+    xavfi bor (settings.py yuklanish paytida licensing.models hali tayyor
+    bo'lmasligi mumkin).
+    """
+    from .models import LicenseState
+
+    state = LicenseState.load()
+    if state and state.public_key:
+        return state.public_key
+    return settings.LICENSE_PUBLIC_KEY
+
+
 def verify_token(token, hardware_hash):
     """
     JWT tokenni Ona serverning public kaliti bilan OFLAYN tekshiradi.
@@ -16,10 +38,12 @@ def verify_token(token, hardware_hash):
     if not token:
         raise LicenseTokenError("Token mavjud emas.")
 
+    public_key = _get_public_key()
+
     try:
         payload = jwt.decode(
             token,
-            settings.LICENSE_PUBLIC_KEY,
+            public_key,
             algorithms=["RS256"],
             issuer="pos-ona",
             leeway=settings.LICENSE_CLOCK_SKEW_SECONDS,
@@ -30,7 +54,7 @@ def verify_token(token, hardware_hash):
         # Grace davri ichida ekanligini qo'lda tekshiramiz (imzoni tasdiqlab).
         payload = jwt.decode(
             token,
-            settings.LICENSE_PUBLIC_KEY,
+            public_key,
             algorithms=["RS256"],
             issuer="pos-ona",
             options={"verify_exp": False},

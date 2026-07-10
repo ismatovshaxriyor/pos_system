@@ -1,8 +1,25 @@
 from datetime import timedelta
 
 import jwt
+from cryptography.hazmat.primitives import serialization
 from django.conf import settings
 from django.utils import timezone
+
+
+def get_public_key_pem():
+    """
+    Private key'dan public qismini hosil qiladi - alohida saqlangan
+    LICENSE_PUBLIC_KEY sozlamasi yo'q, shu bilan ikkalasi hech qachon
+    bir-biridan ajralib qolmaydi (masalan private key almashtirilganda
+    kimdir alohida public faylni yangilashni unutib qo'yishi mumkin edi).
+    Faollashtirish javobida Bolaga yuboriladi - qarang: sync/views.py
+    ActivationView.
+    """
+    private_key = serialization.load_pem_private_key(settings.LICENSE_PRIVATE_KEY.encode(), password=None)
+    return private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode()
 
 
 def _build_token(license_obj, start, ttl_days):

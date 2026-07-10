@@ -78,6 +78,12 @@ class ActivateView(APIView):
         # yuboradi, Ona tomonda esa case-sensitive aniq mos kelish talab
         # qilinadi (LicenseAuthentication).
         state.license_key = data.get('license_key', license_key)
+        # Ona'dan kelgan bo'lsa saqlanadi - keyingi verify_token() chaqiruvlari
+        # shu qiymatni ishlatadi (jwt_utils.py), LICENSE_PUBLIC_KEY_FILE'ni har
+        # bir qurilmaga qo'lda nusxalash shart bo'lmasin uchun. `or` bilan -
+        # eski Ona versiyasi bu maydonni qaytarmasa, avval saqlangan qiymat
+        # (agar bor bo'lsa) bo'sh matn bilan ustidan yozib yuborilmaydi.
+        state.public_key = data.get('public_key') or state.public_key
         state.jwt_token = tokens[0]['token']
         state.token_expires_at = parse_datetime(tokens[0]['expires_at'])
         state.pending_tokens = tokens[1:]

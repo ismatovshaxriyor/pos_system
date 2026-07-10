@@ -32,6 +32,12 @@ class LicenseState(models.Model):
     pending_tokens = models.JSONField(default=list, blank=True)
     hardware_hash = models.CharField(max_length=128)
 
+    # Ona faollashtirish javobida qaytaradi (sync/views.py::ActivationView) -
+    # LICENSE_PUBLIC_KEY_FILE'ni har bir Bola'ga qo'lda nusxalash o'rniga.
+    # Bo'sh bo'lsa verify_token() settings.LICENSE_PUBLIC_KEY'ga (statik
+    # fayl/env) qaytadi - qarang: licensing/jwt_utils.py.
+    public_key = models.TextField(blank=True, default='')
+
     restaurant_id = models.UUIDField(null=True, blank=True)
     restaurant_name = models.CharField(max_length=200, blank=True, default='')
 

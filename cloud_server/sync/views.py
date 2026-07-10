@@ -5,7 +5,7 @@ from rest_framework import status, permissions
 from django.utils import timezone
 from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
-from .jwt_utils import issue_license_token_batch
+from .jwt_utils import issue_license_token_batch, get_public_key_pem
 from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
     ErrorLogBatchSerializer,
@@ -82,6 +82,10 @@ class ActivationView(APIView):
             # Kanonik (bazadagi) registr - Bola shu qiymatni saqlashi kerak,
             # foydalanuvchi kiritgan matnni emas (yuqoridagi izohga qarang).
             "license_key": license_obj.key,
+            # Bola shu yerdan olib LicenseState'ga saqlaydi - keyingi har bir
+            # o'rnatishda public key faylini qo'lda nusxalash shart emas
+            # (public key sirli emas, https orqali kelayotgani kifoya).
+            "public_key": get_public_key_pem(),
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
         }
 
