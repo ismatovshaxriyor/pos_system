@@ -5,30 +5,67 @@ from django.conf import settings
 from django.utils import timezone
 
 
-def issue_license_token(license_obj):
+def _build_token(license_obj, start, ttl_days):
     """
-    License obyekti uchun RS256 bilan imzolangan JWT token yasaydi.
-    Faqat Ona serverda ishlaydi (private key shu yerda).
-    Qaytaradi: (token_str, expires_at_datetime)
-
-    Token muddati HECH QACHON license.expires_at'dan uzoqroq bo'lmaydi -
-    aks holda litsenziya muddati tugagandan keyin ham (oxirgi yangilashda
-    olingan uzoq muddatli token tufayli) Bola bir necha kun ishlab qolishi
-    mumkin edi. Shu bilan litsenziya muddati = amaldagi bloklash muddati.
+    `start`dan boshlab `ttl_days` kunlik JWT yasaydi. Token muddati HECH
+    QACHON license.expires_at'dan uzoqroq bo'lmaydi - aks holda litsenziya
+    muddati tugagandan keyin ham (oldindan olingan uzoq muddatli token
+    tufayli) Bola bir necha kun ishlab qolishi mumkin edi. Shu bilan
+    litsenziya muddati = amaldagi bloklash muddati.
     """
-    now = timezone.now()
-    max_exp = now + timedelta(days=settings.LICENSE_TOKEN_TTL_DAYS)
-    exp = min(max_exp, license_obj.expires_at)
+    exp = min(start + timedelta(days=ttl_days), license_obj.expires_at)
 
     claims = {
         "iss": "pos-ona",
         "sub": str(license_obj.restaurant_id),
         "license_id": str(license_obj.id),
         "hw": license_obj.hardware_hash,
-        "iat": int(now.timestamp()),
-        "nbf": int(now.timestamp()) - 60,
+        "iat": int(start.timestamp()),
+        "nbf": int(start.timestamp()) - 60,
         "exp": int(exp.timestamp()),
     }
 
     token = jwt.encode(claims, settings.LICENSE_PRIVATE_KEY, algorithm="RS256")
     return token, exp
+
+
+def issue_license_token(license_obj):
+    """
+    License obyekti uchun bitta RS256 JWT yasaydi (hozirgi paytdan boshlab).
+    Faqat Ona serverda ishlaydi (private key shu yerda).
+    Qaytaradi: (token_str, expires_at_datetime)
+
+    Qo'lda tarqatiladigan oflayn yangilash kodlari uchun ishlatiladi (bitta
+    qisqa token - Telegram/SMS orqali nusxalab yuborish qulay bo'lishi
+    uchun). Doimiy avtomatik yangilash uchun `issue_license_token_batch`ga
+    qarang.
+    """
+    return _build_token(license_obj, timezone.now(), settings.LICENSE_TOKEN_TTL_DAYS)
+
+
+def issue_license_token_batch(license_obj, count=None):
+    """
+    Bittasi tugagan zahoti keyingisi boshlanadigan qilib, ketma-ket bir
+    nechta token yasaydi. Bola bularning barchasini bir martada saqlab
+    qo'yadi va vaqti kelganda mahalliy ravishda birin-ketin almashtiradi -
+    shu bilan restoran haftalar davomida oflayn qolsa ham, Onaga qayta-qayta
+    ulanmasdan ishlashda davom etadi (private key baribir faqat shu yerda
+    qoladi, Bola hech qachon o'zi token yasay olmaydi).
+
+    Litsenziya muddati (`license_obj.expires_at`) yetib kelsa, keyingi
+    tokenlar yasalmay to'xtatiladi.
+
+    Qaytaradi: [(token_str, expires_at_datetime), ...] - kamida bitta token.
+    """
+    count = count or settings.LICENSE_TOKEN_BATCH_SIZE
+    tokens = []
+    start = timezone.now()
+
+    for _ in range(max(count, 1)):
+        token, exp = _build_token(license_obj, start, settings.LICENSE_TOKEN_TTL_DAYS)
+        tokens.append((token, exp))
+        if exp >= license_obj.expires_at:
+            break
+        start = exp
+
+    return tokens

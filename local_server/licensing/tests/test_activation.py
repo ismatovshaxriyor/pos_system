@@ -32,8 +32,7 @@ class ActivateViewTests(TestCase):
     def test_successful_activation_persists_state(self, mock_activate):
         expires_at = (timezone.now() + timezone.timedelta(days=7)).isoformat()
         mock_activate.return_value = _mock_response(200, {
-            "token": "fake.jwt.token",
-            "expires_at": expires_at,
+            "tokens": [{"token": "fake.jwt.token", "expires_at": expires_at}],
             "restaurant": {"id": "11111111-1111-1111-1111-111111111111", "name": "Test Restoran"},
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
         })
@@ -46,6 +45,27 @@ class ActivateViewTests(TestCase):
         self.assertEqual(state.restaurant_name, "Test Restoran")
         self.assertEqual(state.jwt_token, "fake.jwt.token")
         self.assertFalse(state.is_blocked)
+
+    @patch('licensing.views.OnaClient.activate')
+    def test_batch_of_tokens_keeps_first_active_and_rest_pending(self, mock_activate):
+        now = timezone.now()
+        tokens = [
+            {"token": "token-1", "expires_at": (now + timezone.timedelta(days=7)).isoformat()},
+            {"token": "token-2", "expires_at": (now + timezone.timedelta(days=14)).isoformat()},
+            {"token": "token-3", "expires_at": (now + timezone.timedelta(days=21)).isoformat()},
+        ]
+        mock_activate.return_value = _mock_response(200, {
+            "tokens": tokens,
+            "restaurant": {"id": "11111111-1111-1111-1111-111111111111", "name": "Test Restoran"},
+            "detail": "Tizim muvaffaqiyatli faollashtirildi.",
+        })
+
+        response = self.client.post(self.url, {"license_key": "abc123"}, content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        state = LicenseState.load()
+        self.assertEqual(state.jwt_token, "token-1")
+        self.assertEqual(state.pending_tokens, tokens[1:])
 
     @patch('licensing.views.OnaClient.activate')
     def test_ona_rejection_is_passed_through(self, mock_activate):
@@ -73,8 +93,7 @@ class ActivateViewTests(TestCase):
         password_hash = make_password("Kuchli-Parol-1")
         expires_at = (timezone.now() + timezone.timedelta(days=7)).isoformat()
         mock_activate.return_value = _mock_response(200, {
-            "token": "fake.jwt.token",
-            "expires_at": expires_at,
+            "tokens": [{"token": "fake.jwt.token", "expires_at": expires_at}],
             "restaurant": {"id": "11111111-1111-1111-1111-111111111111", "name": "Test Restoran"},
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
             "admin": {
@@ -102,8 +121,7 @@ class ActivateViewTests(TestCase):
     def test_no_admin_data_means_no_user_created(self, mock_activate):
         expires_at = (timezone.now() + timezone.timedelta(days=7)).isoformat()
         mock_activate.return_value = _mock_response(200, {
-            "token": "fake.jwt.token",
-            "expires_at": expires_at,
+            "tokens": [{"token": "fake.jwt.token", "expires_at": expires_at}],
             "restaurant": {"id": "11111111-1111-1111-1111-111111111111", "name": "Test Restoran"},
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
         })
@@ -121,8 +139,7 @@ class ActivateViewTests(TestCase):
         password_hash = make_password("Yangi-Parol-2")
         expires_at = (timezone.now() + timezone.timedelta(days=7)).isoformat()
         mock_activate.return_value = _mock_response(200, {
-            "token": "fake.jwt.token",
-            "expires_at": expires_at,
+            "tokens": [{"token": "fake.jwt.token", "expires_at": expires_at}],
             "restaurant": {"id": "11111111-1111-1111-1111-111111111111", "name": "Test Restoran"},
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
             "admin": {

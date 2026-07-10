@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from licensing import hardware
 from licensing.models import LicenseState
-from licensing.tasks import send_heartbeat
+from licensing.tasks import renew_license_token, send_heartbeat
 
 
 def _mock_response(status_code, data):
@@ -93,6 +93,26 @@ class SendHeartbeatTests(TestCase):
 
         mock_renew_delay.assert_called_once()
 
+    @patch('licensing.tasks.renew_license_token.delay')
+    @patch('licensing.tasks.OnaClient.heartbeat')
+    def test_pending_batch_tokens_delay_renewal(self, mock_heartbeat, mock_renew_delay):
+        # The current token expires soon, but a batch of pre-issued pending
+        # tokens covers weeks further out - renewal must be judged against
+        # the furthest expiry in the batch, not just the active token.
+        self._activated_state(
+            token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+            pending_tokens=[
+                {"token": "future-token", "expires_at": (timezone.now() + timezone.timedelta(days=20)).isoformat()},
+            ],
+        )
+        mock_heartbeat.return_value = _mock_response(200, {
+            "status": "ok", "license_active": True, "desired_version": "", "commands": [],
+        })
+
+        send_heartbeat.run()
+
+        mock_renew_delay.assert_not_called()
+
     @patch('licensing.tasks.OnaClient.heartbeat')
     def test_network_error_is_swallowed(self, mock_heartbeat):
         import requests
@@ -100,3 +120,41 @@ class SendHeartbeatTests(TestCase):
         mock_heartbeat.side_effect = requests.ConnectionError("offline")
 
         send_heartbeat.run()  # should not raise
+
+
+@override_settings(HARDWARE_ID_OVERRIDE='dev-macbook')
+class RenewLicenseTokenTests(TestCase):
+    def setUp(self):
+        hardware._cached_fingerprint = None
+        self.addCleanup(self._reset_cache)
+
+    def _reset_cache(self):
+        hardware._cached_fingerprint = None
+
+    def _activated_state(self, **overrides):
+        defaults = dict(
+            license_key='abc123',
+            hardware_hash=hardware.get_hardware_fingerprint(),
+            restaurant_name='Test Restoran',
+            token_expires_at=timezone.now() + timezone.timedelta(days=7),
+            activated_at=timezone.now(),
+            last_renewed_at=timezone.now(),
+        )
+        defaults.update(overrides)
+        return LicenseState.objects.create(**defaults)
+
+    @patch('licensing.tasks.OnaClient.renew')
+    def test_renewal_stores_first_token_as_active_and_rest_as_pending(self, mock_renew):
+        self._activated_state()
+        now = timezone.now()
+        tokens = [
+            {"token": "token-1", "expires_at": (now + timezone.timedelta(days=7)).isoformat()},
+            {"token": "token-2", "expires_at": (now + timezone.timedelta(days=14)).isoformat()},
+        ]
+        mock_renew.return_value = _mock_response(200, {"tokens": tokens, "detail": "ok"})
+
+        renew_license_token.run()
+
+        state = LicenseState.load()
+        self.assertEqual(state.jwt_token, "token-1")
+        self.assertEqual(state.pending_tokens, tokens[1:])

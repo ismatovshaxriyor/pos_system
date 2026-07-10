@@ -202,6 +202,11 @@ def _load_pem(file_env, inline_env, default=''):
 # Licensing (JWT) settings - private key lives ONLY on the cloud (Ona) server.
 LICENSE_PRIVATE_KEY = _load_pem('LICENSE_PRIVATE_KEY_FILE', 'LICENSE_PRIVATE_KEY')
 LICENSE_TOKEN_TTL_DAYS = int(os.environ.get('LICENSE_TOKEN_TTL_DAYS', 7))
+# Activate/renew issue this many sequential tokens in one call (each starting
+# where the previous one expires) so a Bola that goes offline for weeks can
+# keep rotating through pre-signed tokens locally, without ever holding the
+# private key itself.
+LICENSE_TOKEN_BATCH_SIZE = int(os.environ.get('LICENSE_TOKEN_BATCH_SIZE', 4))
 
 # Spectacular settings
 SPECTACULAR_SETTINGS = {

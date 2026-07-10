@@ -4,7 +4,6 @@ from django.db import DatabaseError
 from django.http import JsonResponse
 
 from .hardware import get_hardware_fingerprint
-from .jwt_utils import LicenseTokenError, verify_token
 from .models import LICENSE_VERIFY_CACHE_KEY, LicenseState
 
 EXEMPT_PREFIXES = ('/api/license/',)
@@ -63,9 +62,5 @@ class LicenseEnforcementMiddleware:
         if state.is_blocked:
             return True
 
-        try:
-            verify_token(state.jwt_token, get_hardware_fingerprint())
-        except LicenseTokenError:
-            return True
-
-        return False
+        _, error = state.current_valid_token(get_hardware_fingerprint())
+        return error is not None

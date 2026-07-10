@@ -9,7 +9,7 @@ from django.utils import timezone
 from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
 from tenants.tasks import mark_offline_restaurants
 from tenants.signals import compute_default_license_expiry
-from .jwt_utils import issue_license_token
+from .jwt_utils import issue_license_token, issue_license_token_batch
 
 
 def _generate_keypair():
@@ -44,7 +44,8 @@ class ActivationTests(TestCase):
             "hardware_hash": "a" * 64,
         }, content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('token', response.data)
+        self.assertIn('tokens', response.data)
+        self.assertGreater(len(response.data['tokens']), 0)
         self.license.refresh_from_db()
         self.assertEqual(self.license.hardware_hash, "a" * 64)
 
@@ -117,6 +118,42 @@ class TokenExpiryCapTests(TestCase):
         self.assertLess(abs((exp - expected_max).total_seconds()), 5)
 
 
+@override_settings(LICENSE_PRIVATE_KEY=PRIVATE_PEM, LICENSE_TOKEN_TTL_DAYS=7, LICENSE_TOKEN_BATCH_SIZE=4)
+class TokenBatchIssuanceTests(TestCase):
+    """
+    Bir chaqiruvda bir nechta ketma-ket token yasalishini tekshiradi -
+    shu orqali Bola internetsiz haftalar davomida oldindan tayyorlangan
+    tokenlarni birin-ketin ishlatib turaveradi.
+    """
+
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name="Test Restoran")
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.expires_at = timezone.now() + timedelta(days=60)
+        self.license.save()
+
+    def test_batch_returns_requested_count_of_sequential_tokens(self):
+        tokens = issue_license_token_batch(self.license)
+
+        self.assertEqual(len(tokens), 4)
+        # Each token's window is exactly one TTL after the previous one's -
+        # i.e. token[i+1] starts right where token[i] expires.
+        for (_, prev_exp), (_, next_exp) in zip(tokens, tokens[1:]):
+            gap = (next_exp - prev_exp).total_seconds() - timedelta(days=7).total_seconds()
+            self.assertLess(abs(gap), 5)
+
+    def test_batch_stops_at_license_expiry(self):
+        # Only ~10 days left - TTL is 7 days, so at most 2 tokens fit before
+        # hitting license.expires_at, not the full batch size of 4.
+        self.license.expires_at = timezone.now() + timedelta(days=10)
+        self.license.save()
+
+        tokens = issue_license_token_batch(self.license)
+
+        self.assertLessEqual(len(tokens), 2)
+        self.assertEqual(tokens[-1][1], self.license.expires_at)
+
+
 class RenewTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
@@ -135,7 +172,8 @@ class RenewTests(TestCase):
             content_type='application/json', **self._auth(),
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn('token', response.data)
+        self.assertIn('tokens', response.data)
+        self.assertGreater(len(response.data['tokens']), 0)
 
     def test_renew_wrong_hardware(self):
         response = self.client.post(

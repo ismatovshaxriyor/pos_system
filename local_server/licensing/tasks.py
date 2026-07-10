@@ -43,11 +43,13 @@ def renew_license_token(self):
         return
 
     data = response.json()
-    state.jwt_token = data['token']
-    state.token_expires_at = parse_datetime(data['expires_at'])
+    tokens = data['tokens']
+    state.jwt_token = tokens[0]['token']
+    state.token_expires_at = parse_datetime(tokens[0]['expires_at'])
+    state.pending_tokens = tokens[1:]
     state.last_renewed_at = timezone.now()
     state.save()
-    logger.info("Litsenziya tokeni muvaffaqiyatli yangilandi.")
+    logger.info("Litsenziya tokeni muvaffaqiyatli yangilandi (%d ta oldindan tayyor).", len(tokens))
 
 
 @shared_task
@@ -88,7 +90,8 @@ def send_heartbeat():
         state.blocked_reason = ''
         state.save()
 
-    if state.token_expires_at and state.token_expires_at - timezone.now() < RENEWAL_LEAD_TIME:
+    furthest_expiry = state.furthest_expiry
+    if furthest_expiry and furthest_expiry - timezone.now() < RENEWAL_LEAD_TIME:
         renew_license_token.delay()
 
     for command in data.get('commands', []):

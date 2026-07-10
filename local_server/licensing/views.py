@@ -68,13 +68,15 @@ class ActivateView(APIView):
         if response.status_code != 200:
             return Response(data, status=response.status_code)
 
+        tokens = data['tokens']
         state = LicenseState.load() or LicenseState()
         state.license_key = license_key
-        state.jwt_token = data['token']
+        state.jwt_token = tokens[0]['token']
+        state.token_expires_at = parse_datetime(tokens[0]['expires_at'])
+        state.pending_tokens = tokens[1:]
         state.hardware_hash = hardware_hash
         state.restaurant_id = data['restaurant']['id']
         state.restaurant_name = data['restaurant']['name']
-        state.token_expires_at = parse_datetime(data['expires_at'])
         state.activated_at = timezone.now()
         state.last_renewed_at = timezone.now()
         state.is_blocked = False
@@ -162,6 +164,8 @@ class StatusView(APIView):
             "activated": bool(state.activated_at),
             "restaurant_name": state.restaurant_name,
             "token_expires_at": state.token_expires_at,
+            "furthest_token_expiry": state.furthest_expiry,
+            "pending_tokens_count": len(state.pending_tokens),
             "last_renewed_at": state.last_renewed_at,
             "is_blocked": state.is_blocked,
             "blocked_reason": state.blocked_reason,

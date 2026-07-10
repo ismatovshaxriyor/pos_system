@@ -5,7 +5,7 @@ from rest_framework import status, permissions
 from django.utils import timezone
 from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
-from .jwt_utils import issue_license_token
+from .jwt_utils import issue_license_token_batch
 from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
 )
@@ -59,15 +59,17 @@ class ActivationView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        token, expires_at = issue_license_token(license_obj)
+        tokens = issue_license_token_batch(license_obj)
 
         restaurant = license_obj.restaurant
         restaurant.last_seen = timezone.now()
         restaurant.save(update_fields=['last_seen'])
 
         response_data = {
-            "token": token,
-            "expires_at": expires_at.isoformat(),
+            "tokens": [
+                {"token": token, "expires_at": expires_at.isoformat()}
+                for token, expires_at in tokens
+            ],
             "restaurant": {"id": str(restaurant.id), "name": restaurant.name},
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
         }
@@ -118,15 +120,17 @@ class RenewView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        token, expires_at = issue_license_token(license_obj)
+        tokens = issue_license_token_batch(license_obj)
 
         restaurant = license_obj.restaurant
         restaurant.last_seen = timezone.now()
         restaurant.save(update_fields=['last_seen'])
 
         return Response({
-            "token": token,
-            "expires_at": expires_at.isoformat(),
+            "tokens": [
+                {"token": token, "expires_at": expires_at.isoformat()}
+                for token, expires_at in tokens
+            ],
             "detail": "Token muvaffaqiyatli yangilandi.",
         }, status=status.HTTP_200_OK)
 
