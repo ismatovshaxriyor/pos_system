@@ -179,6 +179,14 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Media files (Product/Category rasmlari). MEDIA_ROOT prod
+# docker-compose.prod.yml'dagi mavjud `media_data:/app/media` volume bilan
+# mos keladi - konteyner qayta yaratilganda rasm yo'qolmaydi. Dev'da alohida
+# volume shart emas, chunki butun loyiha allaqachon `.:/app` bilan
+# bind-mount qilingan (media/ .gitignore'da).
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 

@@ -48,6 +48,9 @@ class ActivateView(APIView):
     def post(self, request):
         serializer = ActivateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Katta-kichik harfni Ona (key__iexact) normallashtiradi - bu yerda
+        # emas, aks holda eski (kichik harfli hex) kalitlar ham
+        # normallashtirilib, o'sha eski qatorlar bilan mos kelmay qolardi.
         license_key = serializer.validated_data['license_key'].strip()
 
         try:
@@ -70,7 +73,11 @@ class ActivateView(APIView):
 
         tokens = data['tokens']
         state = LicenseState.load() or LicenseState()
-        state.license_key = license_key
+        # Foydalanuvchi kiritgan matn emas, Ona qaytargan KANONIK registr -
+        # keyingi renew/heartbeat so'rovlari shu qiymatni Token sifatida
+        # yuboradi, Ona tomonda esa case-sensitive aniq mos kelish talab
+        # qilinadi (LicenseAuthentication).
+        state.license_key = data.get('license_key', license_key)
         state.jwt_token = tokens[0]['token']
         state.token_expires_at = parse_datetime(tokens[0]['expires_at'])
         state.pending_tokens = tokens[1:]

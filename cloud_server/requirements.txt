@@ -10,3 +10,4 @@ django-cors-headers
 django-jazzmin==3.0.1
 PyJWT
 cryptography
+qrcode

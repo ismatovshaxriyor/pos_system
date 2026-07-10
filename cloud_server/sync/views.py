@@ -32,7 +32,14 @@ class ActivationView(APIView):
         hardware_hash = serializer.validated_data['hardware_hash']
 
         try:
-            license_obj = License.objects.select_related('restaurant').get(key=license_key)
+            # key__iexact - mobil ilovada kalit qo'lda kiritilganda katta-
+            # kichik harf farqi faollashtirishni buzmasin (masalan avtomatik
+            # katta harf o'chirilgan klaviatura). Keyingi so'rovlar (renew/
+            # heartbeat) uchun Bolaga har doim quyida license_obj.key -
+            # bazadagi KANONIK registr - qaytariladi, foydalanuvchi teri
+            # matn emas, aks holda LicenseAuthentication (case-sensitive
+            # aniq mos kelish) keyingi so'rovlarda rad etadi.
+            license_obj = License.objects.select_related('restaurant').get(key__iexact=license_key)
         except License.DoesNotExist:
             return Response(
                 {"detail": "Litsenziya kaliti noto'g'ri."},
@@ -72,6 +79,9 @@ class ActivationView(APIView):
                 for token, expires_at in tokens
             ],
             "restaurant": {"id": str(restaurant.id), "name": restaurant.name},
+            # Kanonik (bazadagi) registr - Bola shu qiymatni saqlashi kerak,
+            # foydalanuvchi kiritgan matnni emas (yuqoridagi izohga qarang).
+            "license_key": license_obj.key,
             "detail": "Tizim muvaffaqiyatli faollashtirildi.",
         }
 

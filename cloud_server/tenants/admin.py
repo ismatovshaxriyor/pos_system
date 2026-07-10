@@ -1,8 +1,13 @@
+import io
+
+import qrcode
+import qrcode.image.svg
 from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
 from sync.jwt_utils import issue_license_token
 
@@ -175,8 +180,29 @@ class LicenseAdmin(admin.ModelAdmin):
     list_display = ('restaurant', 'key', 'hardware_hash', 'expires_at', 'is_active', 'created_at')
     list_filter = ('is_active', 'expires_at')
     search_fields = ('restaurant__name', 'key')
-    readonly_fields = ('key', 'hardware_hash')
+    readonly_fields = ('key', 'hardware_hash', 'qr_code')
     actions = ['reset_hardware_hash', 'generate_offline_token']
+
+    @admin.display(description="QR kod")
+    def qr_code(self, obj):
+        """
+        Restoranni ro'yxatdan o'tkazayotgan operator shu QR'ni ekranda
+        ko'rsatib/chop etib qo'yadi - restoran admini uni mobil ilovadagi
+        "QR kodni skanerlash" bilan o'qib, kalitni qo'lda kiritmasdan
+        faollashtiradi. Faqat xom kalit matni kodlanadi (server manzili
+        emas) - mobil ilova qaysi Bola bilan gaplashishini allaqachon
+        boshqa yo'l bilan biladi. SVG - Pillow kabi qo'shimcha bog'liqlik
+        kerak emas (cloud_server'da rasm ishlov berish boshqa joyda
+        ishlatilmaydi).
+        """
+        if not obj.key:
+            return '-'
+        factory = qrcode.image.svg.SvgPathImage
+        img = qrcode.make(obj.key, image_factory=factory, box_size=8)
+        buf = io.BytesIO()
+        img.save(buf)
+        svg = mark_safe(buf.getvalue().decode('utf-8'))
+        return format_html('<div style="width:220px">{}</div>', svg)
 
     @admin.action(description="Qurilma bog'lanishini tozalash (kompyuter almashtirilganda)")
     def reset_hardware_hash(self, request, queryset):

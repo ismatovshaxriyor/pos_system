@@ -14,8 +14,10 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve as serve_static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -32,8 +34,15 @@ urlpatterns = [
     path('api/auth/device/register/', DeviceRegisterView.as_view(), name='auth-device-register'),
     path('api/auth/pin-login/', PinLoginView.as_view(), name='auth-pin-login'),
     path('api/license/', include('licensing.urls')),
-    
+
     # Swagger API Docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+
+    # Product/Category rasmlari. django.views.static.serve DEBUG'ga qarab
+    # o'chib qolmaydi (django.contrib.staticfiles'dan farqli) - shart,
+    # chunki bu yerda nginx yo'q, daphne hammasini o'zi xizmat qiladi
+    # (bitta restoran ko'lamida yetarli - docs/3'dagi Nginx rejasi hali
+    # amalga oshirilmagan).
+    re_path(r'^media/(?P<path>.*)$', serve_static, {'document_root': settings.MEDIA_ROOT}),
 ]

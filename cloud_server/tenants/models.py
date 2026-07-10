@@ -35,8 +35,19 @@ class RestaurantStatus(models.Model):
     def __str__(self):
         return f"{self.restaurant.name} holati"
 
+# 0/O, 1/I kabi chalkash belgilarsiz - local_server/core/services.py'dagi
+# DeviceRegistrationCode.CODE_ALPHABET bilan bir xil pattern.
+LICENSE_KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+
 def generate_license_key():
-    return secrets.token_hex(20)  # 40 chars long token
+    """
+    XXXX-XXXX-XXXX (mobil ilovada qo'lda kiritish uchun) - avvalgi
+    40-belgili secrets.token_hex(20)'dan farqli, faqat QR/paste bilan
+    kiritsa bo'ladigan uzunlikda edi.
+    """
+    groups = (''.join(secrets.choice(LICENSE_KEY_ALPHABET) for _ in range(4)) for _ in range(3))
+    return '-'.join(groups)
 
 class License(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
