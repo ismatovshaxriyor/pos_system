@@ -63,6 +63,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # gunicorn'ning o'zi static fayllarni xizmat qilmaydi va bu yerda
+    # nginx yo'q (docs/3'dagi reja hali amalga oshirilmagan) - whitenoise
+    # ularni to'g'ridan-to'g'ri WSGI qatlamida siqib/keshlab beradi.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -146,6 +150,20 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'staticfiles': {
+        # Manifest (hashed-filename) storage needs `collectstatic` to have
+        # already run, or any {% static %} lookup raises - fine for prod
+        # (entrypoint.sh runs it before gunicorn starts), but dev/test
+        # (runserver, manage.py test) never run it, so they fall back to
+        # plain storage where nothing needs to be pre-collected.
+        'BACKEND': (
+            'whitenoise.storage.CompressedManifestStaticFilesStorage' if not DEBUG
+            else 'django.contrib.staticfiles.storage.StaticFilesStorage'
+        ),
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
