@@ -87,10 +87,16 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), source='category', write_only=True
+    )
 
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = (
+            'id', 'category', 'category_id', 'sync_uuid', 'is_synced', 'created_at', 'updated_at',
+            'name', 'price', 'barcode', 'image', 'is_available',
+        )
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)

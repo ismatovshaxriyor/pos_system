@@ -41,6 +41,17 @@ class ProductWritePermissionTests(TestCase):
         response = self.client.get(reverse('product-list'), **_auth_header(self.waiter))
         self.assertEqual(response.status_code, 200)
 
+    def test_manager_can_create_product_with_category(self):
+        response = self.client.post(
+            reverse('product-list'),
+            {"category_id": self.category.id, "name": "Qahva", "price": "12000"},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['category']['id'], self.category.id)
+        product = Product.objects.get(name='Qahva')
+        self.assertEqual(product.category_id, self.category.id)
+
 
 class OrderQuerysetScopingTests(TestCase):
     def setUp(self):
