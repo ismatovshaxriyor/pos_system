@@ -14,6 +14,42 @@ OK_CACHE_TTL = 60
 BLOCKED_CACHE_TTL = 10
 
 
+def _compute_blocked():
+    try:
+        state = LicenseState.load()
+    except DatabaseError:
+        # licensing_licensestate jadvali hali mavjud emas (migrate
+        # bosqichida). DEBUG'da ochiq, prod'da yopiq (fail-closed).
+        return not settings.DEBUG
+
+    if state is None:
+        return True
+
+    if state.is_blocked:
+        return True
+
+    _, error = state.current_valid_token(get_hardware_fingerprint())
+    return error is not None
+
+
+def is_license_blocked():
+    """
+    Kill-switch tekshiruvi - modul darajasida, chunki HTTP middleware ham,
+    WebSocket consumer ham (core.consumers, Django MIDDLEWARE ASGI
+    consumer'lar uchun ishlamaydi) shu bitta implementatsiyani chaqiradi.
+    """
+    if not settings.LICENSE_ENFORCEMENT:
+        return False
+
+    verdict = cache.get(LICENSE_VERIFY_CACHE_KEY)
+    if verdict is not None:
+        return verdict
+
+    blocked = _compute_blocked()
+    cache.set(LICENSE_VERIFY_CACHE_KEY, blocked, BLOCKED_CACHE_TTL if blocked else OK_CACHE_TTL)
+    return blocked
+
+
 class LicenseEnforcementMiddleware:
     """
     Kill-switch: litsenziya JWT tokeni yaroqsiz/muddati o'tgan yoki qurilma
@@ -27,40 +63,11 @@ class LicenseEnforcementMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if not settings.LICENSE_ENFORCEMENT:
-            return self.get_response(request)
-
         path = request.path
         if not path.startswith('/api/') or path.startswith(EXEMPT_PREFIXES):
             return self.get_response(request)
 
-        if self._is_blocked():
+        if is_license_blocked():
             return JsonResponse(BLOCKED_RESPONSE, status=402)
 
         return self.get_response(request)
-
-    def _is_blocked(self):
-        verdict = cache.get(LICENSE_VERIFY_CACHE_KEY)
-        if verdict is not None:
-            return verdict
-
-        blocked = self._compute_blocked()
-        cache.set(LICENSE_VERIFY_CACHE_KEY, blocked, BLOCKED_CACHE_TTL if blocked else OK_CACHE_TTL)
-        return blocked
-
-    def _compute_blocked(self):
-        try:
-            state = LicenseState.load()
-        except DatabaseError:
-            # licensing_licensestate jadvali hali mavjud emas (migrate
-            # bosqichida). DEBUG'da ochiq, prod'da yopiq (fail-closed).
-            return not settings.DEBUG
-
-        if state is None:
-            return True
-
-        if state.is_blocked:
-            return True
-
-        _, error = state.current_valid_token(get_hardware_fingerprint())
-        return error is not None

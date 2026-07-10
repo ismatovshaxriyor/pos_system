@@ -19,12 +19,18 @@ from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework.authtoken.views import obtain_auth_token
 
+from core.auth_views import DeviceRegisterView, PinLoginView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
+
     # API endpoints
     path('api/', include('core.urls')),
     path('api/auth/login/', obtain_auth_token, name='api_token_auth'),
+    # Admin (is_staff) - yuqoridagi telefon+parol bilan kiradi. Boshqa xodim
+    # (manager/cashier/waiter) - qurilmaga bog'langan PIN bilan, shu ikkitasi:
+    path('api/auth/device/register/', DeviceRegisterView.as_view(), name='auth-device-register'),
+    path('api/auth/pin-login/', PinLoginView.as_view(), name='auth-pin-login'),
     path('api/license/', include('licensing.urls')),
     
     # Swagger API Docs

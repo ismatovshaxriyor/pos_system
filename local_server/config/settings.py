@@ -45,6 +45,10 @@ if os.environ.get('SECURE_PROXY_SSL_HEADER', '0') == '1':
 # Application definition
 
 INSTALLED_APPS = [
+    # daphne ENG BOSHIDA bo'lishi shart - shundagina `runserver` dev'da
+    # avtomatik ASGI-aware bo'ladi (WebSocket'ni ham xizmat qiladi).
+    'daphne',
+
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -52,13 +56,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third party apps
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
     'drf_spectacular',
-    
+    'channels',
+
     # Local apps
     'core',
     'licensing',
@@ -103,6 +108,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Real-vaqt (WebSocket) qatlami - mavjud Redis instansiyasi (cache/celery
+# uchun ham ishlatiladigan) qayta ishlatiladi, yangi infratuzilma qo'shilmaydi.
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {'hosts': [os.environ.get('REDIS_URL', 'redis://localhost:6379/0')]},
+    },
+}
 
 
 # Database

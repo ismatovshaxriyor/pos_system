@@ -30,7 +30,12 @@ services:
 
   web:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2
+    # WebSocket (Django Channels) uchun ASGI server kerak - gunicorn+WSGI
+    # WS ulanishlarni xizmat qila olmaydi. Daphne yagona-processli async,
+    # bitta restoranning real yukiga (bir necha o'nlab xodim qurilmasi)
+    # yetarli - sinxron DRF view'lar ASGI ostida sync_to_async thread pool
+    # orqali baribir parallel ishlaydi.
+    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
     env_file: .env
     environment:
       - RUN_MIGRATIONS=1

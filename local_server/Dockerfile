@@ -60,5 +60,7 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 # Dev compose overrides this with `python manage.py runserver` (source is
 # bind-mounted over /app there, so this multi-stage compilation has no
 # effect on dev - it only hardens the image actually shipped to prod).
-# Prod compose uses this gunicorn default.
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+# Prod compose overrides this too (docker-compose.prod.yml) - kept here as
+# a self-consistent fallback since `channels` is now a hard dependency and
+# gunicorn+WSGI can't serve WebSocket.
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
