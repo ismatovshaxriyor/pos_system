@@ -1,5 +1,6 @@
 import base64
 import io
+from datetime import timedelta
 
 import qrcode
 from django import forms
@@ -8,7 +9,42 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
 from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
+from .signals import compute_default_license_expiry
 from sync.jwt_utils import issue_license_token
+
+LICENSE_WARNING_DAYS = 7
+
+
+def _mark_paid(modeladmin, request, license_queryset):
+    new_expiry = compute_default_license_expiry()
+    updated = license_queryset.update(expires_at=new_expiry)
+    modeladmin.message_user(
+        request,
+        f"{updated} ta litsenziya {new_expiry:%Y-%m-%d %H:%M} gacha uzaytirildi.",
+    )
+
+
+class LicenseExpiryFilter(admin.SimpleListFilter):
+    title = "litsenziya muddati"
+    parameter_name = 'license_expiry'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('expired', "Muddati o'tgan"),
+            ('soon', f"{LICENSE_WARNING_DAYS} kun ichida tugaydi"),
+            ('ok', "Sog'lom"),
+        )
+
+    def queryset(self, request, queryset):
+        now = timezone.now()
+        soon = now + timedelta(days=LICENSE_WARNING_DAYS)
+        if self.value() == 'expired':
+            return queryset.filter(license__expires_at__lt=now)
+        if self.value() == 'soon':
+            return queryset.filter(license__expires_at__gte=now, license__expires_at__lte=soon)
+        if self.value() == 'ok':
+            return queryset.filter(license__expires_at__gt=soon)
+        return queryset
 
 
 class RestaurantStatusInline(admin.StackedInline):
@@ -75,22 +111,22 @@ def _enqueue_command(modeladmin, request, queryset, command_type, success_messag
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'online_badge', 'admin_display', 'contact_info', 'is_active',
+        'name', 'online_badge', 'license_status_badge', 'admin_display', 'contact_info', 'is_active',
         'app_version_display', 'desired_version', 'last_seen', 'created_at',
         'unresolved_errors_badge',
     )
-    list_filter = ('is_active', 'is_online')
+    list_filter = ('is_active', 'is_online', LicenseExpiryFilter)
     search_fields = ('name', 'address', 'contact_info')
     readonly_fields = ('is_online',)
     inlines = [RestaurantAdminAccountInline, RestaurantStatusInline]
     actions = [
         'action_block_system', 'action_unblock_system',
-        'action_force_license_renew', 'action_update_app',
+        'action_force_license_renew', 'action_update_app', 'action_mark_paid',
     ]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.annotate(
+        return qs.select_related('license').annotate(
             unresolved_error_count=Count('error_logs', filter=Q(error_logs__is_resolved=False)),
         )
 
@@ -104,6 +140,25 @@ class RestaurantAdmin(admin.ModelAdmin):
         return format_html(
             '<span style="color:#fff;background:#b3261e;padding:2px 8px;'
             'border-radius:8px;font-size:11px">Oflayn</span>'
+        )
+
+    @admin.display(description="Litsenziya", ordering='license__expires_at')
+    def license_status_badge(self, obj):
+        try:
+            expires_at = obj.license.expires_at
+        except License.DoesNotExist:
+            return format_html('<span style="color:#6b7280">Litsenziyasiz</span>')
+
+        now = timezone.now()
+        if expires_at < now:
+            color, text = '#b3261e', "Muddati o'tgan"
+        elif expires_at <= now + timedelta(days=LICENSE_WARNING_DAYS):
+            color, text = '#c77d00', f"{(expires_at - now).days} kun qoldi"
+        else:
+            color, text = '#22883f', expires_at.strftime('%Y-%m-%d')
+        return format_html(
+            '<span style="color:#fff;background:{};padding:2px 8px;'
+            'border-radius:8px;font-size:11px">{}</span>', color, text,
         )
 
     @admin.display(description="Admin")
@@ -147,6 +202,10 @@ class RestaurantAdmin(admin.ModelAdmin):
     def action_force_license_renew(self, request, queryset):
         _enqueue_command(self, request, queryset, 'force_license_renew', "Litsenziyani yangilash")
 
+    @admin.action(description="To'lov qilindi - litsenziya muddatini uzaytirish")
+    def action_mark_paid(self, request, queryset):
+        _mark_paid(self, request, License.objects.filter(restaurant__in=queryset))
+
     @admin.action(description="Yangilanishni yuborish (desired_version bo'yicha)")
     def action_update_app(self, request, queryset):
         count = 0
@@ -180,7 +239,11 @@ class LicenseAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'expires_at')
     search_fields = ('restaurant__name', 'key')
     readonly_fields = ('key', 'hardware_hash', 'qr_code')
-    actions = ['reset_hardware_hash', 'generate_offline_token']
+    actions = ['reset_hardware_hash', 'generate_offline_token', 'mark_paid']
+
+    @admin.action(description="To'lov qilindi - muddatni uzaytirish")
+    def mark_paid(self, request, queryset):
+        _mark_paid(self, request, queryset)
 
     @admin.display(description="QR kod")
     def qr_code(self, obj):
