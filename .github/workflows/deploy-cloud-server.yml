@@ -1,0 +1,32 @@
+name: Deploy cloud_server (Ona)
+
+# cloud_server/** ostida biror narsa main'ga push qilinganda EC2'dagi
+# production instansiyani yangilaydi - shu path filtri bo'lmasa,
+# local_server'dagi o'zgarishlar ham kerak bo'lmagan deploy'ni
+# ishga tushirar edi (ikkala loyiha mustaqil, CLAUDE.md'ga qarang).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloud_server/**"
+      - ".github/workflows/deploy-cloud-server.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/pos_system
+            git fetch origin main
+            git reset --hard origin/main
+            cd cloud_server
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker image prune -f
