@@ -40,6 +40,21 @@ yaml
 
 ---
 
+## 2.1. Mobil Ilova Bola'ni Lokal Tarmoqda Qanday Topadi (mDNS)
+
+Xodim/admin mobil ilovasi restoran WiFi'siga ulanganda Bola serverining IP manzilini bilishi kerak. Router'da statik IP/DHCP reservation band qilish har bir restoranda qo'lda sozlash talab qiladi va avtomatik emas - shuning uchun **mDNS (Avahi)** ishlatiladi: Bola kompyuteri o'zini tarmoqda e'lon qiladi, IP o'zgarsa ham (masalan router qayta ishga tushsa) ilova uni qayta topaveradi, qo'lda hech narsa sozlash shart emas.
+
+### O'rnatish (Bola kompyuterida, Docker'dan tashqarida - host darajasida):
+1. `sudo apt install avahi-daemon` (Ubuntu Desktop'da odatda oldindan o'rnatilgan bo'ladi).
+2. Repodagi `local_server/pos-bola.avahi.service` faylini `/etc/avahi/services/pos-bola.service` ga nusxalang.
+3. `sudo systemctl restart avahi-daemon`.
+
+Bu ikkita narsani beradi: (1) kompyuterning o'zi `<hostname>.local` orqali topiladi, (2) `_pos-bola._tcp` xizmat turi e'lon qilinadi (portu 8000, `path=/api/` TXT-record bilan) - mobil ilova hostname'ni oldindan bilishi shart emas, shu xizmat turini DNS-SD/mDNS orqali browse qilib topadi (Flutter'da `multicast_dns` yoki `bonsoir` paketi bilan).
+
+**Muhim eslatma:** ba'zi WiFi router'lar (ayniqsa mehmonxona/tijorat tarmoqlarida) xavfsizlik uchun multicast trafikni (shu jumladan mDNS'ni) bloklaydi - bunday holatda avtomatik topish ishlamaydi. Shu sabab ilovada IP'ni qo'lda kiritish (yoki QR-kod orqali bir martalik ulanish) zaxira variant sifatida albatta qoldirilishi kerak, mDNS faqat qulaylik uchun, yagona yechim sifatida emas.
+
+---
+
 ## 3. Favqulodda Holatlarda Tiklash (Disaster Recovery & Backup)
 
 Agar restorandagi lokal server kompyuteri butunlay kuyib ketsa yoki o'g'irlab ketilsa, biznes to'xtab qolmasligi va ma'lumotlar yo'qolmasligi kerak.
