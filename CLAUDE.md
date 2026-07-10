@@ -21,13 +21,15 @@ The full design intent is documented in Uzbek under `docs/` — read the relevan
 
 Each server is developed and run independently via its own compose file. There is no root-level build/run command. Two compose files per project: `docker-compose.yml` (dev — `runserver`, source bind-mounted, ports open on `127.0.0.1`) and `docker-compose.prod.yml` (prod — gunicorn, registry image, Watchtower, no db/redis ports published, needs a real `.env`).
 
+**Migration files are not committed to git** (gitignored via `**/migrations/*.py`, `__init__.py` excepted) — each environment generates its own from the current `models.py` state. `entrypoint.sh` in both projects runs `makemigrations --noinput` immediately before `migrate --noinput` whenever `RUN_MIGRATIONS=1`, so a fresh checkout/container always regenerates what it needs; there's nothing to reconcile by hand between environments. On a fresh `git clone`, run `makemigrations` yourself before the first `migrate` (see below) — the `migrations/` directories exist but start out with only `__init__.py`.
+
 ### local_server (dev: port 8000, Postgres 127.0.0.1:15432, Redis 127.0.0.1:16379)
 ```bash
 cd local_server
 docker compose up -d --build       # web, db, redis, celery_worker, celery_beat, db_backup
+docker compose exec web python manage.py makemigrations core licensing   # regenerate from current models (not committed - see above)
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
-docker compose exec web python manage.py makemigrations core   # or: licensing
 docker compose exec web python manage.py test licensing        # or: core / licensing.tests.test_middleware etc.
 docker compose exec web python manage.py activate_license <KEY>  # CLI onboarding, calls ActivateView in-process
 docker compose logs -f celery_beat   # watch send-heartbeat / renew-license-daily firing every ~60s / daily 03:00
@@ -38,6 +40,7 @@ Admin UI: `http://localhost:8000/admin/` · Swagger: `http://localhost:8000/api/
 ```bash
 cd cloud_server
 docker compose up -d --build       # web, db, redis, celery_worker, celery_beat
+docker compose exec web python manage.py makemigrations tenants   # regenerate from current models (not committed - see above)
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 docker compose exec web python manage.py generate_signing_keys   # prints RSA-2048 PEM pair to stdout - see Licensing setup below
