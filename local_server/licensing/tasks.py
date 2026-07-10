@@ -10,7 +10,7 @@ from django.utils.dateparse import parse_datetime
 from .client import OnaClient
 from .hardware import get_hardware_fingerprint
 from .metrics import collect_metrics
-from .models import LicenseState
+from .models import ErrorLog, LicenseState
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,87 @@ def send_heartbeat():
     for command in data.get('commands', []):
         # execute_remote_command is defined further down in this module.
         execute_remote_command.delay(command)
+
+
+@shared_task
+def send_error_logs():
+    """
+    Hali Onaga yuborilmagan xato yozuvlarini partiyalab yuboradi.
+    Heartbeat'dan mustaqil task/endpoint - buzilgan payload heartbeat'ning
+    litsenziya tekshiruvi/buyruq pollingiga hech qanday ta'sir qilmasligi
+    kerak. Tarmoq xatosi kutilgan holat - faqat INFO darajada qayd etiladi
+    (bu yerda logger.error() chaqirilsa, "Ona o'chgan" holatining o'zi yangi
+    ErrorLog qatorini hosil qilib, aynan eng yomon paytda navbatni yanada
+    shishirib yuborar edi).
+    """
+    state = LicenseState.load()
+    if not state or not state.activated_at:
+        return
+
+    batch = list(
+        ErrorLog.objects.filter(is_reported=False).order_by('occurred_at')[:settings.ERROR_LOG_BATCH_SIZE]
+    )
+    if not batch:
+        return
+
+    client = OnaClient()
+    events = [
+        {
+            "id": str(row.event_uuid),
+            "level": row.level,
+            "logger_name": row.logger_name,
+            "message": row.message,
+            "traceback": row.traceback,
+            "module": row.module,
+            "func_name": row.func_name,
+            "line_no": row.line_no,
+            "occurred_at": row.occurred_at.isoformat(),
+        }
+        for row in batch
+    ]
+
+    try:
+        response = client.post_error_logs(state.license_key, events)
+    except requests.RequestException as exc:
+        logger.info("Xato jurnali yuborilmadi (oflayn bo'lishi mumkin): %s", exc)
+        return
+
+    if response.status_code != 200:
+        logger.warning("Xato jurnalini yuborish rad etildi: %s", response.text)
+        return
+
+    ErrorLog.objects.filter(id__in=[row.id for row in batch]).update(
+        is_reported=True, reported_at=timezone.now(),
+    )
+
+
+@shared_task
+def cleanup_error_logs():
+    """
+    Disk cheklangan - eskirgan xato yozuvlarini tozalaydi. Ikki bosqich:
+    (1) muvaffaqiyatli yuborilgan va ERROR_LOG_RETENTION_DAYS'dan eski
+    qatorlar o'chiriladi; (2) hali yuborilmagan qatorlar soni
+    ERROR_LOG_MAX_UNREPORTED'dan oshsa (Ona uzoq vaqt ishlamay qolgan holat),
+    eng eskilari ham qurbon qilinadi - disk to'lib butun tizim ishdan
+    chiqishidan ko'ra ba'zi eski hisobotlarni yo'qotish afzal.
+    """
+    cutoff = timezone.now() - timedelta(days=settings.ERROR_LOG_RETENTION_DAYS)
+    reported_deleted, _ = ErrorLog.objects.filter(is_reported=True, reported_at__lt=cutoff).delete()
+
+    unreported_count = ErrorLog.objects.filter(is_reported=False).count()
+    excess = unreported_count - settings.ERROR_LOG_MAX_UNREPORTED
+    overflow_deleted = 0
+    if excess > 0:
+        stale_ids = list(
+            ErrorLog.objects.filter(is_reported=False).order_by('occurred_at').values_list('id', flat=True)[:excess]
+        )
+        overflow_deleted, _ = ErrorLog.objects.filter(id__in=stale_ids).delete()
+        logger.warning(
+            "Xato jurnali cheklovdan oshdi (%d ta yuborilmagan) - eng eski "
+            "%d ta yozuv disk sig'imi uchun o'chirildi.", unreported_count, overflow_deleted,
+        )
+
+    return {"reported_deleted": reported_deleted, "overflow_deleted": overflow_deleted}
 
 
 def _handle_block_system(payload):

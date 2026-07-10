@@ -1,8 +1,10 @@
+import uuid
 from datetime import datetime, UTC
 
 from django.core.cache import cache
 from django.db import models
 from django.utils.dateparse import parse_datetime
+from simple_history.models import HistoricalRecords
 
 LICENSE_VERIFY_CACHE_KEY = 'license:verify'
 
@@ -41,6 +43,8 @@ class LicenseState(models.Model):
     blocked_reason = models.CharField(max_length=50, blank=True, default='', choices=BLOCK_REASON_CHOICES)
 
     updated_at = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Litsenziya holati"
@@ -110,3 +114,42 @@ class LicenseState(models.Model):
             return claims, None
 
         return None, last_error
+
+
+class ErrorLog(models.Model):
+    """
+    Django logging orqali ushlangan ERROR/CRITICAL darajadagi voqealar
+    (DatabaseErrorLogHandler tomonidan yoziladi). send_error_logs Celery
+    vazifasi orqali Onaga partiyalab yuboriladi - heartbeat'dan butunlay
+    mustaqil, shu yerdagi muammo litsenziya/buyruq oqimiga ta'sir qilmasligi
+    kerak. BaseModel'ga ataylab meros qilinmagan - uning sync_uuid/is_synced
+    jufti kelajakdagi umumiy biznes-ma'lumot sinxronizatsiyasi uchun
+    ajratilgan ma'no, bu yerda qayta ishlatish chalkashtiradi.
+    """
+    LEVEL_CHOICES = (
+        ('ERROR', 'ERROR'),
+        ('CRITICAL', 'CRITICAL'),
+    )
+
+    event_uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES, db_index=True)
+    logger_name = models.CharField(max_length=200, blank=True, default='')
+    message = models.TextField()
+    traceback = models.TextField(blank=True, default='')
+    module = models.CharField(max_length=200, blank=True, default='')
+    func_name = models.CharField(max_length=200, blank=True, default='')
+    line_no = models.PositiveIntegerField(null=True, blank=True)
+    occurred_at = models.DateTimeField(db_index=True)
+    is_reported = models.BooleanField(default=False, db_index=True)
+    reported_at = models.DateTimeField(null=True, blank=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Xato jurnali"
+        verbose_name_plural = "Xato jurnali"
+        ordering = ['-occurred_at']
+        indexes = [models.Index(fields=['is_reported', 'occurred_at'])]
+
+    def __str__(self):
+        return f"[{self.level}] {self.occurred_at:%Y-%m-%d %H:%M} - {self.message[:60]}"

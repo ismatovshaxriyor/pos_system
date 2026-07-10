@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from cryptography.hazmat.primitives import serialization
@@ -6,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
+from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
 from tenants.tasks import mark_offline_restaurants
 from tenants.signals import compute_default_license_expiry
 from .jwt_utils import issue_license_token, issue_license_token_batch
@@ -420,3 +421,107 @@ class AutoLicenseCreationTests(TestCase):
         restaurant.save()  # created=False this time - must not create a 2nd license
 
         self.assertEqual(License.objects.filter(restaurant=restaurant).count(), 1)
+
+
+class ErrorLogIngestTests(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name="Test Restoran")
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.hardware_hash = "a" * 64
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
+        self.url = reverse('sync-error-logs')
+
+    def _auth(self, key=None):
+        return {"HTTP_AUTHORIZATION": f"Token {key or self.license.key}"}
+
+    def _event(self, **overrides):
+        defaults = dict(
+            id=str(uuid.uuid4()),
+            level='ERROR',
+            logger_name='django.request',
+            message="Internal Server Error: /api/orders/1/",
+            traceback='Traceback...',
+            module='views',
+            func_name='order_detail',
+            line_no=42,
+            occurred_at=timezone.now().isoformat(),
+        )
+        defaults.update(overrides)
+        return defaults
+
+    def test_batch_creates_rows(self):
+        response = self.client.post(
+            self.url, {"events": [self._event(), self._event()]},
+            content_type='application/json', **self._auth(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['received'], 2)
+        self.assertEqual(ErrorLog.objects.filter(restaurant=self.restaurant).count(), 2)
+
+    def test_duplicate_ids_are_ignored_not_duplicated(self):
+        event = self._event()
+
+        self.client.post(
+            self.url, {"events": [event]}, content_type='application/json', **self._auth(),
+        )
+        response = self.client.post(
+            self.url, {"events": [event]}, content_type='application/json', **self._auth(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ErrorLog.objects.filter(id=event['id']).count(), 1)
+
+    def test_accepted_for_inactive_license(self):
+        # Lenient auth: a blocked/expired restaurant must still be able to
+        # report errors - it may be the most important one to hear from.
+        self.license.is_active = False
+        self.license.save()
+
+        response = self.client.post(
+            self.url, {"events": [self._event()]}, content_type='application/json', **self._auth(),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ErrorLog.objects.count(), 1)
+
+    def test_rejects_unknown_key(self):
+        response = self.client.post(
+            self.url, {"events": [self._event()]},
+            content_type='application/json', **self._auth("nope"),
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_batch_over_limit_rejected(self):
+        events = [self._event(id=str(uuid.uuid4())) for _ in range(501)]
+
+        response = self.client.post(
+            self.url, {"events": events}, content_type='application/json', **self._auth(),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ErrorLog.objects.count(), 0)
+
+    def test_malformed_event_rejects_whole_batch(self):
+        good_event = self._event()
+        bad_event = self._event(id=str(uuid.uuid4()), level='NOT_A_LEVEL')
+
+        response = self.client.post(
+            self.url, {"events": [good_event, bad_event]},
+            content_type='application/json', **self._auth(),
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ErrorLog.objects.count(), 0)
+
+    def test_restaurant_attribution_ignores_any_client_supplied_restaurant_field(self):
+        other_restaurant = Restaurant.objects.create(name="Boshqa Restoran")
+        event = self._event(restaurant_id=str(other_restaurant.id))
+
+        self.client.post(
+            self.url, {"events": [event]}, content_type='application/json', **self._auth(),
+        )
+
+        row = ErrorLog.objects.get(id=event['id'])
+        self.assertEqual(row.restaurant_id, self.restaurant.id)

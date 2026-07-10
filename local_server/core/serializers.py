@@ -1,7 +1,9 @@
+from decimal import Decimal
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
-    User, Table, Category, Product, Order, OrderItem,
+    User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, Notification,
 )
 
@@ -109,17 +111,39 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = ('id', 'product', 'product_id', 'quantity', 'price')
         read_only_fields = ('price',)
 
+class PaymentSerializer(serializers.ModelSerializer):
+    received_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = ('id', 'amount', 'method', 'received_by', 'created_at')
+        read_only_fields = ('received_by', 'created_at')
+
+class DiscountSerializer(serializers.Serializer):
+    """`set_discount` action so'rov tanasi uchun - haqiqiy validatsiya."""
+    discount_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'))
+    discount_reason = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
     waiter = UserSerializer(read_only=True)
     cashier = UserSerializer(read_only=True)
     table = TableSerializer(read_only=True)
-    
+
     table_id = serializers.PrimaryKeyRelatedField(
         queryset=Table.objects.all(), source='table', write_only=True, required=False, allow_null=True
     )
 
+    final_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
     class Meta:
         model = Order
-        fields = ('id', 'table', 'table_id', 'waiter', 'cashier', 'total_amount', 'status', 'items', 'created_at')
-        read_only_fields = ('total_amount', 'waiter', 'cashier')
+        fields = (
+            'id', 'table', 'table_id', 'waiter', 'cashier', 'total_amount',
+            'discount_amount', 'discount_reason', 'final_amount', 'amount_paid', 'balance_due',
+            'status', 'items', 'payments', 'created_at',
+        )
+        read_only_fields = ('total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason')

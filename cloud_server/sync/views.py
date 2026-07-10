@@ -3,11 +3,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.utils import timezone
-from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
+from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token_batch
 from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
+    ErrorLogBatchSerializer,
 )
 
 MAX_COMMANDS_PER_HEARTBEAT = 10
@@ -217,3 +218,47 @@ class CommandResultView(APIView):
         command.save(update_fields=['status', 'result', 'completed_at'])
 
         return Response({"detail": "Natija qabul qilindi."}, status=status.HTTP_200_OK)
+
+
+class ErrorLogView(APIView):
+    """
+    Bola'dan xato jurnali partiyasini qabul qiladi. Auth "yumshoq"
+    (HeartbeatAuthentication) - o'chirilgan/muddati tugagan litsenziyaga ega
+    restoran ham xato hisobot berishda davom etsin (aynan shu restoranlar
+    muammoni ko'rish uchun eng muhim bo'lishi mumkin). Heartbeat/buyruq
+    oqimidan butunlay mustaqil endpoint - bu yerdagi validatsiya xatosi
+    ularga hech qanday ta'sir qilmaydi.
+    """
+    authentication_classes = [HeartbeatAuthentication]
+
+    def post(self, request):
+        license_obj = request.auth
+        restaurant = license_obj.restaurant
+
+        serializer = ErrorLogBatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        events = serializer.validated_data['events']
+
+        now = timezone.now()
+        rows = [
+            ErrorLog(
+                id=event['id'],
+                restaurant=restaurant,
+                level=event['level'],
+                logger_name=event.get('logger_name', ''),
+                message=event['message'],
+                traceback=event.get('traceback', ''),
+                module=event.get('module', ''),
+                func_name=event.get('func_name', ''),
+                line_no=event.get('line_no'),
+                occurred_at=event['occurred_at'],
+                received_at=now,
+            )
+            for event in events
+        ]
+        # bulk_create bypasses save()/pre_save() - received_at is set
+        # explicitly above since auto_now_add would otherwise be silently
+        # left unset.
+        ErrorLog.objects.bulk_create(rows, ignore_conflicts=True)
+
+        return Response({"received": len(rows), "detail": "Xatolar qabul qilindi."}, status=status.HTTP_200_OK)

@@ -121,3 +121,44 @@ class RemoteCommand(models.Model):
 
     def __str__(self):
         return f"{self.get_command_type_display()} - {self.restaurant.name} ({self.status})"
+
+
+class ErrorLog(models.Model):
+    """
+    Bola'dan qabul qilingan ERROR/CRITICAL log voqealari. `id` — Bola
+    tomonida generatsiya qilingan UUID (event_uuid); shu bilan qayta
+    yuborilgan (retry) partiyalar bulk_create(ignore_conflicts=True) orqali
+    tabiiy ravishda dublikatsiz qoladi.
+    """
+    LEVEL_CHOICES = (
+        ('ERROR', 'ERROR'),
+        ('CRITICAL', 'CRITICAL'),
+    )
+
+    id = models.UUIDField(primary_key=True, editable=False)
+    restaurant = models.ForeignKey(Restaurant, related_name='error_logs', on_delete=models.CASCADE)
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES, db_index=True)
+    logger_name = models.CharField(max_length=200, blank=True, default='')
+    message = models.TextField()
+    traceback = models.TextField(blank=True, default='')
+    module = models.CharField(max_length=200, blank=True, default='')
+    func_name = models.CharField(max_length=200, blank=True, default='')
+    line_no = models.PositiveIntegerField(null=True, blank=True)
+    occurred_at = models.DateTimeField(db_index=True)   # Bola'ning o'z soati - soat farqi (clock skew) mumkin
+    received_at = models.DateTimeField(db_index=True)    # Ona'ning o'z soati - saralash/filtrlash shu bo'yicha
+    is_resolved = models.BooleanField(default=False, db_index=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='resolved_error_logs',
+    )
+    resolution_note = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-received_at']
+        indexes = [
+            models.Index(fields=['restaurant', 'is_resolved']),
+            models.Index(fields=['level', 'is_resolved']),
+        ]
+
+    def __str__(self):
+        return f"[{self.level}] {self.restaurant.name} - {self.message[:60]}"

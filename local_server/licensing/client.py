@@ -59,3 +59,12 @@ class OnaClient:
             timeout=self.timeout,
         )
         return response
+
+    def post_error_logs(self, license_key, events):
+        response = requests.post(
+            self._url('/api/sync/error-logs/'),
+            json={"events": events},
+            headers=self._auth_headers(license_key),
+            timeout=self.timeout,
+        )
+        return response

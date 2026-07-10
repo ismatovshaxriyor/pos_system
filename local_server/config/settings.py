@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     'channels',
+    'simple_history',
 
     # Local apps
     'core',
@@ -80,6 +81,12 @@ MIDDLEWARE = [
 
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+
+    # AuthenticationMiddleware'dan KEYIN bo'lishi shart - request.user'ni
+    # thread-local'ga saqlab, HistoricalRecords yozuvlariga "kim o'zgartirdi"
+    # (history_user) ma'lumotini avtomatik biriktiradi.
+    'simple_history.middleware.HistoryRequestMiddleware',
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
@@ -204,6 +211,12 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# Celery worker jarayoni sukut bo'yicha root logger'dagi handler'larni
+# ishga tushganda olib tashlaydi (worker_hijack_root_logger default True) -
+# shu qatorsiz Celery tasklaridagi ERROR/CRITICAL loglar runserver'da
+# ishlab, celery_worker/celery_beat konteynerida jimgina yo'qolib qolar edi.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
 CELERY_BEAT_SCHEDULE = {
     'send-heartbeat': {
         'task': 'licensing.tasks.send_heartbeat',
@@ -214,6 +227,15 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'licensing.tasks.renew_license_token',
         'schedule': crontab(hour=3, minute=0),
     },
+    'send-error-logs': {
+        'task': 'licensing.tasks.send_error_logs',
+        'schedule': 120.0,
+        'options': {'expires': 100},
+    },
+    'cleanup-error-logs': {
+        'task': 'licensing.tasks.cleanup_error_logs',
+        'schedule': crontab(hour=4, minute=0),
+    },
 }
 
 # Cache (Redis) - used to cache the license-verification verdict so the
@@ -223,6 +245,42 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
     }
+}
+
+# Error log reporting (Bola -> Ona)
+ERROR_LOG_BATCH_SIZE = int(os.environ.get('ERROR_LOG_BATCH_SIZE', 200))
+ERROR_LOG_RETENTION_DAYS = int(os.environ.get('ERROR_LOG_RETENTION_DAYS', 14))
+ERROR_LOG_MAX_UNREPORTED = int(os.environ.get('ERROR_LOG_MAX_UNREPORTED', 5000))
+
+# ERROR/CRITICAL darajadagi barcha loglarni (view'lardagi unhandled
+# exception'lar, Celery tasklardagi xatoliklar, logger.error()/critical()
+# chaqiruvlari) DatabaseErrorLogHandler orqali ErrorLog jadvaliga yozadi -
+# keyinchalik send_error_logs task'i buni Onaga yuboradi. `django`/`celery`
+# loggerlari odatda propagate=False bilan ishlaydi, shu sabab db_error_log
+# ularga ALOHIDA berilgan - lekin aynan shuning uchun ular propagate=True
+# qilinmasligi kerak, aks holda root'ga ham ko'tarilib ikki marta yozilib
+# qolardi.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {'format': '{asctime} {levelname} {name} {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'},
+        'db_error_log': {
+            'class': 'licensing.log_handler.DatabaseErrorLogHandler',
+            'level': 'ERROR',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'db_error_log'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {'handlers': ['console', 'db_error_log'], 'level': 'INFO', 'propagate': False},
+        'celery': {'handlers': ['console', 'db_error_log'], 'level': 'INFO', 'propagate': False},
+    },
 }
 
 

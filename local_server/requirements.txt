@@ -16,3 +16,4 @@ requests
 channels
 channels-redis
 daphne
+django-simple-history

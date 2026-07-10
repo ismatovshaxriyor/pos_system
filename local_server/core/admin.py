@@ -1,13 +1,14 @@
 from django.contrib import admin, messages
+from simple_history.admin import SimpleHistoryAdmin
 
 from . import services
 from .models import (
-    User, Table, Category, Product, Order, OrderItem,
+    User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
 )
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(SimpleHistoryAdmin):
     list_display = ('username', 'role', 'is_staff', 'is_synced')
     list_filter = ('role', 'is_staff', 'is_synced')
     actions = ['generate_registration_code']
@@ -28,7 +29,7 @@ class UserAdmin(admin.ModelAdmin):
             )
 
 @admin.register(StaffDevice)
-class StaffDeviceAdmin(admin.ModelAdmin):
+class StaffDeviceAdmin(SimpleHistoryAdmin):
     list_display = ('user', 'device_label', 'device_id', 'is_active', 'last_login_at')
     list_filter = ('is_active',)
     search_fields = ('user__username', 'device_id', 'device_label')
@@ -43,27 +44,27 @@ class StaffDeviceAdmin(admin.ModelAdmin):
         self.message_user(request, f"{count} ta qurilma chetlashtirildi.", level=messages.SUCCESS)
 
 @admin.register(DeviceRegistrationCode)
-class DeviceRegistrationCodeAdmin(admin.ModelAdmin):
+class DeviceRegistrationCodeAdmin(SimpleHistoryAdmin):
     list_display = ('user', 'code', 'expires_at', 'used_at', 'created_by')
     readonly_fields = ('code',)
     search_fields = ('user__username', 'code')
 
 @admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
+class NotificationAdmin(SimpleHistoryAdmin):
     list_display = ('notif_type', 'recipient', 'message', 'is_read', 'created_at')
     list_filter = ('notif_type', 'is_read')
 
 @admin.register(Table)
-class TableAdmin(admin.ModelAdmin):
+class TableAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'capacity', 'is_active', 'is_synced')
     list_filter = ('is_active', 'is_synced')
 
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'is_synced')
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'category', 'price', 'is_available', 'is_synced')
     list_filter = ('category', 'is_available', 'is_synced')
     search_fields = ('name', 'barcode')
@@ -72,9 +73,35 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 1
 
+class PaymentInline(admin.TabularInline):
+    model = Payment
+    extra = 1
+    readonly_fields = ('received_by', 'created_at')
+
+@admin.register(Payment)
+class PaymentAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'order', 'amount', 'method', 'received_by', 'created_at', 'is_synced')
+    list_filter = ('method', 'is_synced', 'created_at')
+
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'table', 'waiter', 'total_amount', 'status', 'created_at', 'is_synced')
+class OrderAdmin(SimpleHistoryAdmin):
+    list_display = (
+        'id', 'table', 'waiter', 'total_amount', 'discount_amount',
+        'final_amount_display', 'amount_paid_display', 'balance_due_display',
+        'status', 'created_at', 'is_synced',
+    )
     list_filter = ('status', 'is_synced', 'created_at')
-    inlines = [OrderItemInline]
+    inlines = [OrderItemInline, PaymentInline]
+
+    @admin.display(description="Yakuniy summa")
+    def final_amount_display(self, obj):
+        return obj.final_amount
+
+    @admin.display(description="To'langan")
+    def amount_paid_display(self, obj):
+        return obj.amount_paid
+
+    @admin.display(description="Qarzdorlik")
+    def balance_due_display(self, obj):
+        return obj.balance_due
 

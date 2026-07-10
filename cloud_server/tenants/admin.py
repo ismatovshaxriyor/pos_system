@@ -1,8 +1,9 @@
 from django import forms
 from django.contrib import admin, messages
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
-from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount
+from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
 from sync.jwt_utils import issue_license_token
 
 
@@ -72,6 +73,7 @@ class RestaurantAdmin(admin.ModelAdmin):
     list_display = (
         'name', 'online_badge', 'admin_display', 'contact_info', 'is_active',
         'app_version_display', 'desired_version', 'last_seen', 'created_at',
+        'unresolved_errors_badge',
     )
     list_filter = ('is_active', 'is_online')
     search_fields = ('name', 'address', 'contact_info')
@@ -81,6 +83,12 @@ class RestaurantAdmin(admin.ModelAdmin):
         'action_block_system', 'action_unblock_system',
         'action_force_license_renew', 'action_update_app',
     ]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            unresolved_error_count=Count('error_logs', filter=Q(error_logs__is_resolved=False)),
+        )
 
     @admin.display(description="Holat", ordering='is_online')
     def online_badge(self, obj):
@@ -112,6 +120,16 @@ class RestaurantAdmin(admin.ModelAdmin):
         if obj.desired_version and status_row.app_version == obj.desired_version:
             return format_html('<span style="color:#22883f">{} ✓</span>', version)
         return version
+
+    @admin.display(description="Xatolar", ordering='unresolved_error_count')
+    def unresolved_errors_badge(self, obj):
+        count = obj.unresolved_error_count
+        if not count:
+            return format_html('<span style="color:#22883f">0</span>')
+        return format_html(
+            '<span style="color:#fff;background:#b3261e;padding:2px 8px;'
+            'border-radius:8px;font-size:11px">{}</span>', count,
+        )
 
     @admin.action(description="Tizimni bloklash")
     def action_block_system(self, request, queryset):
@@ -238,6 +256,62 @@ class RemoteCommandAdmin(admin.ModelAdmin):
     def requeue_commands(self, request, queryset):
         updated = queryset.exclude(status='completed').update(status='pending', sent_at=None)
         self.message_user(request, f"{updated} ta buyruq qayta navbatga qo'yildi.")
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(ErrorLog)
+class ErrorLogAdmin(admin.ModelAdmin):
+    list_display = ('restaurant', 'level_badge', 'message_preview', 'occurred_at', 'received_at', 'resolved_badge')
+    list_filter = ('level', 'is_resolved', 'restaurant')
+    search_fields = ('restaurant__name', 'message', 'logger_name', 'traceback')
+    date_hierarchy = 'received_at'
+    readonly_fields = (
+        'id', 'restaurant', 'level', 'logger_name', 'message', 'traceback',
+        'module', 'func_name', 'line_no', 'occurred_at', 'received_at',
+    )
+    fields = readonly_fields + ('is_resolved', 'resolved_at', 'resolved_by', 'resolution_note')
+    actions = ['mark_resolved', 'mark_unresolved']
+
+    LEVEL_COLORS = {'ERROR': '#b3261e', 'CRITICAL': '#7c1d1d'}
+
+    @admin.display(description="Daraja")
+    def level_badge(self, obj):
+        color = self.LEVEL_COLORS.get(obj.level, '#6b7280')
+        return format_html(
+            '<span style="color:#fff;background:{};padding:2px 8px;'
+            'border-radius:8px;font-size:11px">{}</span>',
+            color, obj.level,
+        )
+
+    @admin.display(description="Xabar")
+    def message_preview(self, obj):
+        return (obj.message[:80] + '…') if len(obj.message) > 80 else obj.message
+
+    @admin.display(description="Holat")
+    def resolved_badge(self, obj):
+        if obj.is_resolved:
+            return format_html(
+                '<span style="color:#fff;background:#22883f;padding:2px 8px;'
+                'border-radius:8px;font-size:11px">Hal qilindi</span>'
+            )
+        return format_html(
+            '<span style="color:#fff;background:#b3261e;padding:2px 8px;'
+            'border-radius:8px;font-size:11px">Ochiq</span>'
+        )
+
+    @admin.action(description="Hal qilindi deb belgilash")
+    def mark_resolved(self, request, queryset):
+        updated = queryset.filter(is_resolved=False).update(
+            is_resolved=True, resolved_at=timezone.now(), resolved_by=request.user,
+        )
+        self.message_user(request, f"{updated} ta xato hal qilindi deb belgilandi.")
+
+    @admin.action(description="Qayta ochish")
+    def mark_unresolved(self, request, queryset):
+        updated = queryset.update(is_resolved=False, resolved_at=None, resolved_by=None)
+        self.message_user(request, f"{updated} ta xato qayta ochildi.")
 
     def has_add_permission(self, request):
         return False

@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Restaurant, RestaurantAdminAccount, License
+from .models import Restaurant, RestaurantAdminAccount, License, ErrorLog
 
 User = get_user_model()
 
@@ -141,3 +141,49 @@ class GenerateOfflineTokenActionTests(TestCase):
 
         messages = list(response.context['messages'])
         self.assertEqual(messages[0].level, django_messages.ERROR)
+
+
+class ErrorLogAdminActionTests(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username='ona_admin3', email='ona3@example.com', password='pass12345',
+        )
+        self.client.force_login(self.superuser)
+        self.restaurant = Restaurant.objects.create(name="Test Restoran")
+        self.error_log = ErrorLog.objects.create(
+            id='11111111-1111-1111-1111-111111111111',
+            restaurant=self.restaurant, level='ERROR', message="xato",
+            occurred_at=timezone.now(), received_at=timezone.now(),
+        )
+        self.changelist_url = reverse('admin:tenants_errorlog_changelist')
+
+    def _run_action(self, action):
+        return self.client.post(self.changelist_url, {
+            'action': action,
+            '_selected_action': [str(self.error_log.pk)],
+        }, follow=True)
+
+    def test_mark_resolved_action_sets_fields_and_user(self):
+        self._run_action('mark_resolved')
+
+        self.error_log.refresh_from_db()
+        self.assertTrue(self.error_log.is_resolved)
+        self.assertIsNotNone(self.error_log.resolved_at)
+        self.assertEqual(self.error_log.resolved_by, self.superuser)
+
+    def test_mark_unresolved_action_clears_fields(self):
+        self.error_log.is_resolved = True
+        self.error_log.resolved_at = timezone.now()
+        self.error_log.resolved_by = self.superuser
+        self.error_log.save()
+
+        self._run_action('mark_unresolved')
+
+        self.error_log.refresh_from_db()
+        self.assertFalse(self.error_log.is_resolved)
+        self.assertIsNone(self.error_log.resolved_at)
+        self.assertIsNone(self.error_log.resolved_by)
+
+    def test_has_add_permission_is_false(self):
+        response = self.client.get(reverse('admin:tenants_errorlog_add'))
+        self.assertEqual(response.status_code, 403)

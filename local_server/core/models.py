@@ -1,14 +1,24 @@
 import uuid
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
+from django.db.models import Sum
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 class BaseModel(models.Model):
     sync_uuid = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True, unique=True)
     is_synced = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Abstract bazaga qo'yilgan HistoricalRecords - har bir konkret
+    # subklass (Table, Category, Product, Order, ...) uchun avtomatik
+    # o'zining Historical<Model> jadvalini hosil qiladi, har birida alohida
+    # e'lon qilish shart emas. `inherit=True` shart - aks holda
+    # simple_history subklasslarni kuzatmaydi (ogohlantirish beradi).
+    history = HistoricalRecords(inherit=True)
 
     class Meta:
         abstract = True
@@ -145,10 +155,30 @@ class Order(BaseModel):
     waiter = models.ForeignKey(User, related_name='orders_taken', on_delete=models.SET_NULL, null=True)
     cashier = models.ForeignKey(User, related_name='orders_cashed', on_delete=models.SET_NULL, null=True, blank=True)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount_reason = models.CharField(max_length=255, blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
 
     def __str__(self):
         return f"Order #{self.id} - {self.status}"
+
+    @property
+    def final_amount(self):
+        return max(self.total_amount - self.discount_amount, Decimal('0'))
+
+    @property
+    def amount_paid(self):
+        """
+        Har doim jonli DB agregatsiyasi - bir nechta kassa terminali bir
+        vaqtda shu order'ga to'lov qo'shishi mumkin, keshlangan/prefetch
+        qilingan qiymat overpayment tekshiruvini chetlab o'tishiga olib
+        kelishi mumkin.
+        """
+        return self.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    @property
+    def balance_due(self):
+        return max(self.final_amount - self.amount_paid, Decimal('0'))
 
 class OrderItem(BaseModel):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
@@ -158,4 +188,30 @@ class OrderItem(BaseModel):
 
     def __str__(self):
         return f"{self.quantity}x {self.product.name} (Order #{self.order.id})"
+
+class Payment(BaseModel):
+    METHOD_CHOICES = (
+        ('cash', 'Cash'),
+        ('card', 'Card'),
+        ('other', 'Other'),
+    )
+
+    order = models.ForeignKey(Order, related_name='payments', on_delete=models.CASCADE)
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))],
+    )
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='cash')
+    received_by = models.ForeignKey(
+        User, related_name='payments_received', on_delete=models.SET_NULL, null=True, blank=True,
+    )
+
+    class Meta:
+        ordering = ('created_at',)
+        indexes = [models.Index(fields=['order', 'created_at'])]
+        constraints = [
+            models.CheckConstraint(check=models.Q(amount__gt=0), name='payment_amount_positive'),
+        ]
+
+    def __str__(self):
+        return f"{self.amount} ({self.method}) - Order #{self.order_id}"
 
