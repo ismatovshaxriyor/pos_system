@@ -108,7 +108,7 @@ class Notification(BaseModel):
     """
     recipient = models.ForeignKey(
         User, null=True, blank=True, related_name='notifications', on_delete=models.CASCADE,
-    )  # None = barcha adminlarga (is_staff=True) mo'ljallangan broadcast
+    )  # None = barcha menejerlarga (role='manager') mo'ljallangan broadcast
     notif_type = models.CharField(max_length=50)
     message = models.CharField(max_length=500)
     payload = models.JSONField(default=dict, blank=True)

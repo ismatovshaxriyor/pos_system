@@ -167,9 +167,14 @@ class DiscountTests(PaymentFlowTestsBase):
         self.assertIsNone(notification.recipient)
         self.assertEqual(notification.payload['order_id'], self.order.id)
 
-    def test_admin_discount_creates_no_notification(self):
+    def test_admin_discount_also_creates_notification(self):
+        """
+        Alohida "admin" roli yo'q - barcha menejerlar teng, shuning uchun
+        endi hech kim bu bildirishnomadan mustasno emas (avval faqat
+        is_staff=True hisob chegirma qo'llasa bildirishnoma yaratilmas edi).
+        """
         self._set_discount(self.admin, '5000')
-        self.assertFalse(Notification.objects.filter(notif_type='discount_applied').exists())
+        self.assertTrue(Notification.objects.filter(notif_type='discount_applied').exists())
 
     def test_setting_same_discount_amount_creates_no_duplicate_notification(self):
         self._set_discount(self.manager, '5000')

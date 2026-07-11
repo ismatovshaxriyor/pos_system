@@ -72,7 +72,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         old_price = serializer.instance.price
         product = serializer.save()
-        if product.price != old_price and not self.request.user.is_staff:
+        if product.price != old_price:
             message = (
                 f"Narx o'zgartirildi: {product.name} {old_price} -> {product.price} "
                 f"({self.request.user.username})"
@@ -107,7 +107,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             'items__product', 'payments__received_by',
         )
         user = self.request.user
-        if user.role == 'waiter' and not user.is_staff:
+        if user.role == 'waiter':
             qs = qs.filter(waiter=user)
         return qs
 
@@ -261,7 +261,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.discount_reason = new_reason
         order.save(update_fields=['discount_amount', 'discount_reason'])
 
-        if new_amount != old_amount and not request.user.is_staff:
+        if new_amount != old_amount:
             message = (
                 f"Chegirma qo'llandi: Buyurtma #{order.id} {old_amount} -> {new_amount} so'm "
                 f"({request.user.username})"
@@ -304,7 +304,7 @@ class NotificationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
     def get_queryset(self):
         user = self.request.user
         qs = Q(recipient=user)
-        if user.is_staff:
+        if user.role == 'manager':
             qs |= Q(recipient__isnull=True)
         return Notification.objects.filter(qs).order_by('-created_at')
 

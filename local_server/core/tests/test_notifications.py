@@ -29,9 +29,14 @@ class ProductPriceChangeNotificationTests(TestCase):
         self.assertEqual(notification.payload['product_id'], self.product.id)
         self.assertEqual(notification.payload['changed_by'], self.manager.id)
 
-    def test_admin_price_change_creates_no_notification(self):
+    def test_admin_price_change_also_creates_notification(self):
+        """
+        Alohida "admin" roli yo'q - barcha menejerlar teng, shuning uchun
+        endi hech kim bu bildirishnomadan mustasno emas (avval faqat
+        is_staff=True hisob o'zgartirsa bildirishnoma yaratilmas edi).
+        """
         self._patch(self.admin, price="20000")
-        self.assertFalse(Notification.objects.filter(notif_type='price_changed').exists())
+        self.assertTrue(Notification.objects.filter(notif_type='price_changed').exists())
 
     def test_manager_editing_non_price_field_creates_no_notification(self):
         self._patch(self.manager, name="Osh (yangi)")
@@ -56,6 +61,12 @@ class NotificationViewSetTests(TestCase):
 
     def test_admin_sees_broadcast_notifications(self):
         response = self.client.get(reverse('notification-list'), **_auth_header(self.admin))
+        ids = [n['id'] for n in response.data]
+        self.assertIn(self.broadcast.id, ids)
+
+    def test_regular_manager_also_sees_broadcast_notifications(self):
+        manager = User.objects.create_user(username='+998900000093', role='manager')
+        response = self.client.get(reverse('notification-list'), **_auth_header(manager))
         ids = [n['id'] for n in response.data]
         self.assertIn(self.broadcast.id, ids)
 
