@@ -109,17 +109,28 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'category', 'category_id', 'sync_uuid', 'is_synced', 'created_at', 'updated_at',
             'name', 'price', 'barcode', 'image', 'is_available', 'cost_price', 'tax_rate', 'is_deleted',
         )
+        # O'chirish faqat DELETE /api/products/<id>/ (soft-delete) orqali;
+        # o'chirilgan mahsulot ro'yxatlardan chiqib ketadi, tiklash - Django
+        # admin orqali.
+        read_only_fields = ('is_deleted',)
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
+    # Soft-delete qilingan mahsulotni yangi buyurtmaga qo'shib bo'lmaydi -
+    # menyudan olib tashlangan, lekin eski OrderItem'lar PROTECT tufayli
+    # unga ishora qilishda davom etadi.
     product_id = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(), source='product', write_only=True
+        queryset=Product.objects.filter(is_deleted=False), source='product', write_only=True
     )
 
     class Meta:
         model = OrderItem
         fields = ('id', 'product', 'product_id', 'quantity', 'price', 'status', 'note', 'modifiers', 'is_voided')
-        read_only_fields = ('price',)
+        # status (oshxona oqimi) va is_voided (void/refund) uchun hali API
+        # oqimi qurilmagan - client ularni to'g'ridan-to'g'ri yoza olmasin,
+        # aks holda keyinchalik qo'shiladigan tekshiruvli action'lar
+        # chetlab o'tiladi. price - narx doim serverda Product.price'dan.
+        read_only_fields = ('price', 'status', 'is_voided')
 
 class PaymentSerializer(serializers.ModelSerializer):
     received_by = UserSerializer(read_only=True)
@@ -127,7 +138,9 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = ('id', 'amount', 'method', 'received_by', 'created_at', 'is_voided', 'refunded_of', 'reference')
-        read_only_fields = ('received_by', 'created_at')
+        # is_voided/refunded_of - void/refund oqimi hali qurilmagan; client
+        # ularni yozolmaydi (amount_paid hisobiga ta'sir qilardi).
+        read_only_fields = ('received_by', 'created_at', 'is_voided', 'refunded_of')
 
 class DiscountSerializer(serializers.Serializer):
     """`set_discount` action so'rov tanasi uchun - haqiqiy validatsiya."""
@@ -157,4 +170,10 @@ class OrderSerializer(serializers.ModelSerializer):
             'discount_amount', 'discount_reason', 'final_amount', 'amount_paid', 'balance_due',
             'status', 'note', 'guest_count', 'items', 'payments', 'created_at',
         )
-        read_only_fields = ('total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason', 'status')
+        # tax_amount/service_charge - moliyaviy maydonlar, discount_amount
+        # bilan bir xil tamoyil: client to'g'ridan-to'g'ri yozolmaydi (hozircha
+        # ularni to'ldiradigan server-tomon oqim ham yo'q - qiymatlar 0).
+        read_only_fields = (
+            'total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason',
+            'status', 'tax_amount', 'service_charge',
+        )

@@ -177,7 +177,13 @@ class Order(BaseModel):
 
     @property
     def total_amount(self):
-        return sum(item.price * item.quantity for item in self.items.all())
+        # Python darajasida filtrlash ataylab - .filter(is_voided=False)
+        # prefetch keshini chetlab har order uchun yangi so'rov yuborar edi
+        # (ro'yxat endpointida N+1).
+        return sum(
+            (item.price * item.quantity for item in self.items.all() if not item.is_voided),
+            Decimal('0'),
+        )
 
     @property
     def final_amount(self):
@@ -191,7 +197,7 @@ class Order(BaseModel):
         qilingan qiymat overpayment tekshiruvini chetlab o'tishiga olib
         kelishi mumkin.
         """
-        return self.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        return self.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     @property
     def balance_due(self):

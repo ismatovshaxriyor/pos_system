@@ -59,6 +59,10 @@ services:
     tmpfs:
       - /tmp
       - /run
+      # entrypoint.sh har start'da `collectstatic` qiladi (whitenoise manifest
+      # storage buni talab qiladi) va STATIC_ROOT=/app/staticfiles'ga yozadi -
+      # read_only ildiz FS bilan bu joy yoziladigan bo'lishi shart.
+      - /app/staticfiles
     depends_on:
       db:
         condition: service_healthy
@@ -90,7 +94,10 @@ services:
 
   celery_beat:
     build: .
-    command: celery -A config beat --loglevel=info
+    # --schedule /tmp'da bo'lishi shart: konteyner read_only, beat esa jadval
+    # faylini (default: /app/celerybeat-schedule) yozib turadi - aks holda
+    # boot'da crash. /tmp - tmpfs; restart'da yo'qolishi zararsiz.
+    command: celery -A config beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     env_file: .env
     environment:
       - DB_HOST=db

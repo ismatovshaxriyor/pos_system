@@ -3,11 +3,15 @@ from datetime import timedelta
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from tenants.models import License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
+from tenants.models import (
+    License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
+    SyncedOrder,
+)
 from tenants.tasks import mark_offline_restaurants
 from tenants.signals import compute_default_license_expiry
 from .jwt_utils import issue_license_token, issue_license_token_batch
@@ -155,6 +159,10 @@ class TokenBatchIssuanceTests(TestCase):
         self.assertEqual(tokens[-1][1], self.license.expires_at)
 
 
+# override_settings shart: usiz test muhitdagi real LICENSE_PRIVATE_KEY'ga
+# (keys/ mount yoki env) bog'lanib qoladi - kalit yo'q joyda (masalan CI)
+# InvalidKeyError bilan yiqiladi.
+@override_settings(LICENSE_PRIVATE_KEY=PRIVATE_PEM, LICENSE_TOKEN_TTL_DAYS=7)
 class RenewTests(TestCase):
     def setUp(self):
         self.restaurant = Restaurant.objects.create(name="Test Restoran")
@@ -250,6 +258,11 @@ class MarkOfflineRestaurantsTests(TestCase):
         fresh = Restaurant.objects.create(
             name="Yangi", is_online=True, last_seen=timezone.now(),
         )
+        # Kesh kalitlarini test o'zi boshqaradi - Redis test yugurishlari
+        # orasida tozalanmaydi, oldingi holat natijani buzmasin.
+        cache.delete(f"restaurant_metrics_{stale.id}")
+        cache.set(f"restaurant_metrics_{fresh.id}", {"cpu_percent": 1.0}, timeout=60)
+        self.addCleanup(cache.delete, f"restaurant_metrics_{fresh.id}")
 
         mark_offline_restaurants.run()
 
@@ -257,6 +270,20 @@ class MarkOfflineRestaurantsTests(TestCase):
         fresh.refresh_from_db()
         self.assertFalse(stale.is_online)
         self.assertTrue(fresh.is_online)
+
+    def test_cache_miss_alone_does_not_mark_recently_seen_offline(self):
+        # Redis flush stsenariysi: kesh bo'sh, lekin last_seen yaqin -
+        # restoran oflayn deb belgilanmasligi kerak (aks holda har Redis
+        # restart butun flotni "oflayn" ko'rsatib yuboradi).
+        recent = Restaurant.objects.create(
+            name="Kesh yo'q, lekin tirik", is_online=True, last_seen=timezone.now(),
+        )
+        cache.delete(f"restaurant_metrics_{recent.id}")
+
+        mark_offline_restaurants.run()
+
+        recent.refresh_from_db()
+        self.assertTrue(recent.is_online)
 
 
 class RemoteCommandLifecycleTests(TestCase):
@@ -525,3 +552,108 @@ class ErrorLogIngestTests(TestCase):
 
         row = ErrorLog.objects.get(id=event['id'])
         self.assertEqual(row.restaurant_id, self.restaurant.id)
+
+
+class OrderSyncTests(TestCase):
+    def setUp(self):
+        self.restaurant = Restaurant.objects.create(name="Test Restoran")
+        self.license = self.restaurant.license  # auto-created by post_save signal
+        self.license.hardware_hash = "a" * 64
+        self.license.expires_at = timezone.now() + timedelta(days=30)
+        self.license.save()
+        self.url = reverse('sync-orders')
+
+    def _auth(self):
+        return {"HTTP_AUTHORIZATION": f"Token {self.license.key}"}
+
+    def _order_payload(self, **overrides):
+        payload = {
+            "sync_uuid": str(uuid.uuid4()),
+            "total_amount": "50000.00",
+            "discount_amount": "0.00",
+            "tax_amount": "0.00",
+            "service_charge": "0.00",
+            "final_amount": "50000.00",
+            "order_type": "dine_in",
+            "status": "completed",
+            "waiter_name": "Ali",
+            "closed_at": timezone.now().isoformat(),
+            "items": [{
+                "sync_uuid": str(uuid.uuid4()),
+                "product_name": "Osh", "quantity": 2, "price": "25000.00",
+            }],
+            "payments": [{
+                "sync_uuid": str(uuid.uuid4()),
+                "amount": "50000.00", "method": "cash", "is_voided": False,
+                "created_at": timezone.now().isoformat(),
+            }],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_orders_stored_and_acked(self):
+        payload = self._order_payload()
+        response = self.client.post(
+            self.url, {"orders": [payload]}, content_type='application/json', **self._auth(),
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['synced_uuids'], [payload['sync_uuid']])
+
+        order = SyncedOrder.objects.get(id=payload['sync_uuid'])
+        self.assertEqual(order.restaurant, self.restaurant)
+        self.assertEqual(order.items.count(), 1)
+        self.assertEqual(order.payments.count(), 1)
+
+    def test_resend_is_idempotent(self):
+        payload = self._order_payload()
+        for _ in range(2):
+            response = self.client.post(
+                self.url, {"orders": [payload]}, content_type='application/json', **self._auth(),
+            )
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(response.data['synced_uuids'], [payload['sync_uuid']])
+
+        self.assertEqual(SyncedOrder.objects.count(), 1)
+        order = SyncedOrder.objects.get(id=payload['sync_uuid'])
+        self.assertEqual(order.items.count(), 1)
+        self.assertEqual(order.payments.count(), 1)
+
+    def test_cannot_overwrite_other_restaurants_order(self):
+        # Tenant izolyatsiyasi: bitta Bola boshqa restoranning sync_uuid'ini
+        # (bila turib yoki UUID to'qnashuvida) qayta yoza olmasligi kerak.
+        other = Restaurant.objects.create(name="Boshqa Restoran")
+        payload = self._order_payload()
+        SyncedOrder.objects.create(
+            id=payload['sync_uuid'], restaurant=other,
+            total_amount='1.00', discount_amount='0.00', final_amount='1.00',
+            status='completed',
+        )
+
+        response = self.client.post(
+            self.url, {"orders": [payload]}, content_type='application/json', **self._auth(),
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['synced_uuids'], [])
+
+        order = SyncedOrder.objects.get(id=payload['sync_uuid'])
+        self.assertEqual(order.restaurant, other)
+
+    def test_requires_license_auth(self):
+        # No authenticate_header -> DRF coerces 401 to 403 (see RenewTests note).
+        response = self.client.post(
+            self.url, {"orders": [self._order_payload()]}, content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_dead_license_can_still_sync(self):
+        # HeartbeatAuthentication: bloklangan/o'chirilgan restoran ham sotuv
+        # hisobotini yuborishda davom etishi kerak.
+        self.license.is_active = False
+        self.license.save()
+
+        payload = self._order_payload()
+        response = self.client.post(
+            self.url, {"orders": [payload]}, content_type='application/json', **self._auth(),
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(SyncedOrder.objects.filter(id=payload['sync_uuid']).exists())

@@ -31,7 +31,11 @@ class ErrorLogEventSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     level = serializers.ChoiceField(choices=('ERROR', 'CRITICAL'))
     logger_name = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
-    message = serializers.CharField(max_length=2000)
+    # 5000 - Bola tomonidagi log_handler.MAX_MESSAGE_CHARS bilan bir xil:
+    # Bola shu chegaragacha kesib saqlaydi/yuboradi; bu yerdagi limit undan
+    # kichik bo'lsa, uzunroq xabar butun partiyani 400 bilan qaytarib,
+    # error-log navbatini abadiy tiqilib qolishiga olib kelardi.
+    message = serializers.CharField(max_length=5000)
     traceback = serializers.CharField(required=False, allow_blank=True, default='')
     module = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
     func_name = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')

@@ -39,9 +39,15 @@ jobs:
           script: |
             set -e
             cd ~/pos_system/cloud_server
-            if docker compose -f docker-compose.prod.yml ps -q db > /dev/null 2>&1; then
+            # Diqqat: bu script SSH orqali oddiy shell'da ishlaydi - $$ bu
+            # yerda compose-uslubidagi ekranlash EMAS, shell PID bo'lib
+            # ochilib ketadi ($$(date ...) esa syntax error berib butun
+            # deploy'ni to'xtatardi). POSTGRES_USER/POSTGRES_DB - db
+            # konteynerining o'z env'i, host shell'da DB_USER yo'qligiga
+            # bog'liq emas.
+            if [ -n "$(docker compose -f docker-compose.prod.yml ps -q db)" ]; then
               mkdir -p backups
-              docker compose -f docker-compose.prod.yml exec -T db pg_dump -U $${DB_USER:-cloud_user} $${DB_NAME:-pos_cloud_db} > backups/pre_deploy_backup_$$(date +%F_%H%M%S).sql || echo "Backup failed"
+              docker compose -f docker-compose.prod.yml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "backups/pre_deploy_backup_$(date +%F_%H%M%S).sql" || echo "Backup failed"
             fi
             cd ~/pos_system
             git fetch origin main

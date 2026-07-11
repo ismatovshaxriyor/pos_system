@@ -191,14 +191,20 @@ def sync_completed_orders():
     if not state or not state.activated_at:
         return
 
+    # order_by shart: tartibsiz [:200] kesimida Postgres qaysi qatorlarni
+    # qaytarishi noaniq - navbatda turgan eski buyurtma yangilari oqimi
+    # ostida cheksiz kutib qolishi (starvation) mumkin edi.
     orders = Order.objects.filter(
-        is_synced=False, 
+        is_synced=False,
         status__in=['completed', 'cancelled']
-    ).prefetch_related('items__product', 'payments', 'waiter')[:200]
-    
+    ).order_by('updated_at').prefetch_related('items__product', 'payments')[:200]
+
     if not orders:
         return
 
+    # Pul qiymatlari str() bilan - float() Decimal'ni ikkilik kasrga
+    # o'girib aniqlikni buzishi mumkin; DRF DecimalField string'ni
+    # to'g'ridan-to'g'ri qabul qiladi.
     orders_data = []
     for order in orders:
         items_data = []
@@ -207,29 +213,32 @@ def sync_completed_orders():
                 "sync_uuid": str(item.sync_uuid),
                 "product_name": item.product.name if item.product else 'Unknown',
                 "quantity": item.quantity,
-                "price": float(item.price)
+                "price": str(item.price)
             })
-        
+
         payments_data = []
         for payment in order.payments.all():
             payments_data.append({
                 "sync_uuid": str(payment.sync_uuid),
-                "amount": float(payment.amount),
+                "amount": str(payment.amount),
                 "method": payment.method,
-                "is_voided": getattr(payment, 'is_voided', False),
+                "is_voided": payment.is_voided,
                 "created_at": payment.created_at.isoformat()
             })
-        
+
         orders_data.append({
             "sync_uuid": str(order.sync_uuid),
-            "total_amount": float(order.total_amount),
-            "discount_amount": float(order.discount_amount),
-            "tax_amount": float(getattr(order, 'tax_amount', 0)),
-            "service_charge": float(getattr(order, 'service_charge', 0)),
-            "final_amount": float(order.final_amount),
-            "order_type": getattr(order, 'order_type', 'dine_in'),
+            "total_amount": str(order.total_amount),
+            "discount_amount": str(order.discount_amount),
+            "tax_amount": str(order.tax_amount),
+            "service_charge": str(order.service_charge),
+            "final_amount": str(order.final_amount),
+            "order_type": order.order_type,
             "status": order.status,
-            "waiter_name": order.waiter.get_full_name() or order.waiter.username if order.waiter else '',
+            # [:100] - Ona'dagi SyncedOrder.waiter_name (va serializer)
+            # max_length=100; uzunroq ism butun buyurtmani validatsiyadan
+            # qaytarib, uni abadiy sinxronlanmas qilib qo'yar edi.
+            "waiter_name": ((order.waiter.get_full_name() or order.waiter.username) if order.waiter else '')[:100],
             "closed_at": order.updated_at.isoformat(),
             "items": items_data,
             "payments": payments_data

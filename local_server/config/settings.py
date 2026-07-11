@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
@@ -215,6 +216,16 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
 
+# Test rejimida throttling o'chiriladi - suite bitta manzildan yuzlab so'rov
+# yuboradi, throttle hisoblagichlari esa Redis'da test yugurishlari orasida
+# ham saqlanib qolib, tasodifiy 429'lar bilan testlarni sindiradi.
+# Rate'lar ham None: ba'zi view'lar throttle_classes'ni klass darajasida
+# o'zi e'lon qiladi va DEFAULT_THROTTLE_CLASSES bo'shligi ularga ta'sir
+# qilmaydi - rate None esa har qanday SimpleRateThrottle'ni o'chiradi.
+if 'test' in sys.argv:
+    REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': None, 'user': None}
+
 # Spectacular settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'POS System Local API',
@@ -271,6 +282,13 @@ CACHES = {
         'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
     }
 }
+
+# Postgres'dan farqli, Django test yugurishi uchun alohida Redis yaratmaydi -
+# testlar dev keshi (PIN rate-limit kalitlari, litsenziya verdikti) bilan
+# bitta bazani bo'lishib, bir-birini nondeterministik ifloslantiradi.
+# Test rejimida alohida DB raqamiga o'tamiz.
+if 'test' in sys.argv and CACHES['default']['LOCATION'].endswith('/0'):
+    CACHES['default']['LOCATION'] = CACHES['default']['LOCATION'][:-2] + '/9'
 
 # Error log reporting (Bola -> Ona)
 ERROR_LOG_BATCH_SIZE = int(os.environ.get('ERROR_LOG_BATCH_SIZE', 200))

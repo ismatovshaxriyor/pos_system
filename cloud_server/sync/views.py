@@ -1,9 +1,11 @@
+import logging
+
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, throttling
 from django.utils import timezone
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.core.cache import cache
 from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
@@ -12,6 +14,8 @@ from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
     ErrorLogBatchSerializer, OrderSyncBatchSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 MAX_COMMANDS_PER_HEARTBEAT = 10
 
@@ -291,6 +295,12 @@ class ErrorLogView(APIView):
 class OrderSyncView(APIView):
     """
     Bola'dan yopilgan buyurtmalarni qabul qiladi.
+
+    Idempotent: bir xil sync_uuid takror yuborilsa buyurtma yangilanadi
+    (update_or_create + child qatorlarni delete-and-recreate). Har buyurtma
+    o'z savepoint'ida saqlanadi - bitta buzuq yozuv butun partiyani
+    yiqitmaydi. Javobdagi synced_uuids faqat muvaffaqiyatli saqlanganlar -
+    Bola qolganlarini keyingi beat'da qayta uradi.
     """
     authentication_classes = [HeartbeatAuthentication]
     permission_classes = [permissions.IsAuthenticated]
@@ -305,51 +315,73 @@ class OrderSyncView(APIView):
 
         synced_uuids = []
 
-        with transaction.atomic():
-            for order_data in orders_data:
-                order_id = order_data['sync_uuid']
-                
-                # update_or_create xuddi bitta uuid uchun takror yuborilsa idempotency
-                order, created = SyncedOrder.objects.update_or_create(
-                    id=order_id,
-                    defaults={
-                        'restaurant': restaurant,
-                        'total_amount': order_data['total_amount'],
-                        'discount_amount': order_data['discount_amount'],
-                        'tax_amount': order_data['tax_amount'],
-                        'service_charge': order_data['service_charge'],
-                        'final_amount': order_data['final_amount'],
-                        'order_type': order_data['order_type'],
-                        'status': order_data['status'],
-                        'waiter_name': order_data['waiter_name'],
-                        'closed_at': order_data.get('closed_at'),
-                    }
+        for order_data in orders_data:
+            order_id = order_data['sync_uuid']
+
+            # Tenant izolyatsiyasi (CommandResultView bilan bir xil tamoyil):
+            # boshqa restoranga tegishli sync_uuid'ni qayta yozib bo'lmaydi -
+            # aks holda buzilgan/yovuz Bola o'z litsenziya kaliti bilan boshqa
+            # restoranning sotuv nusxalarini o'zgartira olar edi. Ataylab
+            # synced_uuids'ga ham qo'shilmaydi: bu holat faqat UUID
+            # to'qnashuvida yuz beradi va logda ko'rinib turishi kerak.
+            if SyncedOrder.objects.filter(id=order_id).exclude(restaurant=restaurant).exists():
+                logger.warning(
+                    "Order sync rad etildi: %s boshqa restoranga tegishli (so'rovchi: %s).",
+                    order_id, restaurant.name,
                 )
+                continue
 
-                order.items.all().delete()
-                order.payments.all().delete()
+            try:
+                with transaction.atomic():
+                    order, _created = SyncedOrder.objects.update_or_create(
+                        id=order_id,
+                        defaults={
+                            'restaurant': restaurant,
+                            'total_amount': order_data['total_amount'],
+                            'discount_amount': order_data['discount_amount'],
+                            'tax_amount': order_data['tax_amount'],
+                            'service_charge': order_data['service_charge'],
+                            'final_amount': order_data['final_amount'],
+                            'order_type': order_data['order_type'],
+                            'status': order_data['status'],
+                            'waiter_name': order_data['waiter_name'],
+                            'closed_at': order_data.get('closed_at'),
+                        }
+                    )
 
-                SyncedOrderItem.objects.bulk_create([
-                    SyncedOrderItem(
-                        id=item_data['sync_uuid'],
-                        order=order,
-                        product_name=item_data['product_name'],
-                        quantity=item_data['quantity'],
-                        price=item_data['price']
-                    ) for item_data in order_data['items']
-                ])
+                    order.items.all().delete()
+                    order.payments.all().delete()
 
-                SyncedPayment.objects.bulk_create([
-                    SyncedPayment(
-                        id=payment_data['sync_uuid'],
-                        order=order,
-                        amount=payment_data['amount'],
-                        method=payment_data['method'],
-                        is_voided=payment_data['is_voided'],
-                        received_at=payment_data['created_at']
-                    ) for payment_data in order_data['payments']
-                ])
+                    SyncedOrderItem.objects.bulk_create([
+                        SyncedOrderItem(
+                            id=item_data['sync_uuid'],
+                            order=order,
+                            product_name=item_data['product_name'],
+                            quantity=item_data['quantity'],
+                            price=item_data['price']
+                        ) for item_data in order_data['items']
+                    ])
 
-                synced_uuids.append(str(order_id))
+                    SyncedPayment.objects.bulk_create([
+                        SyncedPayment(
+                            id=payment_data['sync_uuid'],
+                            order=order,
+                            amount=payment_data['amount'],
+                            method=payment_data['method'],
+                            is_voided=payment_data['is_voided'],
+                            received_at=payment_data['created_at']
+                        ) for payment_data in order_data['payments']
+                    ])
+            except IntegrityError:
+                # Masalan item/payment sync_uuid'i boshqa buyurtmaniki bilan
+                # to'qnashdi - savepoint bekor bo'ladi, qolgan buyurtmalar
+                # saqlanaveradi.
+                logger.warning(
+                    "Order sync IntegrityError: %s o'tkazib yuborildi (%s).",
+                    order_id, restaurant.name,
+                )
+                continue
+
+            synced_uuids.append(str(order_id))
 
         return Response({"synced_uuids": synced_uuids, "detail": "Buyurtmalar sinxronlashtirildi."}, status=status.HTTP_201_CREATED)

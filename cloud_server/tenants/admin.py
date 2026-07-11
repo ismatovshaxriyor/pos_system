@@ -8,7 +8,10 @@ from django.contrib import admin, messages
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
-from .models import Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
+from .models import (
+    Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
+    SyncedOrder, SyncedOrderItem, SyncedPayment,
+)
 from .signals import compute_default_license_expiry
 from sync.jwt_utils import issue_license_token
 
@@ -414,4 +417,42 @@ class ErrorLogAdmin(admin.ModelAdmin):
         self.message_user(request, f"{updated} ta xato qayta ochildi.")
 
     def has_add_permission(self, request):
+        return False
+
+
+class SyncedOrderItemInline(admin.TabularInline):
+    model = SyncedOrderItem
+    extra = 0
+    can_delete = False
+    readonly_fields = ('id', 'product_name', 'quantity', 'price')
+
+
+class SyncedPaymentInline(admin.TabularInline):
+    model = SyncedPayment
+    extra = 0
+    can_delete = False
+    readonly_fields = ('id', 'amount', 'method', 'is_voided', 'received_at')
+
+
+@admin.register(SyncedOrder)
+class SyncedOrderAdmin(admin.ModelAdmin):
+    """
+    Bola'lardan kelgan sotuv nusxalari - faqat o'qish uchun: haqiqat manbai
+    restoran ichidagi Bola DB'sida, bu yerda tahrirlash sinxronizatsiya
+    bilan ziddiyat tug'diradi (keyingi qayta yuborish ustidan yozadi).
+    """
+    list_display = ('id', 'restaurant', 'status', 'order_type', 'final_amount', 'waiter_name', 'closed_at', 'received_at')
+    list_filter = ('status', 'order_type', 'restaurant')
+    search_fields = ('id', 'waiter_name', 'restaurant__name')
+    date_hierarchy = 'closed_at'
+    list_select_related = ('restaurant',)
+    inlines = [SyncedOrderItemInline, SyncedPaymentInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False

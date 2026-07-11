@@ -97,7 +97,11 @@ services:
 
   celery_beat:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
-    command: celery -A config beat --loglevel=info
+    # --schedule /tmp'da bo'lishi shart: konteyner read_only, beat esa jadval
+    # faylini (default: /app/celerybeat-schedule) yozib turadi - aks holda
+    # boot'da crash. /tmp - tmpfs; restart'da yo'qolishi zararsiz, jadval
+    # settings'dagi CELERY_BEAT_SCHEDULE'dan qayta quriladi.
+    command: celery -A config beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     env_file: .env
     environment:
       - DB_HOST=db

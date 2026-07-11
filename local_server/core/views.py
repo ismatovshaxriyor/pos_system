@@ -70,6 +70,20 @@ class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
 
+    def get_queryset(self):
+        # Soft-delete qilingan mahsulotlar API'dan butunlay yashiriladi
+        # (tiklash - Django admin orqali).
+        return Product.objects.filter(is_deleted=False)
+
+    def perform_destroy(self, instance):
+        # OrderItem.product PROTECT - bir marta sotilgan mahsulotni hard
+        # delete qilish ProtectedError (500) beradi. DELETE shuning uchun
+        # soft-delete: menyudan yo'qoladi, tarixiy buyurtmalar esa
+        # mahsulotga ishora qilishda davom etadi.
+        instance.is_deleted = True
+        instance.is_available = False
+        instance.save(update_fields=['is_deleted', 'is_available', 'updated_at'])
+
     def perform_update(self, serializer):
         old_price = serializer.instance.price
         product = serializer.save()
@@ -95,11 +109,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
-        # Chegirma qo'yish - moliyaviy jihatdan nozik amal, faqat
-        # menejer/admin uchun. Qolgan barcha action (yaratish, to'lov
-        # qo'shish, yopish) kassir/afitsiant ham bajarishi kerak bo'lgani
-        # uchun oddiy IsAuthenticated'da qoladi.
-        if self.action == 'set_discount':
+        # Chegirma qo'yish va bekor qilish - moliyaviy jihatdan nozik
+        # amallar, faqat menejer/admin uchun. Qolgan barcha action (yaratish,
+        # to'lov qo'shish, yopish) kassir/afitsiant ham bajarishi kerak
+        # bo'lgani uchun oddiy IsAuthenticated'da qoladi.
+        # Diqqat: bu override bor ekan, @action(permission_classes=...) bu
+        # ViewSet'da ISHLAMAYDI - action darajasidagi ruxsatlar faqat shu
+        # yerda e'lon qilinadi.
+        if self.action in ('set_discount', 'cancel'):
             return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
         return [permissions.IsAuthenticated()]
 
@@ -140,20 +157,27 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
         order = self.get_object()
-        if order.status in ('completed', 'cancelled'):
-            return Response({'detail': 'Order already completed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
 
-        balance_due = order.balance_due
-        if balance_due > 0:
-            return Response(
-                {'detail': f"Buyurtma to'liq to'lanmagan. Qolgan qarz: {balance_due} so'm."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        with transaction.atomic():
+            # Status/balans tekshiruvi lock ichida - aks holda parallel
+            # add_item/add_payment bilan poyga: tekshiruvdan keyin, saqlashdan
+            # oldin buyurtma o'zgarib qolishi mumkin (TOCTOU).
+            order = Order.objects.select_for_update().get(pk=order.pk)
+            if order.status in ORDER_FINISHED_STATUSES:
+                return Response({'detail': 'Order already completed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
 
-        order.status = 'completed'
-        order.cashier = request.user
-        order.save()
+            balance_due = order.balance_due
+            if balance_due > 0:
+                return Response(
+                    {'detail': f"Buyurtma to'liq to'lanmagan. Qolgan qarz: {balance_due} so'm."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
+            order.status = 'completed'
+            order.cashier = request.user
+            order.save()
+
+        broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
 
@@ -169,10 +193,15 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         order = self.get_object()
-        if order.status != 'new':
-            return Response({'detail': "Faqat 'new' holatdagi buyurtmalarni boshlash mumkin."}, status=status.HTTP_400_BAD_REQUEST)
-        order.status = 'in_progress'
-        order.save(update_fields=['status'])
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=order.pk)
+            if order.status != 'new':
+                return Response({'detail': "Faqat 'new' holatdagi buyurtmalarni boshlash mumkin."}, status=status.HTTP_400_BAD_REQUEST)
+            order.status = 'in_progress'
+            # updated_at (auto_now) update_fields ro'yxatida bo'lmasa
+            # yangilanmaydi - sync closed_at shu maydonga tayanadi.
+            order.save(update_fields=['status', 'updated_at'])
+        broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
         return Response({'status': 'Order started'})
@@ -184,16 +213,21 @@ class OrderViewSet(viewsets.ModelViewSet):
             400: OpenApiResponse(ErrorDetailSerializer, description="Yopilgan buyurtmani bekor qilib bo'lmaydi."),
         },
     )
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsManagerOrAdmin])
+    # Ruxsat get_permissions()'da (IsManagerOrAdmin) - bu yerda
+    # permission_classes yozish befoyda, override uni bekor qiladi.
+    @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         order = self.get_object()
-        if order.status == 'completed':
-            return Response({'detail': "Yakunlangan buyurtmani bekor qilib bo'lmaydi."}, status=status.HTTP_400_BAD_REQUEST)
-        if order.status == 'cancelled':
-            return Response({'detail': "Buyurtma allaqachon bekor qilingan."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        order.status = 'cancelled'
-        order.save(update_fields=['status'])
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=order.pk)
+            if order.status == 'completed':
+                return Response({'detail': "Yakunlangan buyurtmani bekor qilib bo'lmaydi."}, status=status.HTTP_400_BAD_REQUEST)
+            if order.status == 'cancelled':
+                return Response({'detail': "Buyurtma allaqachon bekor qilingan."}, status=status.HTTP_400_BAD_REQUEST)
+
+            order.status = 'cancelled'
+            order.save(update_fields=['status', 'updated_at'])
+        broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
         return Response({'status': 'Order cancelled'})
@@ -208,27 +242,33 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
         order = self.get_object()
-        if order.status in ORDER_FINISHED_STATUSES:
-            return Response(
-                {'detail': "Yopilgan yoki bekor qilingan buyurtmaga mahsulot qo'shib bo'lmaydi."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         serializer = OrderItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         product = serializer.validated_data['product']
         quantity = serializer.validated_data.get('quantity', 1)
-        price = product.price
 
         with transaction.atomic():
+            # Status tekshiruvi lock ichida - lock'dan oldin tekshirilsa,
+            # parallel close/cancel bilan poygada yopilgan buyurtmaga item
+            # qo'shilib qolishi mumkin edi.
             order = Order.objects.select_for_update().get(pk=order.pk)
-            
+            if order.status in ORDER_FINISHED_STATUSES:
+                return Response(
+                    {'detail': "Yopilgan yoki bekor qilingan buyurtmaga mahsulot qo'shib bo'lmaydi."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             OrderItem.objects.create(
                 order=order,
                 product=product,
                 quantity=quantity,
-                price=price
+                price=product.price,
+                note=serializer.validated_data.get('note', ''),
+                modifiers=serializer.validated_data.get('modifiers') or {},
             )
+
+        broadcast_event('order_updated', {'order_id': order.id})
 
         return Response({'status': 'Item added'}, status=status.HTTP_201_CREATED)
 
@@ -245,11 +285,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_payment(self, request, pk=None):
         order = self.get_object()
-        if order.status in ORDER_FINISHED_STATUSES:
-            return Response(
-                {'detail': "Yopilgan yoki bekor qilingan buyurtmaga to'lov qo'shib bo'lmaydi."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         serializer = PaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -258,11 +293,18 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             # Bir nechta kassa terminali bir vaqtda shu order'ga to'lov
-            # qo'shishi mumkin (split-payment) - qatorni qulflab, eng so'nggi
-            # balance_due'ni shu tranzaksiya ichida qayta o'qiymiz, aks holda
-            # ikki parallel so'rov orasidagi race overpayment'ga olib kelishi
+            # qo'shishi mumkin (split-payment) - qatorni qulflab, statusni ham,
+            # eng so'nggi balance_due'ni ham shu tranzaksiya ichida qayta
+            # o'qiymiz, aks holda ikki parallel so'rov orasidagi race
+            # overpayment'ga yoki yopilgan buyurtmaga to'lovga olib kelishi
             # mumkin.
             order = Order.objects.select_for_update().get(pk=order.pk)
+            if order.status in ORDER_FINISHED_STATUSES:
+                return Response(
+                    {'detail': "Yopilgan yoki bekor qilingan buyurtmaga to'lov qo'shib bo'lmaydi."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             balance_due = order.balance_due
             if amount > balance_due:
                 return Response(
@@ -274,6 +316,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 order=order,
                 amount=amount,
                 method=serializer.validated_data.get('method', 'cash'),
+                reference=serializer.validated_data.get('reference', ''),
                 received_by=request.user,
             )
 
@@ -294,27 +337,31 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def set_discount(self, request, pk=None):
         order = self.get_object()
-        if order.status in ORDER_FINISHED_STATUSES:
-            return Response(
-                {'detail': "Yopilgan yoki bekor qilingan buyurtmaga chegirma qo'llab bo'lmaydi."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         serializer = DiscountSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         new_amount = serializer.validated_data['discount_amount']
         new_reason = serializer.validated_data.get('discount_reason', '')
-        if new_amount > order.total_amount:
-            return Response(
-                {'detail': f"Chegirma summasi buyurtma summasidan ({order.total_amount} so'm) katta bo'lishi mumkin emas."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
-        old_amount = order.discount_amount
-        order.discount_amount = new_amount
-        order.discount_reason = new_reason
-        order.save(update_fields=['discount_amount', 'discount_reason'])
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=order.pk)
+            if order.status in ORDER_FINISHED_STATUSES:
+                return Response(
+                    {'detail': "Yopilgan yoki bekor qilingan buyurtmaga chegirma qo'llab bo'lmaydi."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if new_amount > order.total_amount:
+                return Response(
+                    {'detail': f"Chegirma summasi buyurtma summasidan ({order.total_amount} so'm) katta bo'lishi mumkin emas."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            old_amount = order.discount_amount
+            order.discount_amount = new_amount
+            order.discount_reason = new_reason
+            order.save(update_fields=['discount_amount', 'discount_reason', 'updated_at'])
 
         if new_amount != old_amount:
             message = (
@@ -381,7 +428,7 @@ class BootstrapView(APIView):
             orders_qs = orders_qs.filter(waiter=user)
         
         categories = Category.objects.all()
-        products = Product.objects.filter(is_available=True)
+        products = Product.objects.filter(is_available=True, is_deleted=False)
         tables = Table.objects.filter(is_active=True)
 
         return Response({
