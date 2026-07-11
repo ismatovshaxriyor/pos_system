@@ -2,9 +2,15 @@ from rest_framework import permissions
 
 
 class IsAdminStaff(permissions.BasePermission):
-    """Faqat is_staff=True (restoran admini)."""
+    """
+    Faqat menejer (`role == 'manager'`) - is_staff'ga emas, rolega bog'liq.
+    Alohida "admin" roli yo'q: restoran birinchi faollashtirilganda Ona'dan
+    kelgan bosh hisob ham, keyinchalik PIN bilan qo'shilgan boshqa
+    menejerlar ham to'liq bir xil huquqqa ega.
+    """
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_staff)
+        user = request.user
+        return bool(user and user.is_authenticated and user.role == 'manager')
 
 
 class IsManagerOrAdmin(permissions.BasePermission):
