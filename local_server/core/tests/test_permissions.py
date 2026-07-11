@@ -66,7 +66,7 @@ class OrderQuerysetScopingTests(TestCase):
         response = self.client.get(reverse('order-list'), **_auth_header(self.waiter_a))
 
         self.assertEqual(response.status_code, 200)
-        ids = [o['id'] for o in response.data]
+        ids = [o['id'] for o in response.data['results']]
         self.assertIn(self.order_a.id, ids)
         self.assertNotIn(self.order_b.id, ids)
 
@@ -78,7 +78,7 @@ class OrderQuerysetScopingTests(TestCase):
     def test_manager_sees_all_orders(self):
         response = self.client.get(reverse('order-list'), **_auth_header(self.manager))
 
-        ids = [o['id'] for o in response.data]
+        ids = [o['id'] for o in response.data['results']]
         self.assertIn(self.order_a.id, ids)
         self.assertIn(self.order_b.id, ids)
 

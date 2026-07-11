@@ -68,3 +68,12 @@ class OnaClient:
             timeout=self.timeout,
         )
         return response
+
+    def post_orders(self, license_key, orders_data):
+        response = requests.post(
+            self._url('/api/sync/orders/'),
+            json={"orders": orders_data},
+            headers=self._auth_headers(license_key),
+            timeout=self.timeout,
+        )
+        return response

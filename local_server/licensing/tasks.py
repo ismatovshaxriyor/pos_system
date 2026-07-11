@@ -11,6 +11,7 @@ from .client import OnaClient
 from .hardware import get_hardware_fingerprint
 from .metrics import collect_metrics
 from .models import ErrorLog, LicenseState
+from core.models import Order
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,77 @@ def cleanup_error_logs():
         )
 
     return {"reported_deleted": reported_deleted, "overflow_deleted": overflow_deleted}
+
+
+@shared_task
+def sync_completed_orders():
+    """
+    Boladagi yopilgan (completed/cancelled) buyurtmalarni Onaga sinxronlash
+    uchun yuboradi. Har daqiqada ishlaydi.
+    """
+    state = LicenseState.load()
+    if not state or not state.activated_at:
+        return
+
+    orders = Order.objects.filter(
+        is_synced=False, 
+        status__in=['completed', 'cancelled']
+    ).prefetch_related('items__product', 'payments', 'waiter')[:200]
+    
+    if not orders:
+        return
+
+    orders_data = []
+    for order in orders:
+        items_data = []
+        for item in order.items.all():
+            items_data.append({
+                "sync_uuid": str(item.sync_uuid),
+                "product_name": item.product.name if item.product else 'Unknown',
+                "quantity": item.quantity,
+                "price": float(item.price)
+            })
+        
+        payments_data = []
+        for payment in order.payments.all():
+            payments_data.append({
+                "sync_uuid": str(payment.sync_uuid),
+                "amount": float(payment.amount),
+                "method": payment.method,
+                "is_voided": getattr(payment, 'is_voided', False),
+                "created_at": payment.created_at.isoformat()
+            })
+        
+        orders_data.append({
+            "sync_uuid": str(order.sync_uuid),
+            "total_amount": float(order.total_amount),
+            "discount_amount": float(order.discount_amount),
+            "tax_amount": float(getattr(order, 'tax_amount', 0)),
+            "service_charge": float(getattr(order, 'service_charge', 0)),
+            "final_amount": float(order.final_amount),
+            "order_type": getattr(order, 'order_type', 'dine_in'),
+            "status": order.status,
+            "waiter_name": order.waiter.get_full_name() or order.waiter.username if order.waiter else '',
+            "closed_at": order.updated_at.isoformat(),
+            "items": items_data,
+            "payments": payments_data
+        })
+
+    client = OnaClient()
+    try:
+        response = client.post_orders(state.license_key, orders_data)
+    except requests.RequestException as exc:
+        logger.info("Sotuvlar sinxronlanmadi (oflayn bo'lishi mumkin): %s", exc)
+        return
+
+    if response.status_code != 201:
+        logger.warning("Sotuvlarni sinxronlash rad etildi: %s", response.text)
+        return
+        
+    data = response.json()
+    synced_uuids = data.get('synced_uuids', [])
+    if synced_uuids:
+        Order.objects.filter(sync_uuid__in=synced_uuids).update(is_synced=True)
 
 
 def _handle_block_system(payload):

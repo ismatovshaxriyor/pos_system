@@ -18,7 +18,7 @@ class TableStatusTests(TestCase):
 
     def _get_status(self, user):
         response = self.client.get(reverse('table-list'), **_auth_header(user))
-        row = next(t for t in response.data if t['id'] == self.table.id)
+        row = next(t for t in response.data['results'] if t['id'] == self.table.id)
         return row['status']
 
     def test_no_order_is_free(self):
@@ -43,6 +43,6 @@ class TableStatusTests(TestCase):
     def test_no_waiter_identity_leaks_for_occupied_table(self):
         Order.objects.create(table=self.table, waiter=self.waiter_b, status='new')
         response = self.client.get(reverse('table-list'), **_auth_header(self.waiter_a))
-        row = next(t for t in response.data if t['id'] == self.table.id)
+        row = next(t for t in response.data['results'] if t['id'] == self.table.id)
         self.assertNotIn('waiter', row)
         self.assertNotIn('orders', row)

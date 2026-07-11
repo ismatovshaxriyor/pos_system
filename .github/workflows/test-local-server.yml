@@ -1,0 +1,23 @@
+name: Test local_server (Bola)
+
+on:
+  push:
+    paths:
+      - "local_server/**"
+      - ".github/workflows/test-local-server.yml"
+  pull_request:
+    paths:
+      - "local_server/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        run: |
+          cd local_server
+          docker compose up -d db redis
+          sleep 10
+          docker compose run --rm web python manage.py makemigrations --check --dry-run
+          docker compose run --rm web python manage.py test

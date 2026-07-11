@@ -61,20 +61,20 @@ class NotificationViewSetTests(TestCase):
 
     def test_admin_sees_broadcast_notifications(self):
         response = self.client.get(reverse('notification-list'), **_auth_header(self.admin))
-        ids = [n['id'] for n in response.data]
+        ids = [n['id'] for n in response.data['results']]
         self.assertIn(self.broadcast.id, ids)
 
     def test_regular_manager_also_sees_broadcast_notifications(self):
         manager = User.objects.create_user(username='+998900000093', role='manager')
         response = self.client.get(reverse('notification-list'), **_auth_header(manager))
-        ids = [n['id'] for n in response.data]
+        ids = [n['id'] for n in response.data['results']]
         self.assertIn(self.broadcast.id, ids)
 
     def test_waiter_does_not_see_broadcast_meant_for_admins_only_if_targeted_elsewhere(self):
         # Bu misolda broadcast (recipient=None) barcha ADMIN uchun - oddiy
         # xodim faqat o'ziga tegishli (targeted) bildirishnomani ko'radi.
         response = self.client.get(reverse('notification-list'), **_auth_header(self.waiter))
-        ids = [n['id'] for n in response.data]
+        ids = [n['id'] for n in response.data['results']]
         self.assertIn(self.targeted.id, ids)
         self.assertNotIn(self.broadcast.id, ids)
 

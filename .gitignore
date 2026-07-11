@@ -19,11 +19,6 @@ venv/
 staticfiles/
 media/
 
-# Migrations are generated via `makemigrations` on container start (see
-# entrypoint.sh) rather than committed, so environments never need to
-# reconcile migration files by hand.
-**/migrations/*.py
-!**/migrations/__init__.py
 
 # Celery
 celerybeat-schedule

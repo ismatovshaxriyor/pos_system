@@ -23,7 +23,6 @@ class PaymentFlowTestsBase(TestCase):
         self.product = Product.objects.create(category=self.category, name='Osh', price=Decimal('25000'))
         self.order = Order.objects.create(table=self.table, waiter=self.waiter)
         OrderItem.objects.create(order=self.order, product=self.product, quantity=2, price=self.product.price)
-        self.order.total_amount = Decimal('50000')
         self.order.save()
 
     def _add_payment(self, user, amount, method='cash'):
@@ -89,7 +88,7 @@ class OverpaymentTests(PaymentFlowTestsBase):
             url, {"method": "cash"}, content_type='application/json', **_auth_header(self.cashier),
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn('amount', response.data)
+        self.assertIn('amount', response.data.get('fields', {}))
 
 
 class CloseFlowTests(PaymentFlowTestsBase):

@@ -1,14 +1,16 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework import status, permissions, throttling
 from django.utils import timezone
-from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog
+from django.db import transaction
+from django.core.cache import cache
+from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token_batch, get_public_key_pem
 from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
-    ErrorLogBatchSerializer,
+    ErrorLogBatchSerializer, OrderSyncBatchSerializer,
 )
 
 MAX_COMMANDS_PER_HEARTBEAT = 10
@@ -24,6 +26,7 @@ class ActivationView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
 
     def post(self, request):
         serializer = ActivationSerializer(data=request.data)
@@ -160,6 +163,7 @@ class HeartbeatView(APIView):
     ishonish mumkin).
     """
     authentication_classes = [HeartbeatAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         license_obj = request.auth
@@ -169,21 +173,25 @@ class HeartbeatView(APIView):
         serializer.is_valid(raise_exception=True)
         metrics = serializer.validated_data
 
-        RestaurantStatus.objects.update_or_create(
-            restaurant=restaurant,
-            defaults={
-                'cpu_percent': metrics.get('cpu_percent'),
-                'ram_percent': metrics.get('ram_percent'),
-                'disk_percent': metrics.get('disk_percent'),
-                'app_version': metrics.get('app_version', ''),
-                'unsynced_count': metrics.get('unsynced_count'),
-                'last_order_at': metrics.get('last_order_at'),
-            },
-        )
+        now = timezone.now()
+        cache.set(f"restaurant_metrics_{restaurant.id}", metrics, timeout=180)
 
-        restaurant.last_seen = timezone.now()
-        restaurant.is_online = True
-        restaurant.save(update_fields=['last_seen', 'is_online'])
+        if not restaurant.is_online or not restaurant.last_seen or (now - restaurant.last_seen).total_seconds() > 300:
+            RestaurantStatus.objects.update_or_create(
+                restaurant=restaurant,
+                defaults={
+                    'cpu_percent': metrics.get('cpu_percent'),
+                    'ram_percent': metrics.get('ram_percent'),
+                    'disk_percent': metrics.get('disk_percent'),
+                    'app_version': metrics.get('app_version', ''),
+                    'unsynced_count': metrics.get('unsynced_count'),
+                    'last_order_at': metrics.get('last_order_at'),
+                },
+            )
+
+            restaurant.last_seen = now
+            restaurant.is_online = True
+            restaurant.save(update_fields=['last_seen', 'is_online'])
 
         license_active = license_obj.is_active and license_obj.expires_at > timezone.now()
 
@@ -216,6 +224,7 @@ class CommandResultView(APIView):
     rad etiladi (tenant izolyatsiyasi).
     """
     authentication_classes = [HeartbeatAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, command_id):
         license_obj = request.auth
@@ -244,6 +253,7 @@ class ErrorLogView(APIView):
     ularga hech qanday ta'sir qilmaydi.
     """
     authentication_classes = [HeartbeatAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         license_obj = request.auth
@@ -276,3 +286,70 @@ class ErrorLogView(APIView):
         ErrorLog.objects.bulk_create(rows, ignore_conflicts=True)
 
         return Response({"received": len(rows), "detail": "Xatolar qabul qilindi."}, status=status.HTTP_200_OK)
+
+
+class OrderSyncView(APIView):
+    """
+    Bola'dan yopilgan buyurtmalarni qabul qiladi.
+    """
+    authentication_classes = [HeartbeatAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        license_obj = request.auth
+        restaurant = license_obj.restaurant
+
+        serializer = OrderSyncBatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        orders_data = serializer.validated_data['orders']
+
+        synced_uuids = []
+
+        with transaction.atomic():
+            for order_data in orders_data:
+                order_id = order_data['sync_uuid']
+                
+                # update_or_create xuddi bitta uuid uchun takror yuborilsa idempotency
+                order, created = SyncedOrder.objects.update_or_create(
+                    id=order_id,
+                    defaults={
+                        'restaurant': restaurant,
+                        'total_amount': order_data['total_amount'],
+                        'discount_amount': order_data['discount_amount'],
+                        'tax_amount': order_data['tax_amount'],
+                        'service_charge': order_data['service_charge'],
+                        'final_amount': order_data['final_amount'],
+                        'order_type': order_data['order_type'],
+                        'status': order_data['status'],
+                        'waiter_name': order_data['waiter_name'],
+                        'closed_at': order_data.get('closed_at'),
+                    }
+                )
+
+                order.items.all().delete()
+                order.payments.all().delete()
+
+                SyncedOrderItem.objects.bulk_create([
+                    SyncedOrderItem(
+                        id=item_data['sync_uuid'],
+                        order=order,
+                        product_name=item_data['product_name'],
+                        quantity=item_data['quantity'],
+                        price=item_data['price']
+                    ) for item_data in order_data['items']
+                ])
+
+                SyncedPayment.objects.bulk_create([
+                    SyncedPayment(
+                        id=payment_data['sync_uuid'],
+                        order=order,
+                        amount=payment_data['amount'],
+                        method=payment_data['method'],
+                        is_voided=payment_data['is_voided'],
+                        received_at=payment_data['created_at']
+                    ) for payment_data in order_data['payments']
+                ])
+
+                synced_uuids.append(str(order_id))
+
+        return Response({"synced_uuids": synced_uuids, "detail": "Buyurtmalar sinxronlashtirildi."}, status=status.HTTP_201_CREATED)

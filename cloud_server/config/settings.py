@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from celery.schedules import crontab
 
 load_dotenv()
 
@@ -76,7 +77,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+
 
 ROOT_URLCONF = 'config.urls'
 
@@ -173,7 +174,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '10/minute',
+        'user': '100/minute',
+    }
 }
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 # Celery settings
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:26379/0')
@@ -187,6 +199,10 @@ CELERY_BEAT_SCHEDULE = {
     'mark-offline-restaurants': {
         'task': 'tenants.tasks.mark_offline_restaurants',
         'schedule': 60.0,
+    },
+    'cleanup-old-data': {
+        'task': 'tenants.tasks.cleanup_old_data',
+        'schedule': crontab(hour=3, minute=30),
     },
 }
 

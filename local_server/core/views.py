@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import viewsets, permissions, status, mixins
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import services
@@ -111,6 +112,19 @@ class OrderViewSet(viewsets.ModelViewSet):
             qs = qs.filter(waiter=user)
         return qs
 
+    @extend_schema(
+        request=OrderSerializer,
+        responses={201: OrderSerializer, 200: OrderSerializer}
+    )
+    def create(self, request, *args, **kwargs):
+        sync_uuid = request.data.get('sync_uuid')
+        if sync_uuid:
+            existing_order = Order.objects.filter(sync_uuid=sync_uuid).first()
+            if existing_order:
+                serializer = self.get_serializer(existing_order)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         order = serializer.save(waiter=self.request.user)
         if order.table_id:
@@ -126,8 +140,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
         order = self.get_object()
-        if order.status == 'completed':
-            return Response({'detail': 'Order already completed'}, status=status.HTTP_400_BAD_REQUEST)
+        if order.status in ('completed', 'cancelled'):
+            return Response({'detail': 'Order already completed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
 
         balance_due = order.balance_due
         if balance_due > 0:
@@ -146,6 +160,45 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response({'status': 'Order closed successfully'})
 
     @extend_schema(
+        request=None,
+        responses={
+            200: StatusMessageSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Faqat 'new' holatdagi buyurtmalarni boshlash mumkin."),
+        },
+    )
+    @action(detail=True, methods=['post'])
+    def start(self, request, pk=None):
+        order = self.get_object()
+        if order.status != 'new':
+            return Response({'detail': "Faqat 'new' holatdagi buyurtmalarni boshlash mumkin."}, status=status.HTTP_400_BAD_REQUEST)
+        order.status = 'in_progress'
+        order.save(update_fields=['status'])
+        if order.table_id:
+            broadcast_event('table_status_changed', {'table_id': order.table_id})
+        return Response({'status': 'Order started'})
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: StatusMessageSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Yopilgan buyurtmani bekor qilib bo'lmaydi."),
+        },
+    )
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated, IsManagerOrAdmin])
+    def cancel(self, request, pk=None):
+        order = self.get_object()
+        if order.status == 'completed':
+            return Response({'detail': "Yakunlangan buyurtmani bekor qilib bo'lmaydi."}, status=status.HTTP_400_BAD_REQUEST)
+        if order.status == 'cancelled':
+            return Response({'detail': "Buyurtma allaqachon bekor qilingan."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        order.status = 'cancelled'
+        order.save(update_fields=['status'])
+        if order.table_id:
+            broadcast_event('table_status_changed', {'table_id': order.table_id})
+        return Response({'status': 'Order cancelled'})
+
+    @extend_schema(
         request=OrderItemSerializer,
         responses={
             201: StatusMessageSerializer,
@@ -155,12 +208,21 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
         order = self.get_object()
-        serializer = OrderItemSerializer(data=request.data)
-        if serializer.is_valid():
-            product = serializer.validated_data['product']
-            quantity = serializer.validated_data.get('quantity', 1)
-            price = product.price
+        if order.status in ORDER_FINISHED_STATUSES:
+            return Response(
+                {'detail': "Yopilgan yoki bekor qilingan buyurtmaga mahsulot qo'shib bo'lmaydi."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        serializer = OrderItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = serializer.validated_data['product']
+        quantity = serializer.validated_data.get('quantity', 1)
+        price = product.price
+
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=order.pk)
+            
             OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -168,12 +230,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 price=price
             )
 
-            # Update total amount
-            order.total_amount += price * quantity
-            order.save()
-
-            return Response({'status': 'Item added'}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 'Item added'}, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         request=PaymentSerializer,
@@ -195,8 +252,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         serializer = PaymentSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         amount = serializer.validated_data['amount']
 
@@ -245,8 +301,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         serializer = DiscountSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         new_amount = serializer.validated_data['discount_amount']
         new_reason = serializer.validated_data.get('discount_reason', '')
@@ -277,10 +332,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         return Response(OrderSerializer(order, context={'request': request}).data)
 
-class OrderItemViewSet(viewsets.ModelViewSet):
-    queryset = OrderItem.objects.all()
-    serializer_class = OrderItemSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
 
 class StaffDeviceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StaffDevice.objects.select_related('user').all()
@@ -316,3 +368,26 @@ class NotificationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
         notification.read_at = timezone.now()
         notification.save(update_fields=['is_read', 'read_at'])
         return Response({'status': 'ok'})
+
+class BootstrapView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        user = request.user
+        
+        orders_qs = Order.objects.filter(status__in=['new', 'in_progress']).prefetch_related('items__product')
+        if user.role == 'waiter':
+            orders_qs = orders_qs.filter(waiter=user)
+        
+        categories = Category.objects.all()
+        products = Product.objects.filter(is_available=True)
+        tables = Table.objects.filter(is_active=True)
+
+        return Response({
+            'user': UserSerializer(user).data,
+            'categories': CategorySerializer(categories, many=True).data,
+            'products': ProductSerializer(products, many=True).data,
+            'tables': TableSerializer(tables, many=True, context={'request': request}).data,
+            'active_orders': OrderSerializer(orders_qs, many=True, context={'request': request}).data,
+        })

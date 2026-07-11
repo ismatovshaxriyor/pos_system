@@ -107,7 +107,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             'id', 'category', 'category_id', 'sync_uuid', 'is_synced', 'created_at', 'updated_at',
-            'name', 'price', 'barcode', 'image', 'is_available',
+            'name', 'price', 'barcode', 'image', 'is_available', 'cost_price', 'tax_rate', 'is_deleted',
         )
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -118,7 +118,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItem
-        fields = ('id', 'product', 'product_id', 'quantity', 'price')
+        fields = ('id', 'product', 'product_id', 'quantity', 'price', 'status', 'note', 'modifiers', 'is_voided')
         read_only_fields = ('price',)
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -126,7 +126,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
-        fields = ('id', 'amount', 'method', 'received_by', 'created_at')
+        fields = ('id', 'amount', 'method', 'received_by', 'created_at', 'is_voided', 'refunded_of', 'reference')
         read_only_fields = ('received_by', 'created_at')
 
 class DiscountSerializer(serializers.Serializer):
@@ -145,6 +145,7 @@ class OrderSerializer(serializers.ModelSerializer):
         queryset=Table.objects.all(), source='table', write_only=True, required=False, allow_null=True
     )
 
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     final_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -152,8 +153,8 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'table', 'table_id', 'waiter', 'cashier', 'total_amount',
+            'id', 'sync_uuid', 'table', 'table_id', 'waiter', 'cashier', 'order_type', 'total_amount', 'tax_amount', 'service_charge',
             'discount_amount', 'discount_reason', 'final_amount', 'amount_paid', 'balance_due',
-            'status', 'items', 'payments', 'created_at',
+            'status', 'note', 'guest_count', 'items', 'payments', 'created_at',
         )
-        read_only_fields = ('total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason')
+        read_only_fields = ('total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason', 'status')

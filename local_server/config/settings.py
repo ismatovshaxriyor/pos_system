@@ -89,12 +89,13 @@ MIDDLEWARE = [
 
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
-    # Custom middleware for Swagger Token auto-prefix
-    'core.middleware.SwaggerTokenPrefixMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+if DEBUG:
+    MIDDLEWARE.append('core.middleware.SwaggerTokenPrefixMiddleware')
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 ROOT_URLCONF = 'config.urls'
 
@@ -201,6 +202,17 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '10/minute',
+        'user': '100/minute',
+    },
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
 
 # Spectacular settings
@@ -243,6 +255,11 @@ CELERY_BEAT_SCHEDULE = {
     'cleanup-error-logs': {
         'task': 'licensing.tasks.cleanup_error_logs',
         'schedule': crontab(hour=4, minute=0),
+    },
+    'sync-completed-orders': {
+        'task': 'licensing.tasks.sync_completed_orders',
+        'schedule': 60.0,
+        'options': {'expires': 50},
     },
 }
 
@@ -313,6 +330,9 @@ def _load_pem(file_env, inline_env, default=''):
 # App / licensing settings
 APP_VERSION = os.environ.get('APP_VERSION', '0.1.0')
 ONA_SERVER_URL = os.environ.get('ONA_SERVER_URL', 'http://host.docker.internal:8001')
+
+if not DEBUG and not ONA_SERVER_URL.startswith('https://'):
+    raise ValueError("ONA_SERVER_URL must use https:// in production.")
 LICENSE_PUBLIC_KEY = _load_pem('LICENSE_PUBLIC_KEY_FILE', 'LICENSE_PUBLIC_KEY')
 LICENSE_ENFORCEMENT = os.environ.get('LICENSE_ENFORCEMENT', '0') == '1'
 LICENSE_CLOCK_SKEW_SECONDS = int(os.environ.get('LICENSE_CLOCK_SKEW_SECONDS', 300))
@@ -350,3 +370,6 @@ JAZZMIN_UI_TWEAKS = {
     "theme": "darkly",
     "dark_mode_theme": "darkly",
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
+

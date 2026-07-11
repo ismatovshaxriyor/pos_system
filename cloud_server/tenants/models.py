@@ -173,3 +173,44 @@ class ErrorLog(models.Model):
 
     def __str__(self):
         return f"[{self.level}] {self.restaurant.name} - {self.message[:60]}"
+
+class SyncedOrder(models.Model):
+    id = models.UUIDField(primary_key=True, editable=False)  # mapped to sync_uuid
+    restaurant = models.ForeignKey(Restaurant, related_name='synced_orders', on_delete=models.CASCADE)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    service_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    final_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    order_type = models.CharField(max_length=20, default='dine_in')
+    status = models.CharField(max_length=20)
+    waiter_name = models.CharField(max_length=100, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-closed_at']
+
+    def __str__(self):
+        return f"SyncedOrder {self.id} - {self.restaurant.name}"
+
+class SyncedOrderItem(models.Model):
+    id = models.UUIDField(primary_key=True, editable=False) # local item's sync_uuid
+    order = models.ForeignKey(SyncedOrder, related_name='items', on_delete=models.CASCADE)
+    product_name = models.CharField(max_length=200)
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product_name} ({self.order.id})"
+
+class SyncedPayment(models.Model):
+    id = models.UUIDField(primary_key=True, editable=False) # local payment's sync_uuid
+    order = models.ForeignKey(SyncedOrder, related_name='payments', on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    method = models.CharField(max_length=20)
+    is_voided = models.BooleanField(default=False)
+    received_at = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.amount} ({self.method}) - Order {self.order.id}"

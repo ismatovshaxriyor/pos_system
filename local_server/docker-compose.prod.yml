@@ -8,12 +8,18 @@ services:
       - POSTGRES_USER=${DB_USER:-pos_user}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pos_user} -d ${DB_NAME:-pos_local_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   db_backup:
     image: prodrigestivill/postgres-backup-local
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_DB=${DB_NAME:-pos_local_db}
@@ -27,6 +33,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   web:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
@@ -46,9 +57,15 @@ services:
       - media_data:/app/media
     ports:
       - "8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -63,10 +80,17 @@ services:
     volumes:
       - ./keys:/app/keys:ro
       - media_data:/app/media
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -80,10 +104,17 @@ services:
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./keys:/app/keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"

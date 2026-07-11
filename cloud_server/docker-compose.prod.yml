@@ -8,10 +8,36 @@ services:
       - POSTGRES_USER=${DB_USER:-cloud_user}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cloud_user} -d ${DB_NAME:-pos_cloud_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db_backup:
+    image: prodrigestivill/postgres-backup-local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=${DB_NAME:-pos_cloud_db}
+      - POSTGRES_USER=${DB_USER:-cloud_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=14
+    volumes:
+      - ./backups:/backups
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   web:
     build: .
@@ -29,9 +55,15 @@ services:
       # tunnel below (Cloudflare terminates TLS at their edge), this port
       # stays reachable just for host-level debugging (curl over SSH).
       - "127.0.0.1:8001:8001"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   celery_worker:
@@ -43,10 +75,17 @@ services:
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./keys:/app/keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     restart: unless-stopped
 
   celery_beat:
@@ -58,10 +97,17 @@ services:
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./keys:/app/keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     depends_on:
-      - db
-      - redis
-      - web
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
     restart: unless-stopped
 
   # Ona serverni Cloudflare edge orqali ochadi - hech qanday port ochish
