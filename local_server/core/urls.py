@@ -4,12 +4,13 @@ from .views import (
     UserViewSet, TableViewSet, CategoryViewSet,
     ProductViewSet, OrderViewSet,
     StaffDeviceViewSet, NotificationViewSet, BootstrapView,
-    RestaurantConfigViewSet, AttendanceViewSet
+    RestaurantConfigViewSet, AttendanceViewSet, TableZoneViewSet
 )
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'tables', TableViewSet)
+router.register(r'table-zones', TableZoneViewSet)
 router.register(r'categories', CategoryViewSet)
 router.register(r'products', ProductViewSet)
 router.register(r'orders', OrderViewSet, basename='order')

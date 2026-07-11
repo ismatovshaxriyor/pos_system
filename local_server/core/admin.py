@@ -6,7 +6,7 @@ from . import services
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
-    RestaurantConfig, Attendance,
+    RestaurantConfig, Attendance, TableZone,
 )
 
 
@@ -89,10 +89,14 @@ class NotificationAdmin(SimpleHistoryAdmin):
     list_display = ('notif_type', 'recipient', 'message', 'is_read', 'created_at')
     list_filter = ('notif_type', 'is_read')
 
+@admin.register(TableZone)
+class TableZoneAdmin(SimpleHistoryAdmin):
+    list_display = ('name', 'created_at', 'updated_at')
+
 @admin.register(Table)
 class TableAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'capacity', 'is_active', 'is_synced')
-    list_filter = ('is_active', 'is_synced')
+    list_display = ('name', 'zone', 'capacity', 'is_active', 'is_synced')
+    list_filter = ('zone', 'is_active', 'is_synced')
 
 @admin.register(Category)
 class CategoryAdmin(SimpleHistoryAdmin):

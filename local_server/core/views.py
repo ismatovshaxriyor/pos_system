@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import services
-from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance
+from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone
 from .permissions import IsAdminStaff, IsManagerOrAdmin
 from .realtime import broadcast_event
 from .serializers import (
@@ -17,9 +17,15 @@ from .serializers import (
     StaffDeviceSerializer, NotificationSerializer,
     RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
     RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
+    TableZoneSerializer,
 )
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
+
+class TableZoneViewSet(viewsets.ModelViewSet):
+    queryset = TableZone.objects.all()
+    serializer_class = TableZoneSerializer
+    permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -441,12 +447,14 @@ class BootstrapView(APIView):
         
         categories = Category.objects.all()
         products = Product.objects.filter(is_available=True, is_deleted=False)
-        tables = Table.objects.filter(is_active=True)
+        tables = Table.objects.filter(is_active=True).select_related('zone')
+        table_zones = TableZone.objects.all()
 
         return Response({
             'user': UserSerializer(user).data,
             'categories': CategorySerializer(categories, many=True).data,
             'products': ProductSerializer(products, many=True).data,
+            'table_zones': TableZoneSerializer(table_zones, many=True).data,
             'tables': TableSerializer(tables, many=True, context={'request': request}).data,
             'active_orders': OrderSerializer(orders_qs, many=True, context={'request': request}).data,
         })

@@ -120,13 +120,29 @@ class Notification(BaseModel):
     def __str__(self):
         return f"{self.notif_type}: {self.message[:50]}"
 
+class TableZone(BaseModel):
+    """
+    Stollarni guruhlash uchun hududlar (Zal, Ko'cha, VIP, va h.k.)
+    """
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        verbose_name = "Stol Hududi"
+        verbose_name_plural = "Stol Hududlari"
+
+    def __str__(self):
+        return self.name
+
+
 class Table(BaseModel):
+    zone = models.ForeignKey(TableZone, related_name='tables', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=50)
     capacity = models.PositiveIntegerField(default=4)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.name
+        zone_name = f" ({self.zone.name})" if self.zone else ""
+        return f"{self.name}{zone_name}"
 
 class Category(BaseModel):
     name = models.CharField(max_length=100)

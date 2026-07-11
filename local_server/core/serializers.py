@@ -4,32 +4,33 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
-    StaffDevice, Notification, RestaurantConfig, Attendance,
+    StaffDevice, Notification, RestaurantConfig, Attendance, TableZone,
 )
 
 TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
 
 class UserSerializer(serializers.ModelSerializer):
-    # AbstractUser'da blank=True (ixtiyoriy) - lekin bu yerda telefon
-    # raqamidan boshqa hech qanday shaxsni aniqlovchi ma'lumot bo'lmasin
-    # uchun majburiy qilib qo'yilgan.
     first_name = serializers.CharField(required=True, allow_blank=False)
 
     class Meta:
         model = User
-        # is_staff API orqali umuman ko'rsatilmaydi/yozilmaydi (nested
-        # holatda ham - received_by/waiter/cashier va h.k. shu serializer'ni
-        # qayta ishlatadi) - bosh admin holatini API mijozlari bilishi/
-        # o'zgartirishi shart emas, faqat Ona orqali (_provision_admin_user)
-        # yoki lokal Django admin orqali boshqariladi.
         fields = ('id', 'username', 'first_name', 'last_name', 'role')
+
+class TableZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TableZone
+        fields = ('id', 'name', 'created_at', 'updated_at')
 
 class TableSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
+    zone = TableZoneSerializer(read_only=True)
+    zone_id = serializers.PrimaryKeyRelatedField(
+        queryset=TableZone.objects.all(), source='zone', write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = Table
-        fields = ('id', 'name', 'capacity', 'is_active', 'status', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'capacity', 'is_active', 'status', 'zone', 'zone_id', 'created_at', 'updated_at')
 
     @extend_schema_field(serializers.ChoiceField(choices=TABLE_STATUS_CHOICES))
     def get_status(self, obj):
