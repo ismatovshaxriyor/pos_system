@@ -65,22 +65,24 @@ class StaffDevice(BaseModel):
     device_id = models.CharField(max_length=255, db_index=True)
     device_label = models.CharField(max_length=100, blank=True, default='')
     is_active = models.BooleanField(default=True)
+    is_approved = models.BooleanField(default=True)  # [NEW] Manager tasdig'i flagi
     last_login_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=['user'], condition=models.Q(is_active=True),
-                name='uniq_active_device_per_user',
+                fields=['user'], condition=models.Q(is_active=True, is_approved=True),
+                name='uniq_active_approved_device_per_user',
             ),
             models.UniqueConstraint(
-                fields=['device_id'], condition=models.Q(is_active=True),
-                name='uniq_active_device_id',
+                fields=['device_id'], condition=models.Q(is_active=True, is_approved=True),
+                name='uniq_active_approved_device_id',
             ),
         ]
 
     def __str__(self):
-        return f"{self.user.username} - {self.device_label or self.device_id[:8]}"
+        status = "approved" if self.is_approved else "pending"
+        return f"{self.user.username} - {self.device_label or self.device_id[:8]} ({status})"
 
 class DeviceRegistrationCode(BaseModel):
     """

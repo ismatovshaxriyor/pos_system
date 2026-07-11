@@ -394,6 +394,17 @@ class StaffDeviceViewSet(viewsets.ReadOnlyModelViewSet):
         services.revoke_device(device, kicked_by=request.user)
         return Response({'detail': "Qurilma chetlashtirildi."})
 
+    @extend_schema(request=None, responses={200: StaffDeviceSerializer, 400: OpenApiResponse(ErrorDetailSerializer)})
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        device = self.get_object()
+        try:
+            approved = services.approve_device(device.pk, request.user)
+        except services.ServiceError as exc:
+            return Response({"detail": exc.message}, status=exc.status)
+        return Response(StaffDeviceSerializer(approved).data)
+
+
 class NotificationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     # OpenAPI sxema-introspeksiyasi uchun - haqiqiy runtime filtrlash
     # get_queryset() orqali bo'ladi.

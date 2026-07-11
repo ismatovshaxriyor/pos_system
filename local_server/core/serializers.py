@@ -54,7 +54,13 @@ class StaffDeviceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StaffDevice
-        fields = ('id', 'user', 'device_id', 'device_label', 'is_active', 'last_login_at', 'created_at')
+        fields = ('id', 'user', 'device_id', 'device_label', 'is_active', 'is_approved', 'last_login_at', 'created_at')
+
+class WaiterLoginSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=15)
+    password = serializers.CharField(max_length=128)
+    device_id = serializers.CharField(max_length=255)
+    device_label = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

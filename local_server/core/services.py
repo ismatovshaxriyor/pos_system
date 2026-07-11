@@ -44,7 +44,7 @@ def generate_registration_code(user, created_by):
 
 
 def _evict_active_device(*, user=None, device_id=None):
-    qs = StaffDevice.objects.filter(is_active=True)
+    qs = StaffDevice.objects.filter(is_active=True, is_approved=True)
     if user is not None:
         qs = qs.filter(user=user)
     if device_id is not None:
@@ -81,7 +81,7 @@ def redeem_registration_code(phone, code, device_id, pin, device_label=''):
         _evict_active_device(device_id=device_id)
         StaffDevice.objects.create(
             user=user, device_id=device_id, device_label=device_label,
-            is_active=True, last_login_at=timezone.now(),
+            is_active=True, is_approved=True, last_login_at=timezone.now(),
         )
         user.pin_hash = make_password(pin)
         user.set_unusable_password()
@@ -143,7 +143,7 @@ def verify_pin_login(device_id, pin):
     if _is_locked(device_id):
         raise ServiceError("Juda ko'p noto'g'ri urinish. Birozdan so'ng qayta urining.", status=429)
 
-    device = StaffDevice.objects.filter(device_id=device_id, is_active=True).select_related('user').first()
+    device = StaffDevice.objects.filter(device_id=device_id, is_active=True, is_approved=True).select_related('user').first()
     if not device or not check_password(pin, device.user.pin_hash):
         _register_failure(device_id)
         raise ServiceError("Qurilma yoki PIN noto'g'ri.")
@@ -236,4 +236,121 @@ def check_out_employee(user, latitude, longitude):
     attendance.check_out_longitude = longitude
     attendance.save(update_fields=['check_out', 'check_out_latitude', 'check_out_longitude', 'updated_at'])
     return attendance
+
+
+def login_waiter(phone, password, device_id, device_label=''):
+    """
+    Ofitsiantni telefon raqami va paroli orqali tizimga kiritadi.
+    TOFU (Trust-On-First-Use) hamda manager tasdiqlashi oqimini tekshiradi.
+    """
+    if not device_id:
+        raise ServiceError("device_id majburiy.")
+
+    # 1. Autentifikatsiya
+    try:
+        user = User.objects.get(username=phone, is_active=True)
+    except User.DoesNotExist:
+        raise ServiceError("Telefon raqami yoki parol noto'g'ri.")
+
+    if not user.check_password(password):
+        raise ServiceError("Telefon raqami yoki parol noto'g'ri.")
+
+    if user.role != 'waiter':
+        raise ServiceError("Faqat ofitsiantlar ushbu endpoint orqali kira oladilar.")
+
+    # 2. Qurilma tekshiruvi
+    # Ushbu foydalanuvchining allaqachon tasdiqlangan qurilmasi bormi?
+    approved_device = StaffDevice.objects.filter(user=user, is_active=True, is_approved=True).first()
+
+    if not approved_device:
+        # TOFU: Birinchi marta kirish. Ushbu qurilma avtomatik tasdiqlanadi.
+        with transaction.atomic():
+            # Agar ushbu device_id boshqa birovga tegishli bo'lsa uni evict qilamiz
+            _evict_active_device(device_id=device_id)
+            device = StaffDevice.objects.create(
+                user=user,
+                device_id=device_id,
+                device_label=device_label,
+                is_active=True,
+                is_approved=True,
+                last_login_at=timezone.now()
+            )
+            token, _ = Token.objects.get_or_create(user=user)
+            return user, token
+    
+    if approved_device.device_id == device_id:
+        # O'zining faol va tasdiqlangan qurilmasidan kirmoqda
+        approved_device.last_login_at = timezone.now()
+        approved_device.save(update_fields=['last_login_at'])
+        token, _ = Token.objects.get_or_create(user=user)
+        return user, token
+
+    # Yangi qurilmadan kirishga urinish!
+    # Agar bu qurilma uchun oldin pending so'rov ochilmagan bo'lsa, yaratamiz
+    pending_device, created = StaffDevice.objects.get_or_create(
+        user=user,
+        device_id=device_id,
+        defaults={
+            'device_label': device_label,
+            'is_active': True,
+            'is_approved': False
+        }
+    )
+    if not created:
+        pending_device.is_active = True
+        pending_device.device_label = device_label
+        pending_device.save(update_fields=['is_active', 'device_label'])
+
+    # Manager uchun bildirishnoma yaratish
+    from .models import Notification
+    message = f"Xodim {user.first_name} ({user.username}) yangi qurilmadan ({device_label or device_id[:8]}) kirishga urindi. Tasdiqlash kutilmoqda."
+    Notification.objects.get_or_create(
+        recipient=None,
+        notif_type='device_approval_requested',
+        message=message,
+        payload={
+            'user_id': user.id,
+            'device_pk': pending_device.id,
+            'device_id': device_id,
+            'device_label': device_label
+        }
+    )
+
+    raise ServiceError("Yangi qurilmadan kirish taqiqlangan. Menejer tasdig'i kutilmoqda.", status=403)
+
+
+def approve_device(device_pk, manager_user):
+    """
+    Menejer tomonidan yangi qurilmani tasdiqlash.
+    """
+    if manager_user.role != 'manager':
+        raise ServiceError("Faqat menejerlar qurilmani tasdiqlashlari mumkin.", status=403)
+
+    try:
+        pending_device = StaffDevice.objects.get(pk=device_pk, is_active=True, is_approved=False)
+    except StaffDevice.DoesNotExist:
+        raise ServiceError("Tasdiqlanishi kutilayotgan faol qurilma topilmadi.")
+
+    with transaction.atomic():
+        # 1. Xodimning eski tasdiqlangan barcha qurilmalarini nofaol (revoked) qilish
+        StaffDevice.objects.filter(user=pending_device.user, is_approved=True).update(is_active=False)
+        
+        # 2. Ushbu device_id boshqa biron kimda faol bo'lsa uni evict qilish
+        _evict_active_device(device_id=pending_device.device_id)
+
+        # 3. Yangi qurilmani tasdiqlangan (approved) qilish
+        pending_device.is_approved = True
+        pending_device.last_login_at = timezone.now()
+        pending_device.save(update_fields=['is_approved', 'last_login_at', 'updated_at'])
+
+        # 4. Foydalanuvchining tokenini o'chirish (eski seanslar uzilishi uchun)
+        Token.objects.filter(user=pending_device.user).delete()
+        token, _ = Token.objects.get_or_create(user=pending_device.user)
+
+        # 5. Eski qurilma websocket ulanishini yopish
+        from . import realtime
+        realtime.force_disconnect(pending_device.user_id)
+
+    return pending_device
+
 

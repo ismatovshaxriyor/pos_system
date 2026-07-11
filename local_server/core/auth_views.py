@@ -6,8 +6,42 @@ from rest_framework.views import APIView
 from . import services
 from .serializers import (
     AuthTokenResponseSerializer, DeviceRegisterSerializer, ErrorDetailSerializer,
-    PinLoginSerializer, UserSerializer,
+    PinLoginSerializer, UserSerializer, WaiterLoginSerializer,
 )
+
+
+class WaiterLoginView(APIView):
+    """
+    Ofitsiantning telefon va parol orqali kirishi.
+    Qurilma TOFU yoki manager tasdig'i asosida tekshiriladi.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        request=WaiterLoginSerializer,
+        responses={
+            200: AuthTokenResponseSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Telefon yoki parol noto'g'ri."),
+            403: OpenApiResponse(ErrorDetailSerializer, description="Yangi qurilmadan kirish taqiqlangan. Menejer tasdig'i kutilmoqda.")
+        }
+    )
+    def post(self, request):
+        serializer = WaiterLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            user, token = services.login_waiter(
+                phone=data['phone'],
+                password=data['password'],
+                device_id=data['device_id'],
+                device_label=data.get('device_label', '')
+            )
+        except services.ServiceError as exc:
+            return Response({"detail": exc.message}, status=exc.status)
+
+        return Response({"token": token.key, "user": UserSerializer(user).data})
 
 
 class DeviceRegisterView(APIView):

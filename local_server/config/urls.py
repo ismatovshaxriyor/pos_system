@@ -21,7 +21,7 @@ from django.views.static import serve as serve_static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework.authtoken.views import obtain_auth_token
 
-from core.auth_views import DeviceRegisterView, PinLoginView
+from core.auth_views import DeviceRegisterView, PinLoginView, WaiterLoginView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -33,6 +33,7 @@ urlpatterns = [
     # (manager/cashier/waiter) - qurilmaga bog'langan PIN bilan, shu ikkitasi:
     path('api/auth/device/register/', DeviceRegisterView.as_view(), name='auth-device-register'),
     path('api/auth/pin-login/', PinLoginView.as_view(), name='auth-pin-login'),
+    path('api/auth/waiter-login/', WaiterLoginView.as_view(), name='auth-waiter-login'),
     path('api/license/', include('licensing.urls')),
 
     # Swagger API Docs
