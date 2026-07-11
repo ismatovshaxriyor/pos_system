@@ -251,3 +251,49 @@ class Payment(BaseModel):
     def __str__(self):
         return f"{self.amount} ({self.method}) - Order #{self.order_id}"
 
+
+class RestaurantConfig(BaseModel):
+    """
+    Restoranning umumiy sozlamalari (singleton).
+    """
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Kenglik (Latitude)")
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Uzunlik (Longitude)")
+    attendance_radius = models.PositiveIntegerField(default=100, help_text="Ruxsat berilgan radius (metrlarda)")
+
+    class Meta:
+        verbose_name = "Restoran Sozlamasi"
+        verbose_name_plural = "Restoran Sozlamalari"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # Singleton bo'lishini ta'minlaydi
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Restoran Koordinatalari: {self.latitude}, {self.longitude} (Radius: {self.attendance_radius}m)"
+
+
+class Attendance(BaseModel):
+    """
+    Xodimlarning kelib-ketish davomati jurnali.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='attendances')
+    check_in = models.DateTimeField(auto_now_add=True)
+    check_out = models.DateTimeField(null=True, blank=True)
+    
+    # Check-in vaqtidagi xodim koordinatalari (audit uchun)
+    check_in_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_in_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    
+    # Check-out vaqtidagi koordinatalar
+    check_out_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_out_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    class Meta:
+        ordering = ('-check_in',)
+        verbose_name = "Davomat"
+        verbose_name_plural = "Davomatlar"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.check_in}"
+
+

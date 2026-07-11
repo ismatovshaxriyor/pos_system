@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import services
-from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification
+from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance
 from .permissions import IsAdminStaff, IsManagerOrAdmin
 from .realtime import broadcast_event
 from .serializers import (
@@ -16,6 +16,7 @@ from .serializers import (
     PaymentSerializer, DiscountSerializer,
     StaffDeviceSerializer, NotificationSerializer,
     RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
+    RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
 )
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
@@ -438,3 +439,69 @@ class BootstrapView(APIView):
             'tables': TableSerializer(tables, many=True, context={'request': request}).data,
             'active_orders': OrderSerializer(orders_qs, many=True, context={'request': request}).data,
         })
+
+
+class RestaurantConfigViewSet(viewsets.ModelViewSet):
+    queryset = RestaurantConfig.objects.all()
+    serializer_class = RestaurantConfigSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+
+    def get_object(self):
+        # Singleton ob'ektini qaytarish/yaratish
+        obj, _ = RestaurantConfig.objects.get_or_create(pk=1)
+        return obj
+
+
+class AttendanceViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AttendanceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'manager':
+            return Attendance.objects.select_related('user').all()
+        return Attendance.objects.filter(user=user)
+
+    @extend_schema(
+        request=CheckInSerializer,
+        responses={201: AttendanceSerializer, 400: OpenApiResponse(ErrorDetailSerializer)}
+    )
+    @action(detail=False, methods=['post'], url_path='check-in')
+    def check_in(self, request):
+        serializer = CheckInSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        latitude = serializer.validated_data['latitude']
+        longitude = serializer.validated_data['longitude']
+        
+        try:
+            attendance = services.check_in_employee(request.user, latitude, longitude)
+        except services.ServiceError as exc:
+            return Response({'detail': exc.message}, status=exc.status)
+            
+        return Response(AttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(
+        request=CheckOutSerializer,
+        responses={200: AttendanceSerializer, 400: OpenApiResponse(ErrorDetailSerializer)}
+    )
+    @action(detail=False, methods=['post'], url_path='check-out')
+    def check_out(self, request):
+        serializer = CheckOutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        latitude = serializer.validated_data['latitude']
+        longitude = serializer.validated_data['longitude']
+        
+        try:
+            attendance = services.check_out_employee(request.user, latitude, longitude)
+        except services.ServiceError as exc:
+            return Response({'detail': exc.message}, status=exc.status)
+            
+        return Response(AttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
+

@@ -150,6 +150,90 @@ def verify_pin_login(device_id, pin):
 
     _clear_failures(device_id)
     device.last_login_at = timezone.now()
-    device.save(update_fields=['last_login_at'])
     token, _ = Token.objects.get_or_create(user=device.user)
     return device.user, token
+
+
+import math
+
+def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Ikki nuqta orasidagi masofani metrda hisoblaydi.
+    """
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+        raise ServiceError("Koordinatalar to'liq emas.")
+        
+    lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
+    
+    R = 6371000.0  # Earth radius in meters
+    
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    
+    a = math.sin(delta_phi / 2.0) ** 2 + \
+        math.cos(phi1) * math.cos(phi2) * \
+        math.sin(delta_lambda / 2.0) ** 2
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    
+    return R * c
+
+
+def check_in_employee(user, latitude, longitude):
+    """
+    Xodimni belgilangan koordinatalar bo'yicha check-in qiladi.
+    """
+    from .models import RestaurantConfig, Attendance
+    
+    # 1. Restoran sozlamalarini olish
+    config = RestaurantConfig.objects.first()
+    if not config or config.latitude is None or config.longitude is None:
+        raise ServiceError("Restoran koordinatalari kiritilmagan. Admin bilan bog'laning.")
+
+    # 2. Masofani hisoblash
+    distance = calculate_haversine_distance(latitude, longitude, config.latitude, config.longitude)
+    if distance > config.attendance_radius:
+        raise ServiceError(f"Siz ishxonadan juda uzoqdasiz. Masofa: {int(distance)}m, ruxsat etilgan radius: {config.attendance_radius}m")
+
+    # 3. Yopilmagan check-in borligini tekshirish
+    active_attendance = Attendance.objects.filter(user=user, check_out__isnull=True).first()
+    if active_attendance:
+        raise ServiceError("Sizda allaqachon yopilmagan check-in mavjud.")
+
+    # 4. Yangi check-in yaratish
+    return Attendance.objects.create(
+        user=user,
+        check_in_latitude=latitude,
+        check_in_longitude=longitude
+    )
+
+
+def check_out_employee(user, latitude, longitude):
+    """
+    Faol check-in ni yopadi (check-out).
+    """
+    from .models import RestaurantConfig, Attendance
+    
+    # 1. Restoran sozlamalarini olish
+    config = RestaurantConfig.objects.first()
+    if not config or config.latitude is None or config.longitude is None:
+        raise ServiceError("Restoran koordinatalari kiritilmagan. Admin bilan bog'laning.")
+
+    # 2. Masofani hisoblash
+    distance = calculate_haversine_distance(latitude, longitude, config.latitude, config.longitude)
+    if distance > config.attendance_radius:
+        raise ServiceError(f"Siz ishxonadan juda uzoqdasiz. Masofa: {int(distance)}m, ruxsat etilgan radius: {config.attendance_radius}m")
+
+    # 3. Faol check-in ni topish
+    attendance = Attendance.objects.filter(user=user, check_out__isnull=True).first()
+    if not attendance:
+        raise ServiceError("Sizda faol check-in topilmadi.")
+
+    # 4. Check-out yozish
+    attendance.check_out = timezone.now()
+    attendance.check_out_latitude = latitude
+    attendance.check_out_longitude = longitude
+    attendance.save(update_fields=['check_out', 'check_out_latitude', 'check_out_longitude', 'updated_at'])
+    return attendance
+

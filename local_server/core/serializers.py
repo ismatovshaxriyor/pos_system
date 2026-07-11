@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
-    StaffDevice, Notification,
+    StaffDevice, Notification, RestaurantConfig, Attendance,
 )
 
 TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
@@ -177,3 +177,34 @@ class OrderSerializer(serializers.ModelSerializer):
             'total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason',
             'status', 'tax_amount', 'service_charge',
         )
+
+
+class RestaurantConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RestaurantConfig
+        fields = ('id', 'latitude', 'longitude', 'attendance_radius', 'created_at', 'updated_at')
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Attendance
+        fields = (
+            'id', 'user', 'check_in', 'check_out',
+            'check_in_latitude', 'check_in_longitude',
+            'check_out_latitude', 'check_out_longitude',
+            'created_at', 'updated_at'
+        )
+        read_only_fields = fields
+
+
+class CheckInSerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+
+
+class CheckOutSerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+

@@ -6,6 +6,7 @@ from . import services
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
+    RestaurantConfig, Attendance,
 )
 
 
@@ -138,4 +139,17 @@ class OrderAdmin(SimpleHistoryAdmin):
     @admin.display(description="Qarzdorlik")
     def balance_due_display(self, obj):
         return obj.balance_due
+
+
+@admin.register(RestaurantConfig)
+class RestaurantConfigAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'latitude', 'longitude', 'attendance_radius', 'updated_at')
+
+
+@admin.register(Attendance)
+class AttendanceAdmin(SimpleHistoryAdmin):
+    list_display = ('user', 'check_in', 'check_out', 'check_in_latitude', 'check_in_longitude', 'created_at')
+    list_filter = ('check_in', 'user')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name')
+
 
