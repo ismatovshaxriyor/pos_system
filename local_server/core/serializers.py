@@ -10,9 +10,19 @@ from .models import (
 TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
 
 class UserSerializer(serializers.ModelSerializer):
+    # AbstractUser'da blank=True (ixtiyoriy) - lekin bu yerda telefon
+    # raqamidan boshqa hech qanday shaxsni aniqlovchi ma'lumot bo'lmasin
+    # uchun majburiy qilib qo'yilgan.
+    first_name = serializers.CharField(required=True, allow_blank=False)
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'role', 'is_staff')
+        # is_staff API orqali umuman ko'rsatilmaydi/yozilmaydi (nested
+        # holatda ham - received_by/waiter/cashier va h.k. shu serializer'ni
+        # qayta ishlatadi) - bosh admin holatini API mijozlari bilishi/
+        # o'zgartirishi shart emas, faqat Ona orqali (_provision_admin_user)
+        # yoki lokal Django admin orqali boshqariladi.
+        fields = ('id', 'username', 'first_name', 'last_name', 'role')
 
 class TableSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()

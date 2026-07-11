@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin, messages
 from simple_history.admin import SimpleHistoryAdmin
 
@@ -7,10 +8,43 @@ from .models import (
     StaffDevice, DeviceRegistrationCode, Notification,
 )
 
+
+class UserAdminForm(forms.ModelForm):
+    """
+    Plain ModelAdmin (no fieldsets/form) was rendering every raw model
+    field, including `password` as an ordinary AdminTextInputWidget text
+    box - typing into it saved the value UNHASHED (ModelAdmin.save_model()
+    just calls instance.save(), it doesn't know to call set_password()
+    the way django.contrib.auth.admin.UserAdmin does). Mirrors
+    cloud_server's RestaurantAdminAccountForm pattern: optional field,
+    blank = leave unchanged, non-blank = hash it properly.
+    """
+    password = forms.CharField(
+        widget=forms.PasswordInput, required=False,
+        help_text="Bo'sh qoldirilsa mavjud parol o'zgarmaydi. Faqat is_staff=True "
+                   "(admin) hisoblar uchun kerak - boshqa xodimlar PIN bilan kiradi.",
+    )
+
+    class Meta:
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'password')
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        raw_password = self.cleaned_data.get('password')
+        if raw_password:
+            instance.set_password(raw_password)
+        if commit:
+            instance.save()
+        return instance
+
+
 @admin.register(User)
 class UserAdmin(SimpleHistoryAdmin):
-    list_display = ('username', 'role', 'is_staff', 'is_synced')
-    list_filter = ('role', 'is_staff', 'is_synced')
+    form = UserAdminForm
+    list_display = ('username', 'first_name', 'last_name', 'role', 'is_staff', 'is_active')
+    list_filter = ('role', 'is_staff', 'is_active')
+    search_fields = ('username', 'first_name', 'last_name')
     actions = ['generate_registration_code']
 
     @admin.action(description="Qurilma ro'yxatga olish kodi yaratish (PIN bilan kiruvchi xodim uchun)")
