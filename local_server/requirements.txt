@@ -3,7 +3,7 @@ djangorestframework
 drf-spectacular
 psycopg2-binary
 celery
-redis
+redis==8.0.1
 Pillow
 python-dotenv
 gunicorn
@@ -13,7 +13,7 @@ PyJWT
 cryptography
 psutil
 requests
-channels
-channels-redis
+channels==4.3.2
+channels-redis==4.3.0
 daphne
 django-simple-history
