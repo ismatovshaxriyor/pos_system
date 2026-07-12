@@ -354,3 +354,88 @@ def approve_device(device_pk, manager_user):
     return pending_device
 
 
+def send_order_to_kitchen(order):
+    """
+    Buyurtmaning hali chop etilmagan barcha taomlarini mos keladigan
+    printerlarga yo'naltiradi va PrintJob yaratadi.
+    """
+    from .models import OrderItem, Printer, PrintJob
+    from .realtime import broadcast_event
+    
+    # Faqat void bo'lmagan va chop etilmagan taomlarni olish
+    items_to_print = order.items.filter(is_printed=False, is_voided=False).select_related('product__category__printer')
+    if not items_to_print.exists():
+        return []
+
+    # Printer bo'yicha guruhlash
+    printer_groups = {}
+    
+    # Asosiy printerni topish yoki generatsiya qilish
+    default_printer = Printer.objects.filter(is_active=True).first()
+
+    for item in items_to_print:
+        printer = None
+        if item.product.category and item.product.category.printer:
+            printer = item.product.category.printer
+        
+        # Agar printer belgilanmagan bo'lsa, default printerga yo'naltirish
+        if not printer:
+            printer = default_printer
+            
+        if not printer:
+            printer, _ = Printer.objects.get_or_create(name="Asosiy printer (standart)", defaults={'is_active': True})
+            default_printer = printer
+            
+        if printer.id not in printer_groups:
+            printer_groups[printer.id] = {
+                'printer': printer,
+                'items': []
+            }
+        printer_groups[printer.id]['items'].append(item)
+
+    created_jobs = []
+    
+    with transaction.atomic():
+        for group_data in printer_groups.values():
+            printer = group_data['printer']
+            items = group_data['items']
+            
+            # Chek uchun ma'lumotlarni yig'ish (snapshot)
+            items_snapshot = []
+            for item in items:
+                items_snapshot.append({
+                    'id': item.id,
+                    'name': item.product.name,
+                    'quantity': item.quantity,
+                    'note': item.note,
+                    'modifiers': item.modifiers
+                })
+                
+            # PrintJob yaratish
+            job = PrintJob.objects.create(
+                printer=printer,
+                order=order,
+                items_snapshot=items_snapshot,
+                status='pending'
+            )
+            
+            # Hamma yuborilgan itemlarni is_printed=True qilish
+            order.items.filter(id__in=[item.id for item in items]).update(is_printed=True)
+            
+            created_jobs.append(job)
+            
+            # WebSocket orqali real-vaqtda xabar berish
+            broadcast_event('new_print_job', {
+                'job_id': job.id,
+                'printer_id': printer.id,
+                'printer_name': printer.name,
+                'order_id': order.id,
+                'waiter': order.waiter.first_name if order.waiter else "Noma'lum afitsiant",
+                'table_name': order.table.name if order.table else "Takeaway",
+                'items': items_snapshot,
+                'created_at': job.created_at.isoformat() if job.created_at else timezone.now().isoformat()
+            })
+            
+    return created_jobs
+
+

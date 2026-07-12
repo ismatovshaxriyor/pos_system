@@ -124,7 +124,14 @@ ASGI_APPLICATION = 'config.asgi.application'
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {'hosts': [os.environ.get('REDIS_URL', 'redis://localhost:6379/0')]},
+        'CONFIG': {
+            'hosts': [{
+                'address': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
+                'socket_timeout': 30,
+                'socket_connect_timeout': 30,
+                'retry_on_timeout': True,
+            }],
+        },
     },
 }
 
@@ -200,8 +207,7 @@ AUTH_USER_MODEL = 'core.User'
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'core.authentication.DeviceTokenAuthentication',
     ],
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',

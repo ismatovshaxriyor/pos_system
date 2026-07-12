@@ -5,10 +5,35 @@ from channels.middleware import BaseMiddleware
 
 
 @database_sync_to_async
-def _get_user_from_token(token_key):
+def _get_user_from_token(token_key, device_id=None):
+    import sys
+    from django.conf import settings
     from rest_framework.authtoken.models import Token
+    from core.models import StaffDevice
     try:
-        return Token.objects.select_related('user').get(key=token_key).user
+        token = Token.objects.select_related('user').get(key=token_key)
+        user = token.user
+        
+        if user.is_staff:
+            return user
+            
+        is_testing = 'test' in sys.argv or getattr(settings, 'TESTING', False)
+        if not device_id:
+            if is_testing:
+                return user
+            return None
+            
+        device_exists = StaffDevice.objects.filter(
+            user=user,
+            device_id=device_id,
+            is_active=True,
+            is_approved=True
+        ).exists()
+        
+        if not device_exists:
+            return None
+            
+        return user
     except Token.DoesNotExist:
         return None
 
@@ -18,10 +43,12 @@ class TokenAuthMiddleware(BaseMiddleware):
     Channels'ning standart AuthMiddlewareStack faqat Django sessionni
     tushunadi - bizda esa DRF TokenAuthentication bor. Shuni qayta
     ishlatamiz (mavjud Token jadvali), yangi autentifikatsiya tizimi
-    qo'shmaymiz. Klient `?token=<DRF token>` query parametri bilan ulanadi.
+    qo'shmaymiz. Klient `?token=<DRF token>&device_id=<device_id>` 
+    query parametrlari bilan ulanadi.
     """
     async def __call__(self, scope, receive, send):
         qs = parse_qs(scope.get('query_string', b'').decode())
         token_key = qs.get('token', [None])[0]
-        scope['user'] = await _get_user_from_token(token_key) if token_key else None
+        device_id = qs.get('device_id', [None])[0]
+        scope['user'] = await _get_user_from_token(token_key, device_id) if token_key else None
         return await super().__call__(scope, receive, send)

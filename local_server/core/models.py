@@ -144,9 +144,19 @@ class Table(BaseModel):
         zone_name = f" ({self.zone.name})" if self.zone else ""
         return f"{self.name}{zone_name}"
 
+class Printer(BaseModel):
+    name = models.CharField(max_length=100)
+    ip_address = models.CharField(max_length=50, blank=True, null=True)
+    port = models.IntegerField(default=9100)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
 class Category(BaseModel):
     name = models.CharField(max_length=100)
     image = models.ImageField(upload_to='categories/', null=True, blank=True)
+    printer = models.ForeignKey(Printer, on_delete=models.SET_NULL, null=True, blank=True, related_name='categories')
 
     def __str__(self):
         return self.name
@@ -236,6 +246,7 @@ class OrderItem(BaseModel):
     note = models.CharField(max_length=255, blank=True, default='')
     modifiers = models.JSONField(default=dict, blank=True)
     is_voided = models.BooleanField(default=False)
+    is_printed = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.quantity}x {self.product.name} (Order #{self.order.id})"
@@ -313,5 +324,19 @@ class Attendance(BaseModel):
 
     def __str__(self):
         return f"{self.user.username} - {self.check_in}"
+
+class PrintJob(BaseModel):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('printed', 'Printed'),
+        ('failed', 'Failed'),
+    )
+    printer = models.ForeignKey(Printer, related_name='jobs', on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, related_name='print_jobs', on_delete=models.CASCADE)
+    items_snapshot = models.JSONField()  # Printed items list: [{"name": str, "quantity": int, "note": str, "modifiers": dict}]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    def __str__(self):
+        return f"Job #{self.id} - Printer: {self.printer.name} (Order #{self.order_id})"
 
 

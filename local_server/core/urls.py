@@ -4,7 +4,8 @@ from .views import (
     UserViewSet, TableViewSet, CategoryViewSet,
     ProductViewSet, OrderViewSet,
     StaffDeviceViewSet, NotificationViewSet, BootstrapView,
-    RestaurantConfigViewSet, AttendanceViewSet, TableZoneViewSet
+    RestaurantConfigViewSet, AttendanceViewSet, TableZoneViewSet,
+    PrinterViewSet, PrintJobViewSet,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,8 @@ router.register(r'devices', StaffDeviceViewSet, basename='staffdevice')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'restaurant-config', RestaurantConfigViewSet, basename='restaurantconfig')
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
+router.register(r'printers', PrinterViewSet, basename='printer')
+router.register(r'print-jobs', PrintJobViewSet, basename='printjob')
 
 urlpatterns = [
     path('bootstrap/', BootstrapView.as_view(), name='bootstrap'),

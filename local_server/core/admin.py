@@ -6,7 +6,7 @@ from . import services
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
-    RestaurantConfig, Attendance, TableZone,
+    RestaurantConfig, Attendance, TableZone, Printer, PrintJob,
 )
 
 
@@ -100,7 +100,7 @@ class TableAdmin(SimpleHistoryAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'is_synced')
+    list_display = ('name', 'printer', 'is_synced')
 
 @admin.register(Product)
 class ProductAdmin(SimpleHistoryAdmin):
@@ -155,5 +155,17 @@ class AttendanceAdmin(SimpleHistoryAdmin):
     list_display = ('user', 'check_in', 'check_out', 'check_in_latitude', 'check_in_longitude', 'created_at')
     list_filter = ('check_in', 'user')
     search_fields = ('user__username', 'user__first_name', 'user__last_name')
+
+
+@admin.register(Printer)
+class PrinterAdmin(SimpleHistoryAdmin):
+    list_display = ('name', 'ip_address', 'port', 'is_active')
+    list_filter = ('is_active',)
+
+
+@admin.register(PrintJob)
+class PrintJobAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'printer', 'order', 'status', 'created_at')
+    list_filter = ('status', 'printer', 'created_at')
 
 

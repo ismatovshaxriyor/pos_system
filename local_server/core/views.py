@@ -1,13 +1,16 @@
 from django.db import transaction
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.views.generic import TemplateView
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import viewsets, permissions, status, mixins
+from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from . import services
-from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone
+from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob
 from .permissions import IsAdminStaff, IsManagerOrAdmin
 from .realtime import broadcast_event
 from .serializers import (
@@ -17,7 +20,7 @@ from .serializers import (
     StaffDeviceSerializer, NotificationSerializer,
     RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
     RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
-    TableZoneSerializer,
+    TableZoneSerializer, PrinterSerializer, PrintJobSerializer,
 )
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
@@ -208,6 +211,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             # updated_at (auto_now) update_fields ro'yxatida bo'lmasa
             # yangilanmaydi - sync closed_at shu maydonga tayanadi.
             order.save(update_fields=['status', 'updated_at'])
+            
+        services.send_order_to_kitchen(order)
         broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
@@ -274,6 +279,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                 note=serializer.validated_data.get('note', ''),
                 modifiers=serializer.validated_data.get('modifiers') or {},
             )
+
+        if order.status == 'in_progress':
+            services.send_order_to_kitchen(order)
 
         broadcast_event('order_updated', {'order_id': order.id})
 
@@ -523,4 +531,142 @@ class AttendanceViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': exc.message}, status=exc.status)
             
         return Response(AttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
+
+
+class PrinterViewSet(viewsets.ModelViewSet):
+    queryset = Printer.objects.all()
+    serializer_class = PrinterSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=None, responses={200: dict})
+    @action(detail=False, methods=['get'], url_path='category-options')
+    def category_options(self, request):
+        """
+        Yangi printer yaratilganda unga qaysi kategoriyalarni bog'lash
+        mumkinligini tanlash uchun yengil ro'yxat. Bu qasddan to'liq
+        `CategoryViewSet` (u `IsManagerOrAdmin` bilan cheklangan va
+        nom/rasm kabi tahririy maydonlarni ham ochadi) o'rniga faqat shu
+        tanlov uchun kerakli maydonlarni qaytaradi - shuning uchun
+        printerni boshqara oladigan har qanday xodim (manager bo'lishi
+        shart emas, kitchen dashboard'ning xizmat hisobi ham) kategoriya
+        nomi/rasmini o'zgartira olmasdan turib qaysi kategoriya qaysi
+        printerga chop etilishini ko'ra/bog'lay oladi.
+        """
+        categories = Category.objects.select_related('printer').order_by('name').values(
+            'id', 'name', 'printer_id', 'printer__name',
+        )
+        return Response(list(categories))
+
+    @extend_schema(request=None, responses={200: StatusMessageSerializer, 400: OpenApiResponse(ErrorDetailSerializer)})
+    @action(detail=True, methods=['post'], url_path='set-categories')
+    def set_categories(self, request, pk=None):
+        """Shu printerga aynan qaysi kategoriyalar bog'langanini to'liq almashtiradi (tanlanmaganlari bo'shatiladi)."""
+        printer = self.get_object()
+        category_ids = request.data.get('category_ids', [])
+        if not isinstance(category_ids, list):
+            return Response({'detail': "category_ids ro'yxat bo'lishi kerak."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            Category.objects.filter(printer=printer).exclude(id__in=category_ids).update(printer=None)
+            Category.objects.filter(id__in=category_ids).update(printer=printer)
+
+        return Response({'status': 'Kategoriyalar yangilandi'})
+
+
+class PrintJobViewSet(viewsets.ModelViewSet):
+    queryset = PrintJob.objects.all().order_by('-created_at')
+    serializer_class = PrintJobSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # ?printer=<id> - bitta stansiya sahifasi (kitchen_dashboard.html)
+        # faqat o'ziga tegishli navbatni so'raydi, boshqa printerlarning
+        # cheklarini butunlay olib kelmasdan.
+        qs = super().get_queryset()
+        printer_id = self.request.query_params.get('printer')
+        if printer_id:
+            qs = qs.filter(printer_id=printer_id)
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='mark-printed')
+    def mark_printed(self, request, pk=None):
+        job = self.get_object()
+        job.status = 'printed'
+        job.save(update_fields=['status', 'updated_at'])
+        broadcast_event('print_job_updated', {'job_id': job.id, 'status': 'printed'})
+        return Response({'status': 'Job marked as printed'})
+
+    @action(detail=True, methods=['post'], url_path='mark-failed')
+    def mark_failed(self, request, pk=None):
+        job = self.get_object()
+        job.status = 'failed'
+        job.save(update_fields=['status', 'updated_at'])
+        broadcast_event('print_job_updated', {'job_id': job.id, 'status': 'failed'})
+        return Response({'status': 'Job marked as failed'})
+
+
+# Oshxona ekrani jismoniy qurilma sifatida restoran ichida turadi - xodimdan
+# har safar telefon+parol talab qilish noqulay (umumiy planshet/monitor).
+# Shu sababli bu sahifada login ekrani yo'q: doimiy, oldindan tayinlangan
+# xizmat hisobi (pastda) ga tegishli token+device_id sahifa render
+# qilinganda shablonga ko'rinmas holda joylab beriladi.
+#
+# Xavfsizlik chegarasi: bu hisob har doim `role='cashier'` va `is_staff=False`
+# bo'lib qoladi - `IsManagerOrAdmin`ning yozish tekshiruvi `user.is_staff or
+# user.role == 'manager'` ekanini unutmang (Auth quirks - is_staff=True bu
+# yerda moliyaviy amallarni (chegirma/bekor qilish/mahsulot-jadval
+# sozlamalari) ham ochib qo'yardi). "view-source" orqali token oshkor
+# bo'lishi mumkinligi tan olingan-va-qabul qilingan tavakkal - blast radius
+# oddiy kassir darajasidan oshmasligi kerak.
+KITCHEN_SERVICE_USERNAME = '+998000000001'
+KITCHEN_SERVICE_DEVICE_ID = 'kitchen-dashboard-service'
+
+
+class KitchenDashboardView(TemplateView):
+    """
+    `printer_id` URL kwarg'i bo'lmasa - barcha printerlar ro'yxati (stansiya
+    tanlash sahifasi). Bo'lsa - shu bitta printerning navbati (jismoniy
+    stansiya ekrani uchun katta, sodda ko'rinish - qarang: shablon).
+    """
+    template_name = 'core/kitchen_dashboard.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ws_token'] = self._get_or_create_service_token()
+        context['ws_device_id'] = KITCHEN_SERVICE_DEVICE_ID
+
+        printer_id = kwargs.get('printer_id')
+        if printer_id is not None:
+            printer = get_object_or_404(Printer, pk=printer_id)
+            context['station_printer_id'] = printer.id
+            context['station_printer_name'] = printer.name
+        else:
+            context['station_printer_id'] = None
+            context['station_printer_name'] = ''
+        return context
+
+    @staticmethod
+    def _get_or_create_service_token():
+        user, created = User.objects.get_or_create(
+            username=KITCHEN_SERVICE_USERNAME,
+            defaults={'role': 'cashier', 'first_name': 'Oshxona ekrani'},
+        )
+        if created:
+            # Parol orqali hech qachon kirilmaydi - shuning uchun
+            # /api/auth/login/ orqali bu hisobga kirish imkonsiz qolishi
+            # kerak (faqat quyidagi StaffDevice+Token orqali).
+            user.set_unusable_password()
+            user.save(update_fields=['password'])
+
+        device, _ = StaffDevice.objects.get_or_create(
+            user=user, device_id=KITCHEN_SERVICE_DEVICE_ID,
+            defaults={'device_label': 'Oshxona ekrani (avto)', 'is_active': True, 'is_approved': True},
+        )
+        if not device.is_active or not device.is_approved:
+            device.is_active = True
+            device.is_approved = True
+            device.save(update_fields=['is_active', 'is_approved', 'updated_at'])
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return token.key
 

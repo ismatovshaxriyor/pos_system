@@ -22,9 +22,12 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 from rest_framework.authtoken.views import obtain_auth_token
 
 from core.auth_views import DeviceRegisterView, PinLoginView, WaiterLoginView
+from core.views import KitchenDashboardView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('kitchen/printers/', KitchenDashboardView.as_view(), name='kitchen-dashboard'),
+    path('kitchen/printers/<int:printer_id>/', KitchenDashboardView.as_view(), name='kitchen-dashboard-station'),
 
     # API endpoints
     path('api/', include('core.urls')),

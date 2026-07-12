@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual POS Kitchen Printers</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d0e12;
+            --surface-color: #161822;
+            --surface-hover: #1f2235;
+            --primary-color: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --text-color: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-color: #10b981;
+            --warn-color: #f59e0b;
+            --danger-color: #ef4444;
+            --border-color: #2e3349;
+            --glass-bg: rgba(22, 24, 34, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 0 15px var(--primary-glow);
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 30%, var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--danger-color);
+            box-shadow: 0 0 8px var(--danger-color);
+        }
+
+        .status-indicator.connected {
+            background-color: var(--accent-color);
+            box-shadow: 0 0 8px var(--accent-color);
+        }
+
+        .status-indicator.connecting {
+            background-color: var(--primary-color);
+            box-shadow: 0 0 8px var(--primary-glow);
+        }
+
+        main {
+            flex: 1;
+            width: 100%;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2.5rem 2rem 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+        }
+
+        .btn {
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .form-group input[type="text"] {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input[type="text"]:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        /* Yangi printer + kategoriya bog'lash modali */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 1rem;
+        }
+
+        .modal-box {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 480px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-box h3 {
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+
+        .category-checklist {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem;
+        }
+
+        .category-empty-msg {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            padding: 0.5rem;
+        }
+
+        .category-checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.5rem 0.6rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .category-checkbox-row:hover {
+            background: var(--surface-hover);
+        }
+
+        .category-checkbox-row input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .category-current-printer {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-left: auto;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.2rem;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Stansiyalar ro'yxati (index sahifa) - auto-fill + max-width shart:
+           auto-fit/1fr bilan ultra-keng ekranda 2-3 ta karta cheksiz
+           kengayib, ichi bo'sh, orasi zich ko'rinar edi. */
+        .stations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 300px));
+            justify-content: start;
+            gap: 2rem;
+        }
+
+        .station-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 2.2rem 1.8rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            text-align: center;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .station-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+        }
+
+        .station-card-icon-badge {
+            width: 68px;
+            height: 68px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+
+        .station-card-icon-badge svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .station-card-name {
+            font-size: 1.3rem;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .station-card-count {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.06);
+            padding: 6px 16px;
+            border-radius: 99px;
+            text-decoration: none;
+        }
+
+        .station-card-count.has-pending {
+            color: #fff;
+            background: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .station-card-hint {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.2s;
+            text-decoration: none;
+        }
+
+        .station-card:hover .station-card-hint {
+            opacity: 1;
+        }
+
+        /* Bitta stansiya sahifasi */
+        .queue-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .empty-jobs-placeholder {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 1rem;
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: 1.1rem;
+            gap: 14px;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            opacity: 0.3;
+        }
+
+        /* Virtual Receipt / Ticket - kattalashtirilgan, oshxonadan uzoqdan o'qiladigan */
+        .receipt-ticket {
+            background: #fff;
+            color: #111827;
+            padding: 1.8rem 1.8rem 1.5rem;
+            border-radius: 6px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            font-family: 'Courier New', Courier, monospace;
+            position: relative;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: visible;
+        }
+
+        .ticket-number-badge {
+            position: absolute;
+            top: -16px;
+            left: -16px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+            border: 3px solid var(--bg-color);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .receipt-header {
+            text-align: center;
+            border-bottom: 1px dashed #9ca3af;
+            padding-bottom: 0.9rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .receipt-shop-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 0.3rem;
+        }
+
+        .receipt-metadata {
+            font-size: 0.95rem;
+            color: #4b5563;
+            line-height: 1.5;
+        }
+
+        .receipt-elapsed {
+            display: inline-block;
+            margin-top: 4px;
+            font-weight: 800;
+            font-size: 1rem;
+        }
+
+        .receipt-elapsed.elapsed-ok { color: #059669; }
+        .receipt-elapsed.elapsed-warn { color: #b45309; }
+        .receipt-elapsed.elapsed-danger { color: #dc2626; }
+
+        .receipt-body {
+            margin-bottom: 0.9rem;
+            border-bottom: 1px dashed #9ca3af;
+            padding-bottom: 0.9rem;
+        }
+
+        .receipt-item-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.15rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .receipt-item-qty {
+            font-weight: bold;
+            font-size: 1.4rem;
+        }
+
+        .receipt-item-details {
+            flex: 1;
+            margin-left: 12px;
+        }
+
+        .receipt-item-name {
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .receipt-item-note {
+            font-size: 0.95rem;
+            color: #ef4444;
+            margin-top: 3px;
+            font-style: italic;
+        }
+
+        .receipt-item-modifiers {
+            font-size: 0.9rem;
+            color: #4b5563;
+            margin-top: 3px;
+            padding-left: 10px;
+        }
+
+        .receipt-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 1.2rem;
+        }
+
+        .receipt-actions button {
+            flex: 1;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            padding: 12px 14px;
+            min-height: 48px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .receipt-actions button.btn-print-success {
+            background: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+
+        .receipt-actions button.btn-print-failed {
+            background: #ef4444;
+            color: white;
+            border-color: #ef4444;
+        }
+
+        .receipt-actions button:hover {
+            filter: brightness(0.9);
+        }
+
+        .notification-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary-color);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+            animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-section">
+            <div class="logo-icon">K</div>
+            <h1>{% if station_printer_name %}{{ station_printer_name }}{% else %}Virtual POS Kitchen Printers{% endif %}</h1>
+        </div>
+        <div class="status-badge">
+            <div class="status-indicator" id="ws-indicator"></div>
+            <span id="ws-status-text">Ulanmagan</span>
+        </div>
+    </header>
+
+    <main>
+        {% if station_printer_id %}
+        <!-- STANSIYA SAHIFASI: faqat shu printerga tegishli navbat, katta/sodda ko'rinishda -->
+        <section id="station-section">
+            <div class="controls-row">
+                <a href="/kitchen/printers/" class="btn btn-secondary">&larr; Stansiyalar</a>
+                <button class="btn btn-secondary" id="reconnect-btn">Qayta ulanish</button>
+            </div>
+
+            <div class="queue-list" id="queue-list">
+                <div class="empty-jobs-placeholder">
+                    <div class="empty-icon">📭</div>
+                    <div>Yangi cheklar yo'q</div>
+                </div>
+            </div>
+        </section>
+        {% else %}
+        <!-- STANSIYALAR RO'YXATI: login ekrani yo'q, sahifa ochilishi bilan
+             o'zi avtomatik ulanadi (qarang: KitchenDashboardView) -->
+        <section id="index-section">
+            <div class="controls-row">
+                <div>
+                    <h2 style="font-size: 1.5rem; font-weight: 800;">Oshxona stansiyalari</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 8px; line-height: 1.5;">
+                        Har bir stansiyani alohida planshetda oching - u faqat o'ziga tegishli cheklarni ko'rsatadi.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" id="add-printer-btn">+ Yangi printer qo'shish</button>
+                    <button class="btn btn-secondary" id="reconnect-btn">Qayta ulanish</button>
+                </div>
+            </div>
+
+            <div class="stations-grid" id="stations-grid">
+                <!-- Stansiya kartalari shu yerga dinamik joylanadi -->
+            </div>
+        </section>
+        {% endif %}
+    </main>
+
+    {% if not station_printer_id %}
+    <!-- ADD PRINTER MODAL - faqat stansiyalar ro'yxati sahifasida kerak -->
+    <div id="printer-modal-overlay" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Yangi printer qo'shish</h3>
+            <div class="form-group">
+                <label for="new-printer-name">Printer nomi</label>
+                <input type="text" id="new-printer-name" placeholder="Masalan: Issiq taomlar printeri">
+            </div>
+            <div class="form-group">
+                <label>Qaysi kategoriyalar shu printerga chop etilsin?</label>
+                <input type="text" id="category-filter-input" placeholder="Kategoriyani qidirish...">
+                <div id="category-checklist" class="category-checklist">
+                    <!-- checkboxes populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="printer-modal-cancel">Bekor qilish</button>
+                <button class="btn" id="printer-modal-save">Saqlash</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div id="toast-container"></div>
+
+    <script>
+        const API_URL = window.location.origin;
+        // Login ekrani yo'q - bu doimiy xizmat hisobiga tegishli token/device_id
+        // sahifa serverda render qilinganda joylab beriladi (qarang:
+        // KitchenDashboardView._get_or_create_service_token). Hech qachon
+        // localStorage'da saqlanmaydi/o'zgartirilmaydi - manba doim server.
+        const token = "{{ ws_token }}";
+        const deviceId = "{{ ws_device_id }}";
+        // null - stansiyalar ro'yxati sahifasi; son - shu printerga tegishli
+        // stansiya sahifasi (qarang: KitchenDashboardView, config/urls.py).
+        const STATION_PRINTER_ID = {{ station_printer_id|default:"null" }};
+
+        // Navbatdagi chekning "necha daqiqa kutayotgani" rangini belgilash
+        // uchun chegaralar (millisekundlarda).
+        const ELAPSED_WARN_MS = 5 * 60 * 1000;
+        const ELAPSED_DANGER_MS = 10 * 60 * 1000;
+
+        // Emoji (masalan printer emoji) tizimning shrift/emoji to'plamiga
+        // qarab turli qurilmalarda tekis/rangsiz chizilishi mumkin - shu
+        // sababli ishonchli, doim bir xil ko'rinadigan ikonka uchun SVG
+        // ishlatiladi ("currentColor" - ota elementning `color`iga mos
+        // ravishda o'zgaradi).
+        const PRINTER_ICON_SVG = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+        `;
+
+        let ws = null;
+
+        // --- WebSocket reliability state ---
+        // Har bir ulanishga o'sib boruvchi "avlod" raqami beriladi - eski,
+        // allaqachon almashtirilgan socketning kechikkan onclose/onmessage
+        // hodisalari joriy holatni buzmasligi uchun (masalan tez-tez
+        // qayta ulanishda ikkita socket bir vaqtda "ochiq" bo'lib qolsa).
+        let wsGeneration = 0;
+        let reconnectTimer = null;
+        let reconnectAttempt = 0;
+        let pingWatchdog = null;
+        // Server ~20s da bir marta "ping" yuboradi (core/consumers.py) - shu
+        // oraliqning 2.5 barobaridan ko'proq vaqt hech narsa kelmasa, ulanish
+        // "zombi" (brauzerda ochiq ko'rinadi, lekin server bilan aloqa yo'q,
+        // masalan WiFi routerning NAT jadvali tugagan) deb hisoblab, majburan
+        // qayta ulanamiz.
+        const PING_TIMEOUT_MS = 55000;
+        const MAX_RECONNECT_DELAY_MS = 15000;
+
+        function setConnectionStatus(state) {
+            const indicator = document.getElementById('ws-indicator');
+            const text = document.getElementById('ws-status-text');
+            const STATES = {
+                connecting: ['status-indicator connecting', 'Ulanmoqda...'],
+                connected: ['status-indicator connected', 'Real-vaqtda ulangan'],
+                reconnecting: ['status-indicator', `Ulanish uzildi, qayta urinilmoqda (${reconnectAttempt})...`],
+                'auth-failed': ['status-indicator', 'Sessiya tugadi - qayta kiring'],
+            };
+            const [cls, txt] = STATES[state] || STATES.connecting;
+            indicator.className = cls;
+            text.innerText = txt;
+        }
+
+        function resetPingWatchdog() {
+            clearTimeout(pingWatchdog);
+            pingWatchdog = setTimeout(() => {
+                // Serverdan kutilgan muddatda hech narsa (na ping, na haqiqiy
+                // hodisa) kelmadi - ulanish "zombi" bo'lib qolgan, lekin
+                // brauzer buni hali sezmagan bo'lishi mumkin. Majburan
+                // yopamiz - bu darhol onclose'ni ishga tushirib, oddiy
+                // qayta ulanish yo'lidan o'tadi.
+                if (ws) { try { ws.close(); } catch (e) {} }
+            }, PING_TIMEOUT_MS);
+        }
+
+        function scheduleReconnect() {
+            reconnectAttempt++;
+            const delay = Math.min(1000 * (2 ** (reconnectAttempt - 1)), MAX_RECONNECT_DELAY_MS);
+            setConnectionStatus('reconnecting');
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connectWS, delay);
+        }
+
+        function connectWS() {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+
+            // Eski socket bo'lsa - hodisa handlerlarini uzib, yopamiz, shu
+            // bilan ikkita socket bir vaqtda aktiv bo'lib qolmaydi.
+            if (ws) {
+                ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
+                try { ws.close(); } catch (e) {}
+            }
+
+            const myGeneration = ++wsGeneration;
+            setConnectionStatus('connecting');
+
+            const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${wsProto}://${window.location.host}/ws/events/?token=${token}&device_id=${deviceId}`);
+
+            ws.onopen = () => {
+                if (myGeneration !== wsGeneration) return;
+                const wasReconnect = reconnectAttempt > 0;
+                reconnectAttempt = 0;
+                setConnectionStatus('connected');
+                resetPingWatchdog();
+                // Qayta ulanishda (yoki birinchi ulanishda) tushib qolgan
+                // cheklarni sinxronlashtirish.
+                if (STATION_PRINTER_ID !== null) loadStationJobs();
+                else loadStations();
+                if (wasReconnect) showToast('WebSocket ulanishi tiklandi', 'success');
+            };
+
+            ws.onclose = (e) => {
+                if (myGeneration !== wsGeneration) return;
+                clearTimeout(pingWatchdog);
+
+                if (e.code === 4001 || e.code === 4403) {
+                    // Token yaroqsiz yoki xizmat qurilmasi biror sababdan
+                    // revoke qilingan - bir xil token bilan qayta urinish
+                    // befoyda (server buni doim rad etadi). Sahifani qayta
+                    // yuklash KitchenDashboardView'ni qaytadan faollashtirilgan
+                    // token bilan qayta render qilishga majburlaydi (qarang:
+                    // _get_or_create_service_token), shuning uchun avtomatik
+                    // qayta urinish o'rniga shuni taklif qilamiz.
+                    setConnectionStatus('auth-failed');
+                    showToast("Ulanish rad etildi - sahifani yangilang (F5)", 'error');
+                    return;
+                }
+
+                // 4402 (litsenziya bloklangan) va boshqa har qanday
+                // sabab - tarmoq uzilishi ham shu yerga tushadi - doim
+                // qayta urinamiz, faqat backoff bilan.
+                scheduleReconnect();
+            };
+
+            ws.onerror = () => {
+                // onclose baribir keyin chaqiriladi - alohida ish shart emas,
+                // faqat konsolga chiqib ketmasligi uchun bo'sh handler.
+            };
+
+            ws.onmessage = (e) => {
+                if (myGeneration !== wsGeneration) return;
+                resetPingWatchdog();
+
+                const payload = JSON.parse(e.data);
+                if (payload.event === 'ping') return; // faqat tirikligini bildiradi
+
+                console.log("WebSocket event:", payload);
+
+                if (payload.event === 'new_print_job') {
+                    if (STATION_PRINTER_ID !== null) handleNewPrintJobStation(payload.data);
+                    else handleNewPrintJobIndex(payload.data);
+                } else if (payload.event === 'print_job_updated') {
+                    if (STATION_PRINTER_ID !== null) handlePrintJobUpdatedStation(payload.data);
+                    else handlePrintJobUpdatedIndex();
+                }
+            };
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            if (type === 'error') {
+                toast.style.borderLeftColor = 'var(--danger-color)';
+            } else {
+                toast.style.borderLeftColor = 'var(--accent-color)';
+            }
+            toast.innerHTML = `
+                <div style="font-weight: 600; font-size: 0.95rem;">${message}</div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // ============================================================
+        // STANSIYA SAHIFASI (bitta printerning navbati)
+        // ============================================================
+        let queueJobs = []; // {id, printer, order, table_name, waiter_name, items_snapshot, created_at}
+        let queueTicker = null;
+
+        function initStationMode() {
+            loadStationJobs();
+            // Yangi ma'lumot kelmasa ham, "necha daqiqa kutayotgani"
+            // yozuvi/rangi vaqt o'tishi bilan yangilanib turishi uchun.
+            queueTicker = setInterval(renderQueue, 15000);
+        }
+
+        async function loadStationJobs() {
+            try {
+                const res = await fetch(`${API_URL}/api/print-jobs/?printer=${STATION_PRINTER_ID}`, {
+                    headers: { 'Authorization': `Token ${token}`, 'X-Device-ID': deviceId }
+                });
+                if (!res.ok) throw new Error("Navbatni yuklab bo'lmadi");
+                const data = await res.json();
+                queueJobs = data.results.filter(job => job.status === 'pending');
+                renderQueue();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function handleNewPrintJobStation(data) {
+            if (data.printer_id !== STATION_PRINTER_ID) return; // boshqa stansiyaga tegishli
+            if (queueJobs.some(j => j.id === data.job_id)) return; // takroriy hodisa
+
+            showToast('Yangi chek keldi', 'success');
+            queueJobs.push({
+                id: data.job_id,
+                printer: data.printer_id,
+                order: data.order_id,
+                table_name: data.table_name,
+                waiter_name: data.waiter,
+                items_snapshot: data.items,
+                created_at: data.created_at,
+            });
+            renderQueue();
+        }
+
+        function handlePrintJobUpdatedStation(data) {
+            // Shu stansiyada (yoki boshqa qurilmadan xuddi shu chekka)
+            // bajarilgan bo'lishi mumkin - ro'yxatda bo'lsa olib tashlaymiz.
+            queueJobs = queueJobs.filter(j => j.id !== data.job_id);
+            renderQueue();
+        }
+
+        function renderQueue() {
+            const list = document.getElementById('queue-list');
+            if (!list) return;
+
+            if (queueJobs.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-jobs-placeholder">
+                        <div class="empty-icon">📭</div>
+                        <div>Yangi cheklar yo'q</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Eng uzoq kutgan birinchi - navbat tartibi shunga mos.
+            const sorted = [...queueJobs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            list.innerHTML = sorted.map((job, index) => renderTicketHtml(job, index + 1)).join('');
+        }
+
+        function renderTicketHtml(job, position) {
+            const elapsedMs = Date.now() - new Date(job.created_at).getTime();
+            let elapsedClass = 'elapsed-ok';
+            if (elapsedMs >= ELAPSED_DANGER_MS) elapsedClass = 'elapsed-danger';
+            else if (elapsedMs >= ELAPSED_WARN_MS) elapsedClass = 'elapsed-warn';
+            const elapsedMin = Math.max(0, Math.floor(elapsedMs / 60000));
+            const elapsedText = elapsedMin < 1 ? 'hozirgina' : `${elapsedMin} daqiqa oldin`;
+
+            let itemsHtml = '';
+            job.items_snapshot.forEach(item => {
+                let noteHtml = item.note ? `<div class="receipt-item-note">Eslatma: ${item.note}</div>` : '';
+                let modsHtml = '';
+                if (item.modifiers && typeof item.modifiers === 'object' && !Array.isArray(item.modifiers) && Object.keys(item.modifiers).length > 0) {
+                    modsHtml += '<div class="receipt-item-modifiers">';
+                    for (const [key, val] of Object.entries(item.modifiers)) {
+                        modsHtml += `<div>- ${key}: ${Array.isArray(val) ? val.join(', ') : val}</div>`;
+                    }
+                    modsHtml += '</div>';
+                }
+
+                itemsHtml += `
+                    <div class="receipt-item-row">
+                        <span class="receipt-item-qty">${item.quantity}x</span>
+                        <div class="receipt-item-details">
+                            <div class="receipt-item-name">${item.name}</div>
+                            ${noteHtml}
+                            ${modsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            return `
+                <div class="receipt-ticket" id="ticket-${job.id}">
+                    <div class="ticket-number-badge">${position}</div>
+                    <div class="receipt-header">
+                        <div class="receipt-shop-name">Buyurtma #${job.order} - ${job.table_name}</div>
+                        <div class="receipt-metadata">
+                            Afitsiant: ${job.waiter_name}<br>
+                            <span class="receipt-elapsed ${elapsedClass}">${elapsedText}</span>
+                        </div>
+                    </div>
+                    <div class="receipt-body">
+                        ${itemsHtml}
+                    </div>
+                    <div class="receipt-actions">
+                        <button class="btn-print-success" onclick="markJobStatus(${job.id}, 'printed')">Chop etildi (OK)</button>
+                        <button class="btn-print-failed" onclick="markJobStatus(${job.id}, 'failed')">Xato (Fail)</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function markJobStatus(jobId, status) {
+            try {
+                const endpoint = status === 'printed' ? 'mark-printed' : 'mark-failed';
+                const res = await fetch(`${API_URL}/api/print-jobs/${jobId}/${endpoint}/`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Token ${token}`, 'X-Device-ID': deviceId }
+                });
+                if (!res.ok) throw new Error("Holatni o'zgartirib bo'lmadi");
+
+                queueJobs = queueJobs.filter(j => j.id !== jobId);
+                renderQueue();
+                showToast(`Chek ${status === 'printed' ? 'chop etildi' : 'bekor qilindi'}`, 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        // ============================================================
+        // STANSIYALAR RO'YXATI (index sahifa)
+        // ============================================================
+        let stationsCache = []; // {id, name, ...}
+        let stationCounts = {}; // printer_id -> kutilayotgan chek soni
+
+        function initIndexMode() {
+            loadStations();
+            wireModalHandlers();
+        }
+
+        async function loadStations() {
+            try {
+                const [printersRes, jobsRes] = await Promise.all([
+                    fetch(`${API_URL}/api/printers/`, { headers: { 'Authorization': `Token ${token}`, 'X-Device-ID': deviceId } }),
+                    fetch(`${API_URL}/api/print-jobs/`, { headers: { 'Authorization': `Token ${token}`, 'X-Device-ID': deviceId } }),
+                ]);
+                if (!printersRes.ok) throw new Error("Printerlarni yuklash xatosi");
+                const printers = await printersRes.json();
+                stationsCache = printers.results;
+
+                stationCounts = {};
+                if (jobsRes.ok) {
+                    const jobsData = await jobsRes.json();
+                    jobsData.results
+                        .filter(job => job.status === 'pending')
+                        .forEach(job => {
+                            stationCounts[job.printer] = (stationCounts[job.printer] || 0) + 1;
+                        });
+                }
+
+                renderStationsGrid();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function renderStationsGrid() {
+            const grid = document.getElementById('stations-grid');
+            if (!grid) return;
+
+            if (stationsCache.length === 0) {
+                grid.innerHTML = '<div class="category-empty-msg">Hozircha printer yo\'q - yuqoridagi tugma orqali qo\'shing.</div>';
+                return;
+            }
+
+            grid.innerHTML = stationsCache.map(printer => {
+                const count = stationCounts[printer.id] || 0;
+                return `
+                    <a class="station-card" href="/kitchen/printers/${printer.id}/">
+                        <div class="station-card-icon-badge">${PRINTER_ICON_SVG}</div>
+                        <div class="station-card-name">${printer.name}</div>
+                        <div class="station-card-count ${count > 0 ? 'has-pending' : ''}">${count} kutilmoqda</div>
+                        <div class="station-card-hint">Ochish uchun bosing &rarr;</div>
+                    </a>
+                `;
+            }).join('');
+        }
+
+        function handleNewPrintJobIndex(data) {
+            stationCounts[data.printer_id] = (stationCounts[data.printer_id] || 0) + 1;
+            renderStationsGrid();
+        }
+
+        function handlePrintJobUpdatedIndex() {
+            // Hodisa qaysi printerga tegishli ekanini bildirmaydi
+            // (faqat job_id/status) - shu sabab hisoblagichlarni to'liq
+            // qayta yuklaymiz. Bitta restoran ko'lamida arzon so'rov.
+            loadStations();
+        }
+
+        function wireModalHandlers() {
+            const printerModalOverlay = document.getElementById('printer-modal-overlay');
+            // Serverdan bir marta yuklangan to'liq ro'yxat - filtr matn
+            // kiritilganda qayta so'rov yubormasdan shu keshdan filtrlaymiz.
+            // Tanlangan id'lar filtrdan mustaqil, alohida saqlanadi - aks
+            // holda foydalanuvchi bir kategoriyani belgilab, keyin filtrni
+            // o'zgartirsa (belgilangan qator ro'yxatdan vaqtincha chiqib
+            // ketsa), tanlovi yo'qolib qolar edi.
+            let categoryOptionsCache = [];
+            let selectedCategoryIds = new Set();
+
+            document.getElementById('add-printer-btn').addEventListener('click', openAddPrinterModal);
+            document.getElementById('printer-modal-cancel').addEventListener('click', closeAddPrinterModal);
+            document.getElementById('printer-modal-save').addEventListener('click', submitAddPrinterModal);
+            document.getElementById('category-filter-input').addEventListener('input', (e) => {
+                renderCategoryChecklist(e.target.value);
+            });
+            document.getElementById('category-checklist').addEventListener('change', (e) => {
+                if (e.target.type !== 'checkbox') return;
+                if (e.target.checked) selectedCategoryIds.add(e.target.value);
+                else selectedCategoryIds.delete(e.target.value);
+            });
+            // Overlayning bo'sh joyiga (modal-box tashqarisiga) bosilsa ham yopiladi
+            printerModalOverlay.addEventListener('click', (e) => {
+                if (e.target === printerModalOverlay) closeAddPrinterModal();
+            });
+
+            async function openAddPrinterModal() {
+                document.getElementById('new-printer-name').value = '';
+                document.getElementById('category-filter-input').value = '';
+                categoryOptionsCache = [];
+                selectedCategoryIds = new Set();
+                printerModalOverlay.style.display = 'flex';
+
+                const checklist = document.getElementById('category-checklist');
+                checklist.innerHTML = '<div class="category-empty-msg">Yuklanmoqda...</div>';
+
+                try {
+                    const res = await fetch(`${API_URL}/api/printers/category-options/`, {
+                        headers: { 'Authorization': `Token ${token}`, 'X-Device-ID': deviceId }
+                    });
+                    if (!res.ok) throw new Error("Kategoriyalarni yuklab bo'lmadi");
+                    categoryOptionsCache = await res.json();
+                    renderCategoryChecklist();
+                } catch (err) {
+                    checklist.innerHTML = `<div class="category-empty-msg" style="color: var(--danger-color);">${err.message}</div>`;
+                }
+            }
+
+            function renderCategoryChecklist(filterText = '') {
+                const checklist = document.getElementById('category-checklist');
+
+                if (categoryOptionsCache.length === 0) {
+                    checklist.innerHTML = '<div class="category-empty-msg">Hozircha kategoriya yo\'q</div>';
+                    return;
+                }
+
+                const needle = filterText.trim().toLowerCase();
+                const filtered = needle
+                    ? categoryOptionsCache.filter(cat => cat.name.toLowerCase().includes(needle))
+                    : categoryOptionsCache;
+
+                if (filtered.length === 0) {
+                    checklist.innerHTML = '<div class="category-empty-msg">Mos kategoriya topilmadi</div>';
+                    return;
+                }
+
+                checklist.innerHTML = filtered.map(cat => `
+                    <label class="category-checkbox-row">
+                        <input type="checkbox" value="${cat.id}" ${selectedCategoryIds.has(String(cat.id)) ? 'checked' : ''}>
+                        <span>${cat.name}</span>
+                        ${cat.printer__name ? `<span class="category-current-printer">hozir: ${cat.printer__name}</span>` : ''}
+                    </label>
+                `).join('');
+            }
+
+            function closeAddPrinterModal() {
+                printerModalOverlay.style.display = 'none';
+            }
+
+            async function submitAddPrinterModal() {
+                const name = document.getElementById('new-printer-name').value.trim();
+                if (!name) {
+                    showToast("Printer nomini kiriting", 'error');
+                    return;
+                }
+
+                const selectedIds = Array.from(selectedCategoryIds).map(id => parseInt(id, 10));
+
+                try {
+                    const res = await fetch(`${API_URL}/api/printers/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Token ${token}`,
+                            'X-Device-ID': deviceId
+                        },
+                        body: JSON.stringify({ name, is_active: true })
+                    });
+                    if (!res.ok) throw new Error("Printerni qo'shib bo'lmadi");
+                    const printer = await res.json();
+
+                    if (selectedIds.length > 0) {
+                        const catRes = await fetch(`${API_URL}/api/printers/${printer.id}/set-categories/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Token ${token}`,
+                                'X-Device-ID': deviceId
+                            },
+                            body: JSON.stringify({ category_ids: selectedIds })
+                        });
+                        if (!catRes.ok) throw new Error("Printer yaratildi, lekin kategoriyalarni bog'lab bo'lmadi");
+                    }
+
+                    showToast("Printer qo'shildi", 'success');
+                    closeAddPrinterModal();
+                    loadStations();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            }
+        }
+
+        // ============================================================
+        // ISHGA TUSHIRISH - barcha `let`/`const` holat va funksiyalar
+        // yuqorida e'lon qilingandan KEYIN, shu yerda chaqiriladi. Bu
+        // tartib muhim: `let` bilan e'lon qilingan o'zgaruvchi o'z qatoriga
+        // yetib kelmaguncha "temporal dead zone"da turadi - shu blok
+        // avvalroq (masalan skript boshida) joylashgan bo'lsa,
+        // initStationMode()/initIndexMode() hali e'lon qilinmagan
+        // queueJobs/queueTicker/stationsCache kabi o'zgaruvchilarga
+        // murojaat qilib, "Cannot access ... before initialization"
+        // xatosini berardi.
+        // ============================================================
+        connectWS();
+
+        // Tarmoq/vkladka qaytib kelganda backoff kutmasdan darhol qayta
+        // urinish - noutbuk uyqudan uyg'onganda yoki WiFi tiklanganda
+        // bir necha soniyalik kutish o'rniga tezkor tiklanish uchun.
+        window.addEventListener('online', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                reconnectAttempt = 0;
+                connectWS();
+            }
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                reconnectAttempt = 0;
+                connectWS();
+            }
+        });
+        document.getElementById('reconnect-btn').addEventListener('click', () => {
+            reconnectAttempt = 0;
+            connectWS();
+        });
+
+        if (STATION_PRINTER_ID !== null) {
+            initStationMode();
+        } else {
+            initIndexMode();
+        }
+    </script>
+</body>
+</html>

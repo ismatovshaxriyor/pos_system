@@ -5,6 +5,7 @@ from rest_framework import serializers
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, Notification, RestaurantConfig, Attendance, TableZone,
+    Printer, PrintJob,
 )
 
 TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
@@ -99,10 +100,20 @@ class StatusMessageSerializer(serializers.Serializer):
     """Oddiy `{"status": "..."}` javoblari (masalan `close`) - faqat OpenAPI hujjatlash uchun."""
     status = serializers.CharField()
 
+class PrinterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Printer
+        fields = ('id', 'name', 'ip_address', 'port', 'is_active', 'created_at', 'updated_at')
+
 class CategorySerializer(serializers.ModelSerializer):
+    printer = PrinterSerializer(read_only=True)
+    printer_id = serializers.PrimaryKeyRelatedField(
+        queryset=Printer.objects.all(), source='printer', write_only=True, required=False, allow_null=True
+    )
+
     class Meta:
         model = Category
-        fields = '__all__'
+        fields = ('id', 'name', 'image', 'printer', 'printer_id', 'created_at', 'updated_at')
 
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
@@ -214,4 +225,15 @@ class CheckInSerializer(serializers.Serializer):
 class CheckOutSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+
+
+class PrintJobSerializer(serializers.ModelSerializer):
+    printer_name = serializers.CharField(source='printer.name', read_only=True)
+    table_name = serializers.CharField(source='order.table.name', read_only=True, default="Takeaway")
+    waiter_name = serializers.CharField(source='order.waiter.first_name', read_only=True, default="Noma'lum")
+
+    class Meta:
+        model = PrintJob
+        fields = ('id', 'printer', 'printer_name', 'order', 'table_name', 'waiter_name', 'items_snapshot', 'status', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'items_snapshot', 'created_at', 'updated_at')
 
