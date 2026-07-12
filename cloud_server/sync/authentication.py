@@ -3,6 +3,29 @@ from rest_framework import exceptions
 from tenants.models import License
 from django.utils import timezone
 
+
+class DummyUser:
+    """
+    Bu tizimda Bola so'rovlari haqiqiy Django foydalanuvchisiga emas,
+    litsenziyaga tegishli - lekin DRF'ning har doim yoqilgan default
+    `UserRateThrottle`si `request.user.is_authenticated` bo'lsa
+    `request.user.pk`ni cache kaliti sifatida o'qiydi, va bu view
+    ishlashidan OLDIN, `dispatch()` ichida chaqiriladi - shuning uchun
+    `pk` yo'qligi har qanday so'rovni (bo'sh bo'lsa ham) `AttributeError`
+    bilan 500'ga olib kelardi (`ActivationView`dan tashqari - u
+    `throttle_classes = [AnonRateThrottle]` bilan buni chetlab o'tgan,
+    qolgan barcha litsenziya-autentifikatsiyali view'lar - Renew,
+    Heartbeat, CommandResult, ErrorLog, OrderSync - shu xatoga duch
+    kelgan). `pk`ni litsenziya id'siga bog'lash shart - aks holda barcha
+    restoranlar bitta umumiy 100/daqiqa throttle hisoblagichini bo'lishib
+    olar edi (`ident=None` hammaga bir xil cache kalit bo'lar edi).
+    """
+    is_authenticated = True
+
+    def __init__(self, pk):
+        self.pk = pk
+
+
 class LicenseAuthentication(authentication.BaseAuthentication):
     """
     Custom authentication class that uses the License key.
@@ -44,19 +67,7 @@ class LicenseAuthentication(authentication.BaseAuthentication):
         if license_obj.expires_at < timezone.now():
             raise exceptions.AuthenticationFailed('License has expired.')
 
-        # For DRF authentication to succeed, we typically return (user, auth)
-        # Since local systems don't correspond to a specific User model in the cloud,
-        # we can return an AnonymousUser or a dummy user object, but store the restaurant.
-        # We will return None for user, and the license as auth, but DRF expects a user.
-        # Let's attach the restaurant to the request and return a dummy object or None.
-        # Returning (None, license_obj) actually tells DRF it's authenticated but without a user.
-        # Wait, returning (None, token) might cause issues if permissions require IsAuthenticated.
-        # We can create a simple dummy object.
-        
-        class DummyUser:
-            is_authenticated = True
-
-        return (DummyUser(), license_obj)
+        return (DummyUser(license_obj.id), license_obj)
 
 
 class HeartbeatAuthentication(LicenseAuthentication):
@@ -75,7 +86,4 @@ class HeartbeatAuthentication(LicenseAuthentication):
         except License.DoesNotExist:
             raise exceptions.AuthenticationFailed('Invalid license key.')
 
-        class DummyUser:
-            is_authenticated = True
-
-        return (DummyUser(), license_obj)
+        return (DummyUser(license_obj.id), license_obj)
