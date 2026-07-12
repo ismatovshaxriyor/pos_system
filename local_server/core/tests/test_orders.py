@@ -105,6 +105,20 @@ class OrderLogicTests(TestCase):
         # total_amount endi DB ustuni emas - itemlardan hisoblanadi
         self.assertEqual(self.order.total_amount, Decimal('50000'))
 
+    def test_add_item_bulk(self):
+        url = reverse('order-add-item', args=[self.order.id])
+        response = self.client.post(
+            url,
+            [
+                {"product_id": self.product.id, "quantity": 1, "note": "taom 1"},
+                {"product_id": self.product.id, "quantity": 2, "note": "taom 2"}
+            ],
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(self.order.items.count(), 2)
+        self.assertEqual(self.order.total_amount, Decimal('75000')) # (1 + 2) * 25000 = 75000
+
     def test_voided_items_excluded_from_total(self):
         self.order.items.create(product=self.product, quantity=1, price=Decimal('25000'))
         self.order.items.create(product=self.product, quantity=3, price=Decimal('25000'), is_voided=True)

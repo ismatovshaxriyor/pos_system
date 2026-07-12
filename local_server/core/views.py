@@ -245,6 +245,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response({'status': 'Order cancelled'})
 
     @extend_schema(
+        description="Buyurtmaga bitta yoki bir nechta mahsulot qo'shish. So'rov tanasida bitta obyekt yoki obyektlar ro'yxati (JSON massiv) yuborilishi mumkin.",
         request=OrderItemSerializer,
         responses={
             201: StatusMessageSerializer,
@@ -254,11 +255,12 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
         order = self.get_object()
+        data = request.data
+        is_many = isinstance(data, list)
 
-        serializer = OrderItemSerializer(data=request.data)
+        serializer = OrderItemSerializer(data=data, many=is_many)
         serializer.is_valid(raise_exception=True)
-        product = serializer.validated_data['product']
-        quantity = serializer.validated_data.get('quantity', 1)
+        items_data = serializer.validated_data if is_many else [serializer.validated_data]
 
         with transaction.atomic():
             # Status tekshiruvi lock ichida - lock'dan oldin tekshirilsa,
@@ -271,14 +273,17 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=quantity,
-                price=product.price,
-                note=serializer.validated_data.get('note', ''),
-                modifiers=serializer.validated_data.get('modifiers') or {},
-            )
+            for item_data in items_data:
+                product = item_data['product']
+                quantity = item_data.get('quantity', 1)
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=quantity,
+                    price=product.price,
+                    note=item_data.get('note', ''),
+                    modifiers=item_data.get('modifiers') or {},
+                )
 
         if order.status == 'in_progress':
             services.send_order_to_kitchen(order)
