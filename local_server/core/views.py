@@ -241,7 +241,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             if order.status in ORDER_FINISHED_STATUSES:
                 return Response({'detail': 'Order already completed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
 
-            balance_due = order.balance_due
+            _, _, balance_due = services.calculate_order_financials(order)
             if balance_due > 0:
                 return Response(
                     {'detail': f"Buyurtma to'liq to'lanmagan. Qolgan qarz: {balance_due} so'm."},
@@ -390,7 +390,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            balance_due = order.balance_due
+            _, _, balance_due = services.calculate_order_financials(order)
             if amount > balance_due:
                 return Response(
                     {'detail': f"To'lov summasi qolgan qarzdan ({balance_due} so'm) oshib ketdi."},
@@ -437,9 +437,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if new_amount > order.total_amount:
+            if new_amount > services.calculate_order_financials(order)[0]:
                 return Response(
-                    {'detail': f"Chegirma summasi buyurtma summasidan ({order.total_amount} so'm) katta bo'lishi mumkin emas."},
+                    {'detail': f"Chegirma summasi buyurtma summasidan ({services.calculate_order_financials(order)[0]} so'm) katta bo'lishi mumkin emas."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

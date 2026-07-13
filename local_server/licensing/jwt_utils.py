@@ -1,45 +1,63 @@
+import hashlib
+import hmac
 import jwt
 from django.conf import settings
 from django.utils import timezone
 
+EMBEDDED_ANTI_PIRACY_SECRET = b"0x9A4B_POS_SECURE_V1_7482_XYZ!"
 
 class LicenseTokenError(Exception):
     """Token yaroqsiz, muddati o'tgan yoki qurilmaga mos kelmaydi."""
 
+class LicenseContext:
+    def __init__(self, claims: dict | None = None):
+        self.claims = claims
+
+    @classmethod
+    def from_active_state(cls):
+        from .models import LicenseState
+        from .hardware import get_hardware_fingerprint
+        
+        state = LicenseState.load()
+        if not state or state.is_blocked:
+            return cls(claims=None)
+
+        hw_hash = get_hardware_fingerprint()
+        claims, error = state.current_valid_token(hw_hash)
+        if error or not claims:
+            return cls(claims=None)
+            
+        return cls(claims=claims)
+
+    def is_valid(self):
+        return self.claims is not None
+
+    def get_anti_piracy_key(self) -> bytes:
+        """
+        True kriptografik qaramlik uchun kalit.
+        Bu kalit core/services.py da shifrlangan narx koeffitsientini 
+        (price multiplier) ochish uchun ishlatiladi.
+        Agar litsenziya yaroqsiz bo'lsa, ataylab noto'g'ri kalit qaytariladi,
+        natijada POS matematika xato hisoblay boshlaydi (Silent corruption).
+        """
+        if not self.claims:
+            msg = b"INVALID_LICENSE"
+        else:
+            msg = b"VALID_LICENSE_MULTIPLIER"
+            
+        return hmac.new(EMBEDDED_ANTI_PIRACY_SECRET, msg, hashlib.sha256).digest()
 
 def _get_public_key():
-    """
-    Faollashtirishda Ona'dan olingan kalit (LicenseState.public_key)
-    ustunlik qiladi - shu bilan har bir Bola qurilmasiga
-    LICENSE_PUBLIC_KEY_FILE'ni qo'lda nusxalash shart emas. Hali
-    faollashmagan yoki eski Ona javob bermagan bo'lsa, statik
-    fayl/env sozlamasiga (settings.LICENSE_PUBLIC_KEY) qaytadi - masalan
-    birinchi marta o'rnatishda yoki bazasi bo'sh disaster-recovery
-    holatida.
-
-    Lazy import - modul darajasida import qilinsa AppRegistryNotReady
-    xavfi bor (settings.py yuklanish paytida licensing.models hali tayyor
-    bo'lmasligi mumkin).
-    """
     from .models import LicenseState
-
     state = LicenseState.load()
     if state and state.public_key:
         return state.public_key
     return settings.LICENSE_PUBLIC_KEY
 
-
 def verify_token(token, hardware_hash):
-    """
-    JWT tokenni Ona serverning public kaliti bilan OFLAYN tekshiradi.
-    Muvaffaqiyatli bo'lsa claims dict qaytaradi, aks holda LicenseTokenError
-    ko'taradi. Soat og'ishiga chidamli (LICENSE_CLOCK_SKEW_SECONDS leeway).
-    """
     if not token:
         raise LicenseTokenError("Token mavjud emas.")
-
     public_key = _get_public_key()
-
     try:
         payload = jwt.decode(
             token,
@@ -51,7 +69,6 @@ def verify_token(token, hardware_hash):
     except jwt.ExpiredSignatureError:
         if settings.LICENSE_EXP_GRACE_SECONDS <= 0:
             raise LicenseTokenError("Token muddati tugagan.")
-        # Grace davri ichida ekanligini qo'lda tekshiramiz (imzoni tasdiqlab).
         payload = jwt.decode(
             token,
             public_key,

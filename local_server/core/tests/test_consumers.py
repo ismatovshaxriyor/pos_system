@@ -15,10 +15,18 @@ class EventsConsumerTests(TransactionTestCase):
     # WebsocketCommunicator + database_sync_to_async alohida DB ulanish
     # konteksti bilan ishlaydi - TestCase'ning tashqi atomic tranzaksiyasi
     # bilan birga ishlatilsa ulanish "yopilib qoladi". TransactionTestCase
-    # (truncate-based) shu muammoni oldini oladi.
-    def setUp(self):
+    # (truncate-based) shu muammoni oldini oladi.    def setUp(self):
+        import unittest.mock as mock
+        self.license_patcher = mock.patch('licensing.middleware.is_license_blocked', return_value=False)
+        self.license_patcher.start()
         self.user = User.objects.create_user(username='+998900000100', role='waiter')
         self.token = Token.objects.create(user=self.user)
+
+    def tearDown(self):
+        if hasattr(self, 'license_patcher'):
+            self.license_patcher.stop()
+        super().tearDown()
+
 
 
 

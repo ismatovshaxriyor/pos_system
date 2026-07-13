@@ -21,6 +21,8 @@ class SyncCompletedOrdersTests(TestCase):
         if hasattr(self, 'multiplier_patcher'):
             self.multiplier_patcher.stop()
         super().tearDown()
+        self.multiplier_patcher.stop()
+
 
     def setUp(self):
         LicenseState.objects.create(
@@ -41,6 +43,10 @@ class SyncCompletedOrdersTests(TestCase):
             order=self.order, product=self.product, quantity=2, price=Decimal('30000'),
         )
         Payment.objects.create(order=self.order, amount=Decimal('60000'), method='cash')
+        import unittest.mock as mock
+        self.multiplier_patcher = mock.patch("core.services._decode_multiplier", return_value=1.0)
+        self.multiplier_patcher.start()
+
 
     def test_not_activated_is_noop(self):
         LicenseState.objects.all().delete()

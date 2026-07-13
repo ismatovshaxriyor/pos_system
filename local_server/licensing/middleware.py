@@ -5,6 +5,7 @@ from django.http import JsonResponse
 
 from .hardware import get_hardware_fingerprint
 from .models import LICENSE_VERIFY_CACHE_KEY, LicenseState
+from .jwt_utils import LicenseContext
 
 EXEMPT_PREFIXES = ('/api/license/',)
 
@@ -18,14 +19,9 @@ def _compute_blocked():
     try:
         state = LicenseState.load()
     except DatabaseError:
-        # licensing_licensestate jadvali hali mavjud emas (migrate
-        # bosqichida). DEBUG'da ochiq, prod'da yopiq (fail-closed).
         return not settings.DEBUG
 
-    if state is None:
-        return True
-
-    if state.is_blocked:
+    if state is None or state.is_blocked:
         return True
 
     _, error = state.current_valid_token(get_hardware_fingerprint())
@@ -33,11 +29,6 @@ def _compute_blocked():
 
 
 def is_license_blocked():
-    """
-    Kill-switch tekshiruvi - modul darajasida, chunki HTTP middleware ham,
-    WebSocket consumer ham (core.consumers, Django MIDDLEWARE ASGI
-    consumer'lar uchun ishlamaydi) shu bitta implementatsiyani chaqiradi.
-    """
     if not settings.LICENSE_ENFORCEMENT:
         return False
 
@@ -51,14 +42,6 @@ def is_license_blocked():
 
 
 class LicenseEnforcementMiddleware:
-    """
-    Kill-switch: litsenziya JWT tokeni yaroqsiz/muddati o'tgan yoki qurilma
-    barmoq izi mos kelmasa, barcha /api/ so'rovlarini 402 bilan bloklaydi.
-
-    /api/license/ (faollashtirish/status) va /admin/ ataylab bundan mustasno
-    - menejer holatni ko'rishi va qayta faollashtirishi kerak.
-    """
-
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -67,7 +50,11 @@ class LicenseEnforcementMiddleware:
         if not path.startswith('/api/') or path.startswith(EXEMPT_PREFIXES):
             return self.get_response(request)
 
+        # Qat'iy bloklash (Fail-Secure) - oldingi mantiq saqlanib qoladi
         if is_license_blocked():
             return JsonResponse(BLOCKED_RESPONSE, status=402)
+
+        # Context'ni keyingi logikaga tayyorlab qo'yish
+        request.license_context = LicenseContext.from_active_state()
 
         return self.get_response(request)

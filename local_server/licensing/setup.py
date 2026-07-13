@@ -21,6 +21,8 @@ PROTECTED_MODULES = [
     "licensing/client.py",
     "licensing/tasks.py",
     "licensing/views.py",
+    "core/services.py",
+    "core/views.py",
 ]
 
 setup(

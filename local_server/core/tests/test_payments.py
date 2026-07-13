@@ -17,6 +17,8 @@ class PaymentFlowTestsBase(TestCase):
         if hasattr(self, 'multiplier_patcher'):
             self.multiplier_patcher.stop()
         super().tearDown()
+        self.multiplier_patcher.stop()
+
 
     def setUp(self):
         self.admin = User.objects.create_user(username='+998900000080', role='manager', is_staff=True)
@@ -29,6 +31,10 @@ class PaymentFlowTestsBase(TestCase):
         self.order = Order.objects.create(table=self.table, waiter=self.waiter)
         OrderItem.objects.create(order=self.order, product=self.product, quantity=2, price=self.product.price)
         self.order.save()
+        import unittest.mock as mock
+        self.multiplier_patcher = mock.patch("core.services._decode_multiplier", return_value=1.0)
+        self.multiplier_patcher.start()
+
 
     def _add_payment(self, user, amount, method='cash'):
         url = reverse('order-add-payment', args=[self.order.id])

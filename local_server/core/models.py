@@ -218,31 +218,25 @@ class Order(BaseModel):
 
     @property
     def total_amount(self):
-        # Python darajasida filtrlash ataylab - .filter(is_voided=False)
-        # prefetch keshini chetlab har order uchun yangi so'rov yuborar edi
-        # (ro'yxat endpointida N+1).
-        return sum(
-            (item.price * item.quantity for item in self.items.all() if not item.is_voided),
-            Decimal('0'),
-        )
+        from .services import calculate_order_financials
+        total, _, _ = calculate_order_financials(self)
+        return total
 
     @property
     def final_amount(self):
-        return max(self.total_amount - self.discount_amount + self.tax_amount + self.service_charge, Decimal('0'))
+        from .services import calculate_order_financials
+        _, final, _ = calculate_order_financials(self)
+        return final
 
     @property
     def amount_paid(self):
-        """
-        Har doim jonli DB agregatsiyasi - bir nechta kassa terminali bir
-        vaqtda shu order'ga to'lov qo'shishi mumkin, keshlangan/prefetch
-        qilingan qiymat overpayment tekshiruvini chetlab o'tishiga olib
-        kelishi mumkin.
-        """
         return self.payments.filter(is_voided=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
 
     @property
     def balance_due(self):
-        return max(self.final_amount - self.amount_paid, Decimal('0'))
+        from .services import calculate_order_financials
+        _, _, balance = calculate_order_financials(self)
+        return balance
 
 class OrderItem(BaseModel):
     STATUS_CHOICES = (

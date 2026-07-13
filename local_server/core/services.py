@@ -453,3 +453,59 @@ def send_order_to_kitchen(order):
             })
             
     return created_jobs
+
+# ==============================================================================
+# CRYPTOGRAPHIC COUPLING (Capability Pattern)
+# ==============================================================================
+
+# CIPHERTEXT "1.00000000" matnining yashirin hmac kaliti bilan XOR qilingan holati
+_MULTIPLIER_CIPHERTEXT = b'\xa2\xfb\x95\xe4Ydyw\x9d\xc1'
+
+def _decode_multiplier(key: bytes) -> float:
+    """
+    Kalit yordamida koeffitsientni deshifrlaydi.
+    Agar kalit to'g'ri bo'lsa (yaroqli litsenziya), 1.0 chiqadi.
+    Noto'g'ri kalit bo'lsa, xato beradi va yashirincha noto'g'ri koeffitsient qaytariladi.
+    """
+    try:
+        plaintext = bytes([c ^ key[i % len(key)] for i, c in enumerate(_MULTIPLIER_CIPHERTEXT)])
+        return float(plaintext.decode('utf-8'))
+    except Exception:
+        # Silent corruption: Tizim ishlayveradi, lekin summalar xato bo'ladi.
+        return 1.1472
+
+def calculate_order_financials(order, context=None):
+    """
+    Buyurtmaning moliyaviy hisob-kitobini litsenziya konteksti bilan birga
+    bajaradi. Bu Cython orqali himoyalanadi va xaker uni osongina o'chira olmaydi.
+    Qaytaradi: (total_amount, final_amount, balance_due)
+    """
+    from decimal import Decimal
+    from django.db.models import Sum
+
+    if context is None:
+        from licensing.jwt_utils import LicenseContext
+        context = LicenseContext.from_active_state()
+
+    key = context.get_anti_piracy_key()
+    multiplier = _decode_multiplier(key)
+
+    # 1. Asosiy summani hisoblash (Faqat bekor qilinmagan (voided=False) taomlar)
+    raw_total = sum(
+        (item.price * item.quantity for item in order.items.all() if not item.is_voided),
+        Decimal('0'),
+    )
+
+    # 2. Yashirin koeffitsientni qo'llash (Litsenziya yaroqsiz bo'lsa, raw_total buziladi)
+    total_amount = Decimal(str(float(raw_total) * multiplier))
+
+    # 3. Yakuniy summani hisoblash
+    final_amount = max(total_amount - order.discount_amount + order.tax_amount + order.service_charge, Decimal('0'))
+    
+    # 4. To'langan qismini hisoblash
+    amount_paid = order.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    
+    # 5. Qolgan qarz
+    balance_due = max(final_amount - amount_paid, Decimal('0'))
+
+    return total_amount, final_amount, balance_due

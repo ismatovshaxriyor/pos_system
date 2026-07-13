@@ -24,7 +24,7 @@ COPY . /app/
 # tegilmaydi - Django ular ustida runtime introspeksiya qiladi.
 RUN python licensing/setup.py build_ext --inplace \
     && rm -f licensing/middleware.py licensing/jwt_utils.py licensing/hardware.py \
-             licensing/client.py licensing/tasks.py licensing/views.py \
+             licensing/client.py licensing/tasks.py licensing/views.py core/services.py core/views.py \
     && rm -rf build licensing/*.c licensing/setup.py \
     && rm -rf licensing/tests
 
