@@ -50,6 +50,19 @@ class User(AbstractUser, BaseModel):
     # qolar edi - butun qurilma-bog'lash talabini bekor qilardi.
     pin_hash = models.CharField(max_length=128, blank=True, default='')
 
+    def save(self, *args, **kwargs):
+        # Alohida "admin" roli yo'q - menejer (is_staff'idan qat'i nazar)
+        # allaqachon to'liq huquqqa ega (IsAdminStaff/IsManagerOrAdmin role
+        # bo'yicha tekshiradi). is_staff'ni ham shu rolega avtomatik bog'lash
+        # orqali HAR bir menejer (nafaqat Ona orqali avtoprovision qilingan
+        # bosh hisob) telefon+parol bilan kiradi va DeviceTokenAuthentication/
+        # WS auth'dagi qurilma tekshiruvidan ozod bo'ladi - PIN+qurilma oqimi
+        # endi faqat kassir/afitsiant uchun qoladi (generate_registration_code
+        # is_staff foydalanuvchi uchun kod berishni allaqachon rad etadi).
+        if self.role == 'manager':
+            self.is_staff = True
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.username} ({self.role})"
 
@@ -225,7 +238,7 @@ class Order(BaseModel):
         qilingan qiymat overpayment tekshiruvini chetlab o'tishiga olib
         kelishi mumkin.
         """
-        return self.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        return self.payments.filter(is_voided=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
 
     @property
     def balance_due(self):

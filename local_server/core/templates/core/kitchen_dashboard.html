@@ -666,6 +666,17 @@
             </svg>
         `;
 
+        // Serverdan kelgan matnlar (taom nomi, ofitsiant kiritgan eslatma,
+        // modifikatorlar, printer nomi...) innerHTML orqali chiziladi - ular
+        // xodim tomonidan kiritilgan erkin matn bo'lgani uchun escape
+        // qilinmasa, chek ichiga yozilgan <img onerror=...> kabi HTML shu
+        // sahifada (xizmat hisobi tokeni bilan!) ishlab ketardi (stored XSS).
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+            }[ch]));
+        }
+
         let ws = null;
 
         // --- WebSocket reliability state ---
@@ -806,7 +817,7 @@
                 toast.style.borderLeftColor = 'var(--accent-color)';
             }
             toast.innerHTML = `
-                <div style="font-weight: 600; font-size: 0.95rem;">${message}</div>
+                <div style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(message)}</div>
             `;
             container.appendChild(toast);
             setTimeout(() => {
@@ -894,21 +905,21 @@
 
             let itemsHtml = '';
             job.items_snapshot.forEach(item => {
-                let noteHtml = item.note ? `<div class="receipt-item-note">Eslatma: ${item.note}</div>` : '';
+                let noteHtml = item.note ? `<div class="receipt-item-note">Eslatma: ${escapeHtml(item.note)}</div>` : '';
                 let modsHtml = '';
                 if (item.modifiers && typeof item.modifiers === 'object' && !Array.isArray(item.modifiers) && Object.keys(item.modifiers).length > 0) {
                     modsHtml += '<div class="receipt-item-modifiers">';
                     for (const [key, val] of Object.entries(item.modifiers)) {
-                        modsHtml += `<div>- ${key}: ${Array.isArray(val) ? val.join(', ') : val}</div>`;
+                        modsHtml += `<div>- ${escapeHtml(key)}: ${escapeHtml(Array.isArray(val) ? val.join(', ') : val)}</div>`;
                     }
                     modsHtml += '</div>';
                 }
 
                 itemsHtml += `
                     <div class="receipt-item-row">
-                        <span class="receipt-item-qty">${item.quantity}x</span>
+                        <span class="receipt-item-qty">${escapeHtml(item.quantity)}x</span>
                         <div class="receipt-item-details">
-                            <div class="receipt-item-name">${item.name}</div>
+                            <div class="receipt-item-name">${escapeHtml(item.name)}</div>
                             ${noteHtml}
                             ${modsHtml}
                         </div>
@@ -920,9 +931,9 @@
                 <div class="receipt-ticket" id="ticket-${job.id}">
                     <div class="ticket-number-badge">${position}</div>
                     <div class="receipt-header">
-                        <div class="receipt-shop-name">Buyurtma #${job.order} - ${job.table_name}</div>
+                        <div class="receipt-shop-name">Buyurtma #${escapeHtml(job.order)} - ${escapeHtml(job.table_name)}</div>
                         <div class="receipt-metadata">
-                            Afitsiant: ${job.waiter_name}<br>
+                            Afitsiant: ${escapeHtml(job.waiter_name)}<br>
                             <span class="receipt-elapsed ${elapsedClass}">${elapsedText}</span>
                         </div>
                     </div>
@@ -1003,9 +1014,9 @@
             grid.innerHTML = stationsCache.map(printer => {
                 const count = stationCounts[printer.id] || 0;
                 return `
-                    <a class="station-card" href="/kitchen/printers/${printer.id}/">
+                    <a class="station-card" href="/kitchen/printers/${encodeURIComponent(printer.id)}/">
                         <div class="station-card-icon-badge">${PRINTER_ICON_SVG}</div>
-                        <div class="station-card-name">${printer.name}</div>
+                        <div class="station-card-name">${escapeHtml(printer.name)}</div>
                         <div class="station-card-count ${count > 0 ? 'has-pending' : ''}">${count} kutilmoqda</div>
                         <div class="station-card-hint">Ochish uchun bosing &rarr;</div>
                     </a>
@@ -1094,9 +1105,9 @@
 
                 checklist.innerHTML = filtered.map(cat => `
                     <label class="category-checkbox-row">
-                        <input type="checkbox" value="${cat.id}" ${selectedCategoryIds.has(String(cat.id)) ? 'checked' : ''}>
-                        <span>${cat.name}</span>
-                        ${cat.printer__name ? `<span class="category-current-printer">hozir: ${cat.printer__name}</span>` : ''}
+                        <input type="checkbox" value="${escapeHtml(cat.id)}" ${selectedCategoryIds.has(String(cat.id)) ? 'checked' : ''}>
+                        <span>${escapeHtml(cat.name)}</span>
+                        ${cat.printer__name ? `<span class="category-current-printer">hozir: ${escapeHtml(cat.printer__name)}</span>` : ''}
                     </label>
                 `).join('');
             }

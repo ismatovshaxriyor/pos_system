@@ -123,6 +123,19 @@ class PinLoginViewTests(TestCase):
         self.assertIn('token', response.data)
         self.assertNotIn('pin', response.data)
 
+    def test_correct_pin_updates_last_login_at(self):
+        # Regressiya: last_login_at xotirada o'rnatilib, hech qachon
+        # saqlanmas edi - admin panelda doim bo'sh ko'rinardi.
+        self.assertIsNone(self.device.last_login_at)
+
+        response = self.client.post(
+            self.url, {"device_id": "device-9", "pin": "482913"}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.device.refresh_from_db()
+        self.assertIsNotNone(self.device.last_login_at)
+
     def test_wrong_pin_rejected(self):
         response = self.client.post(
             self.url, {"device_id": "device-9", "pin": "000000"}, content_type='application/json',

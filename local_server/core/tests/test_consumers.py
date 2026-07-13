@@ -20,6 +20,8 @@ class EventsConsumerTests(TransactionTestCase):
         self.user = User.objects.create_user(username='+998900000100', role='waiter')
         self.token = Token.objects.create(user=self.user)
 
+
+
     async def test_unauthenticated_connect_is_rejected(self):
         communicator = WebsocketCommunicator(application, "/ws/events/")
         connected, _ = await communicator.connect()

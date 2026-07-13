@@ -209,6 +209,11 @@ def sync_completed_orders():
     for order in orders:
         items_data = []
         for item in order.items.all():
+            # total_amount void qilingan qatorlarni hisobga olmaydi - ular
+            # payload'ga kirsa, Ona tomonda itemlar yig'indisi buyurtma
+            # summasiga mos kelmay qolardi.
+            if item.is_voided:
+                continue
             items_data.append({
                 "sync_uuid": str(item.sync_uuid),
                 "product_name": item.product.name if item.product else 'Unknown',

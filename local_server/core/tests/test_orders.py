@@ -1,14 +1,23 @@
+import uuid
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from core.models import Category, Order, Product, Table, User
+from core.views import RESTAURANT_TZ
 
 def _auth_header(user):
     token, _ = Token.objects.get_or_create(user=user)
     return {"HTTP_AUTHORIZATION": f"Token {token.key}"}
 
 class OrderLogicTests(TestCase):
+    def tearDown(self):
+        if hasattr(self, 'multiplier_patcher'):
+            self.multiplier_patcher.stop()
+        super().tearDown()
+
     def setUp(self):
         self.manager = User.objects.create_user(username='+998900000081', role='manager')
         self.table = Table.objects.create(name='Test Table')
@@ -124,6 +133,37 @@ class OrderLogicTests(TestCase):
         self.order.items.create(product=self.product, quantity=3, price=Decimal('25000'), is_voided=True)
         self.assertEqual(self.order.total_amount, Decimal('25000'))
 
+    def test_create_with_client_sync_uuid_is_idempotent(self):
+        # Oflayn mijoz o'zi yaratgan sync_uuid bilan yuboradi; javob
+        # yo'qolib retry qilinsa, dublikat buyurtma ochilmasligi kerak.
+        client_uuid = str(uuid.uuid4())
+        url = reverse('order-list')
+        payload = {"table_id": self.table.id, "sync_uuid": client_uuid}
+
+        first = self.client.post(
+            url, payload, content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(first.status_code, 201)
+        # Mijoz yuborgan UUID aynan saqlangan bo'lishi shart - aks holda
+        # retry'dagi qidiruv hech qachon mos kelmaydi.
+        self.assertEqual(first.data['sync_uuid'], client_uuid)
+
+        retry = self.client.post(
+            url, payload, content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(retry.status_code, 200)
+        self.assertEqual(retry.data['id'], first.data['id'])
+        self.assertEqual(
+            Order.objects.filter(sync_uuid=client_uuid).count(), 1,
+        )
+
+    def test_create_with_invalid_sync_uuid_returns_400(self):
+        response = self.client.post(
+            reverse('order-list'), {"sync_uuid": "bu-uuid-emas"},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_product_delete_is_soft_and_blocks_ordering(self):
         del_url = reverse('product-detail', args=[self.product.id])
         response = self.client.delete(del_url, **_auth_header(self.manager))
@@ -148,3 +188,73 @@ class OrderLogicTests(TestCase):
             content_type='application/json', **_auth_header(self.manager),
         )
         self.assertEqual(response.status_code, 400)
+
+
+class OrderDateFilterTests(TestCase):
+    """
+    Afitsiant/kassir/menejer '?date=' orqali buyurtmalar tarixini kun
+    bo'yicha ko'radi - kun chegarasi Django'ning global TIME_ZONE (UTC) emas,
+    RESTAURANT_TZ (Asia/Tashkent) bo'yicha hisoblanadi (core/views.py).
+    """
+    def tearDown(self):
+        if hasattr(self, 'multiplier_patcher'):
+            self.multiplier_patcher.stop()
+        super().tearDown()
+
+    def setUp(self):
+        self.waiter = User.objects.create_user(username='+998900000090', role='waiter')
+        self.other_waiter = User.objects.create_user(username='+998900000091', role='waiter')
+        self.table = Table.objects.create(name='Test Table')
+
+        self.today_order = Order.objects.create(table=self.table, waiter=self.waiter)
+        self.yesterday_order = Order.objects.create(table=self.table, waiter=self.waiter)
+        self.other_waiter_today_order = Order.objects.create(table=self.table, waiter=self.other_waiter)
+
+        now_local = timezone.now().astimezone(RESTAURANT_TZ)
+        today_start = datetime.combine(now_local.date(), time(hour=10), tzinfo=RESTAURANT_TZ)
+        # Mahalliy kun boshlanishidan 1 soat OLDIN (masalan 00:30) - UTC
+        # bo'yicha hali "kechagi kun" bo'lib qolishi mumkin bo'lgan holat.
+        just_after_midnight = datetime.combine(now_local.date(), time(hour=0, minute=30), tzinfo=RESTAURANT_TZ)
+        yesterday_start = today_start - timedelta(days=1)
+
+        Order.objects.filter(pk=self.today_order.pk).update(created_at=just_after_midnight)
+        Order.objects.filter(pk=self.yesterday_order.pk).update(created_at=yesterday_start)
+        Order.objects.filter(pk=self.other_waiter_today_order.pk).update(created_at=today_start)
+
+    def test_date_today_excludes_yesterday_and_respects_local_midnight(self):
+        response = self.client.get(
+            reverse('order-list'), {"date": "today"}, **_auth_header(self.waiter),
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [o['id'] for o in response.data['results']]
+        self.assertIn(self.today_order.id, ids)
+        self.assertNotIn(self.yesterday_order.id, ids)
+        # Boshqa afitsiantning bugungi buyurtmasi hali ham ko'rinmaydi -
+        # date filtri waiter scoping'ini bekor qilmaydi.
+        self.assertNotIn(self.other_waiter_today_order.id, ids)
+
+    def test_explicit_iso_date_filters_correctly(self):
+        yesterday_date = (timezone.now().astimezone(RESTAURANT_TZ).date() - timedelta(days=1)).isoformat()
+        response = self.client.get(
+            reverse('order-list'), {"date": yesterday_date}, **_auth_header(self.waiter),
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = [o['id'] for o in response.data['results']]
+        self.assertIn(self.yesterday_order.id, ids)
+        self.assertNotIn(self.today_order.id, ids)
+
+    def test_invalid_date_returns_400(self):
+        response = self.client.get(
+            reverse('order-list'), {"date": "bugun-emas"}, **_auth_header(self.waiter),
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_manager_sees_all_waiters_orders_for_the_date(self):
+        manager = User.objects.create_user(username='+998900000092', role='manager')
+        response = self.client.get(
+            reverse('order-list'), {"date": "today"}, **_auth_header(manager),
+        )
+        ids = [o['id'] for o in response.data['results']]
+        self.assertIn(self.today_order.id, ids)
+        self.assertIn(self.other_waiter_today_order.id, ids)
+        self.assertNotIn(self.yesterday_order.id, ids)

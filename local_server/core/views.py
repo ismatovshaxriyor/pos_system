@@ -1,4 +1,8 @@
-from django.db import transaction
+import uuid
+import zoneinfo
+from datetime import date as date_cls, datetime, time, timedelta
+
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -8,6 +12,7 @@ from rest_framework import viewsets, permissions, status, mixins
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from . import services
 from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob
@@ -24,6 +29,13 @@ from .serializers import (
 )
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
+
+# Restoran jismonan O'zbekistonda - Django'ning global TIME_ZONE (UTC) bo'yicha
+# "bugun"ni hisoblash tungi soat 24:00 atrofidagi buyurtmalarni ~5 soatga
+# noto'g'ri kunga tashlab yuborardi (masalan mahalliy 00:30dagi buyurtma UTC
+# bo'yicha hali "kechagi kun"). ?date= filtri shuning uchun kun chegarasini
+# har doim shu zonada hisoblaydi, saqlangan created_at UTC bo'lib qolaveradi.
+RESTAURANT_TZ = zoneinfo.ZoneInfo('Asia/Tashkent')
 
 class TableZoneViewSet(viewsets.ModelViewSet):
     queryset = TableZone.objects.all()
@@ -137,23 +149,76 @@ class OrderViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.role == 'waiter':
             qs = qs.filter(waiter=user)
-        return qs
+
+        # ?date=today yoki ?date=YYYY-MM-DD - afitsiant/kassir/menejer
+        # buyurtmalar tarixini kunlar bo'yicha ko'rishi uchun (masalan
+        # afitsiant o'zining bugungi buyurtmalarini kuzatishi). Waiter uchun
+        # yuqoridagi filter bilan birlashib, faqat o'zining shu kungi
+        # buyurtmalarini beradi.
+        date_param = self.request.query_params.get('date')
+        if date_param:
+            if date_param == 'today':
+                target_date = timezone.now().astimezone(RESTAURANT_TZ).date()
+            else:
+                try:
+                    target_date = date_cls.fromisoformat(date_param)
+                except ValueError:
+                    raise ValidationError(
+                        {'date': "YYYY-MM-DD formatida yoki 'today' bo'lishi kerak."},
+                    )
+            day_start = datetime.combine(target_date, time.min, tzinfo=RESTAURANT_TZ)
+            qs = qs.filter(created_at__gte=day_start, created_at__lt=day_start + timedelta(days=1))
+
+        return qs.order_by('-created_at')
 
     @extend_schema(
         request=OrderSerializer,
         responses={201: OrderSerializer, 200: OrderSerializer}
     )
     def create(self, request, *args, **kwargs):
-        sync_uuid = request.data.get('sync_uuid')
-        if sync_uuid:
-            existing_order = Order.objects.filter(sync_uuid=sync_uuid).first()
+        # Oflayn-birinchi mijoz uchun idempotent yaratish: mijoz o'zi
+        # generatsiya qilgan sync_uuid bilan yuboradi; so'rov takrorlansa
+        # (javob yo'qolgan/retry) yangi buyurtma ochilmasdan mavjudi
+        # qaytariladi. sync_uuid modelda editable=False bo'lgani uchun
+        # serializer uni e'tiborsiz qoldiradi - shu sababli qiymat quyida
+        # perform_create'ga alohida uzatiladi, aks holda birinchi so'rovda
+        # tasodifiy UUID saqlanib, retry hech qachon mos kelmas edi.
+        raw_sync_uuid = request.data.get('sync_uuid') if isinstance(request.data, dict) else None
+        client_sync_uuid = None
+        if raw_sync_uuid:
+            try:
+                client_sync_uuid = uuid.UUID(str(raw_sync_uuid))
+            except (ValueError, TypeError):
+                return Response(
+                    {'detail': "sync_uuid yaroqli UUID bo'lishi kerak."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            existing_order = Order.objects.filter(sync_uuid=client_sync_uuid).first()
             if existing_order:
                 serializer = self.get_serializer(existing_order)
                 return Response(serializer.data, status=status.HTTP_200_OK)
-        return super().create(request, *args, **kwargs)
+
+        self._client_sync_uuid = client_sync_uuid
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            # Ikki parallel retry bir xil sync_uuid bilan poyga qildi -
+            # birinchisi yutgan, mavjud buyurtmani qaytaramiz.
+            existing_order = (
+                Order.objects.filter(sync_uuid=client_sync_uuid).first()
+                if client_sync_uuid else None
+            )
+            if existing_order is None:
+                raise
+            serializer = self.get_serializer(existing_order)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
-        order = serializer.save(waiter=self.request.user)
+        extra = {}
+        client_sync_uuid = getattr(self, '_client_sync_uuid', None)
+        if client_sync_uuid is not None:
+            extra['sync_uuid'] = client_sync_uuid
+        order = serializer.save(waiter=self.request.user, **extra)
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
 
@@ -463,13 +528,18 @@ class BootstrapView(APIView):
         tables = Table.objects.filter(is_active=True).select_related('zone')
         table_zones = TableZone.objects.all()
 
+        # context={'request': ...} hammasiga - ImageField'lar (category/product
+        # rasmi) kontekstsiz nisbiy URL (/media/...) qaytaradi, ViewSet'lar
+        # esa absolyut qaytaradi; mobil mijoz ikkala ko'rinishga duch
+        # kelmasligi kerak.
+        context = {'request': request}
         return Response({
-            'user': UserSerializer(user).data,
-            'categories': CategorySerializer(categories, many=True).data,
-            'products': ProductSerializer(products, many=True).data,
-            'table_zones': TableZoneSerializer(table_zones, many=True).data,
-            'tables': TableSerializer(tables, many=True, context={'request': request}).data,
-            'active_orders': OrderSerializer(orders_qs, many=True, context={'request': request}).data,
+            'user': UserSerializer(user, context=context).data,
+            'categories': CategorySerializer(categories, many=True, context=context).data,
+            'products': ProductSerializer(products, many=True, context=context).data,
+            'table_zones': TableZoneSerializer(table_zones, many=True, context=context).data,
+            'tables': TableSerializer(tables, many=True, context=context).data,
+            'active_orders': OrderSerializer(orders_qs, many=True, context=context).data,
         })
 
 

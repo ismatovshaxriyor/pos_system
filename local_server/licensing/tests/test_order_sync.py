@@ -17,6 +17,11 @@ def _mock_response(status_code, data):
 
 
 class SyncCompletedOrdersTests(TestCase):
+    def tearDown(self):
+        if hasattr(self, 'multiplier_patcher'):
+            self.multiplier_patcher.stop()
+        super().tearDown()
+
     def setUp(self):
         LicenseState.objects.create(
             license_key='abc123',
@@ -66,6 +71,26 @@ class SyncCompletedOrdersTests(TestCase):
 
         self.order.refresh_from_db()
         self.assertTrue(self.order.is_synced)
+
+    @patch('licensing.tasks.OnaClient.post_orders')
+    def test_voided_items_excluded_from_payload(self, mock_post):
+        # total_amount void qatorlarni hisobga olmaydi - payload'dagi
+        # itemlar ham shunga mos bo'lishi kerak, aks holda Ona tomonda
+        # itemlar yig'indisi buyurtma summasidan oshib ketadi.
+        OrderItem.objects.create(
+            order=self.order, product=self.product, quantity=5,
+            price=Decimal('30000'), is_voided=True,
+        )
+        mock_post.return_value = _mock_response(
+            201, {"synced_uuids": [str(self.order.sync_uuid)]},
+        )
+
+        sync_completed_orders.run()
+
+        (_, orders_data) = mock_post.call_args[0]
+        payload = orders_data[0]
+        self.assertEqual(len(payload['items']), 1)
+        self.assertEqual(Decimal(payload['total_amount']), Decimal('60000'))
 
     @patch('licensing.tasks.OnaClient.post_orders')
     def test_open_orders_never_sent(self, mock_post):

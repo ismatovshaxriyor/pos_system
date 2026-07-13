@@ -13,6 +13,11 @@ def _auth_header(user):
 
 
 class PaymentFlowTestsBase(TestCase):
+    def tearDown(self):
+        if hasattr(self, 'multiplier_patcher'):
+            self.multiplier_patcher.stop()
+        super().tearDown()
+
     def setUp(self):
         self.admin = User.objects.create_user(username='+998900000080', role='manager', is_staff=True)
         self.manager = User.objects.create_user(username='+998900000081', role='manager')

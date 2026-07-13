@@ -67,7 +67,16 @@ class ActivateView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            # Ona o'rnidagi proxy/tunnel (masalan cloudflared) HTML xato
+            # sahifasi qaytargan bo'lishi mumkin - foydalanuvchiga 500
+            # o'rniga tushunarli xabar.
+            return Response(
+                {"detail": "Ona serverdan kutilmagan javob keldi. Birozdan so'ng qayta urining."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         if response.status_code != 200:
             return Response(data, status=response.status_code)
 

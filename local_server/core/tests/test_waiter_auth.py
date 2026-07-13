@@ -113,3 +113,44 @@ class WaiterAuthTestCase(APITestCase):
         })
         self.assertEqual(response2.status_code, status.HTTP_200_OK)
         self.assertIn('token', response2.data)
+
+    def test_relogin_from_replaced_old_device_requires_reapproval(self):
+        """
+        Regressiya: yangi qurilma tasdiqlangach, ofitsiant ESKI (bir paytlar
+        approved bo'lgan, endi nofaol) qurilmasidan qayta kirsa, qator
+        is_approved=True holicha qayta faollashtirilib, partial unique
+        constraint (bitta userda bitta active+approved qurilma) buzilar va
+        IntegrityError 500 qaytarar edi. To'g'ri xatti-harakat: eski qurilma
+        ham endi menejer tasdig'ini kutadi (403).
+        """
+        # 1. Birinchi qurilma (TOFU bilan avtomatik approved)
+        self.client.post('/api/auth/waiter-login/', {
+            'phone': '+998901112233', 'password': 'password123',
+            'device_id': 'device-asror-1', 'device_label': 'Asror Phone',
+        })
+        # 2. Ikkinchi qurilma pending bo'ladi, menejer uni tasdiqlaydi
+        self.client.post('/api/auth/waiter-login/', {
+            'phone': '+998901112233', 'password': 'password123',
+            'device_id': 'device-asror-2', 'device_label': 'Asror iPad',
+        })
+        pending = StaffDevice.objects.get(device_id='device-asror-2')
+        self.client.force_authenticate(user=self.manager)
+        self.client.post(f'/api/devices/{pending.pk}/approve/')
+        self.client.force_authenticate(user=None)
+
+        # 3. Eski qurilmadan qayta kirish - 500 emas, 403 (qayta tasdiqlash)
+        response = self.client.post('/api/auth/waiter-login/', {
+            'phone': '+998901112233', 'password': 'password123',
+            'device_id': 'device-asror-1', 'device_label': 'Asror Phone',
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("Menejer tasdig'i kutilmoqda", response.data['detail'])
+
+        old_device = StaffDevice.objects.get(device_id='device-asror-1')
+        self.assertTrue(old_device.is_active)
+        self.assertFalse(old_device.is_approved)
+
+        # Hozirgi tasdiqlangan qurilma o'z holicha qoladi
+        current = StaffDevice.objects.get(device_id='device-asror-2')
+        self.assertTrue(current.is_active)
+        self.assertTrue(current.is_approved)

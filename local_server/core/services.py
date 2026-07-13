@@ -150,6 +150,7 @@ def verify_pin_login(device_id, pin):
 
     _clear_failures(device_id)
     device.last_login_at = timezone.now()
+    device.save(update_fields=['last_login_at', 'updated_at'])
     token, _ = Token.objects.get_or_create(user=device.user)
     return device.user, token
 
@@ -286,20 +287,35 @@ def login_waiter(phone, password, device_id, device_label=''):
         return user, token
 
     # Yangi qurilmadan kirishga urinish!
-    # Agar bu qurilma uchun oldin pending so'rov ochilmagan bo'lsa, yaratamiz
-    pending_device, created = StaffDevice.objects.get_or_create(
-        user=user,
-        device_id=device_id,
-        defaults={
-            'device_label': device_label,
-            'is_active': True,
-            'is_approved': False
-        }
+    # Agar bu qurilma uchun oldin pending so'rov ochilmagan bo'lsa, yaratamiz.
+    # get_or_create emas: (user, device_id) bo'yicha bir nechta tarixiy qator
+    # bo'lishi mumkin (masalan registratsiya-kod oqimi har safar yangi qator
+    # yaratadi) - MultipleObjectsReturned 500 bermasligi uchun eng so'nggisini
+    # olamiz. Topilgan qator ILGARI approved bo'lgan (keyin boshqa qurilma
+    # tasdiqlanganda deaktivlangan) eski qurilma bo'lishi ham mumkin - unda
+    # is_approved'ni majburan False qilamiz: faqat is_active=True qilib
+    # qo'yish uni user'ning hozirgi faol qurilmasi bilan birga ikkinchi
+    # "active+approved" qatorga aylantirib, uniq_active_approved_device_per_user
+    # constraint'ini buzar edi (IntegrityError -> 500). Eski qurilmaga
+    # qaytish ham menejer tasdig'ini talab qiladi - xavfsizlik modeliga mos.
+    pending_device = (
+        StaffDevice.objects.filter(user=user, device_id=device_id)
+        .order_by('-id')
+        .first()
     )
-    if not created:
+    if pending_device is None:
+        pending_device = StaffDevice.objects.create(
+            user=user,
+            device_id=device_id,
+            device_label=device_label,
+            is_active=True,
+            is_approved=False,
+        )
+    else:
         pending_device.is_active = True
+        pending_device.is_approved = False
         pending_device.device_label = device_label
-        pending_device.save(update_fields=['is_active', 'device_label'])
+        pending_device.save(update_fields=['is_active', 'is_approved', 'device_label', 'updated_at'])
 
     # Manager uchun bildirishnoma yaratish
     from .models import Notification
@@ -437,5 +453,3 @@ def send_order_to_kitchen(order):
             })
             
     return created_jobs
-
-
