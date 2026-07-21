@@ -159,9 +159,22 @@ class Table(BaseModel):
 
 class Printer(BaseModel):
     name = models.CharField(max_length=100)
-    ip_address = models.CharField(max_length=50, blank=True, null=True)
+    ip_address = models.CharField(
+        max_length=50, blank=True, null=True,
+        help_text="Bo'sh - virtual printer (chek faqat oshxona ekranida ko'rinadi). "
+                  "To'ldirilgan - ESC/POS baytlar shu manzilga TCP orqali avtomatik yuboriladi.",
+    )
     port = models.IntegerField(default=9100)
+    chars_per_line = models.PositiveIntegerField(
+        default=48,
+        help_text="Bir qatordagi belgilar soni: 80mm qog'oz (XP-Q80A) - 48, 58mm - 32.",
+    )
     is_active = models.BooleanField(default=True)
+
+    @property
+    def is_network(self):
+        """IP kiritilgan printerga jismonan (ESC/POS, TCP 9100) chop etishga urinamiz."""
+        return bool(self.ip_address and self.ip_address.strip())
 
     def __str__(self):
         return self.name

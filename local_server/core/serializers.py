@@ -163,7 +163,7 @@ class StatusMessageSerializer(serializers.Serializer):
 class PrinterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Printer
-        fields = ('id', 'name', 'ip_address', 'port', 'is_active', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'ip_address', 'port', 'chars_per_line', 'is_active', 'created_at', 'updated_at')
 
 class CategorySerializer(serializers.ModelSerializer):
     printer = PrinterSerializer(read_only=True)

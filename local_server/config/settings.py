@@ -278,6 +278,13 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 60.0,
         'options': {'expires': 50},
     },
+    # Jismoniy printer navbatida qolib ketgan pending cheklarni qayta yuborish /
+    # juda eskirganini failed qilish (core/tasks.py::sweep_stale_print_jobs).
+    'sweep-stale-print-jobs': {
+        'task': 'core.tasks.sweep_stale_print_jobs',
+        'schedule': 120.0,
+        'options': {'expires': 100},
+    },
 }
 
 # Cache (Redis) - used to cache the license-verification verdict so the

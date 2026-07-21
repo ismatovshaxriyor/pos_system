@@ -233,7 +233,7 @@ class AttendanceAdmin(SimpleHistoryAdmin):
 
 @admin.register(Printer)
 class PrinterAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'ip_address', 'port', 'is_active')
+    list_display = ('name', 'ip_address', 'port', 'chars_per_line', 'is_active')
     list_filter = ('is_active',)
 
 

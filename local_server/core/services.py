@@ -460,6 +460,20 @@ def send_order_to_kitchen(order):
                 'created_at': job.created_at.isoformat() if job.created_at else timezone.now().isoformat()
             })
 
+    # Jismoniy (IP kiritilgan) printerlarga ESC/POS chop etishni navbatga
+    # qo'yish. on_commit shart: job qatorlari tranzaksiya commit bo'lmaguncha
+    # celery workerga ko'rinmaydi (OrderViewSet.start buni tashqi atomic +
+    # select_for_update ichida chaqiradi).
+    network_job_ids = [job.id for job in created_jobs if job.printer.is_network]
+    if network_job_ids:
+        from .tasks import print_job_to_printer
+
+        def _dispatch_to_hardware(job_ids=tuple(network_job_ids)):
+            for job_id in job_ids:
+                print_job_to_printer.delay(job_id)
+
+        transaction.on_commit(_dispatch_to_hardware)
+
     # Ombor: oshxonaga yuborilgan (sotilgan) taomlar bo'yicha ingredient
     # zaxirasini kamaytirish. Xatolik POS/kitchen oqimini TO'XTATMASLIGI kerak -
     # zaxira ikkilamchi ledger, chop etish esa kritik. Log ERROR handler orqali

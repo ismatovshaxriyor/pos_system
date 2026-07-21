@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from . import services
+from . import escpos, services
 from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob, Customer
 from .permissions import IsAdminStaff, IsManagerOrAdmin
 from .realtime import broadcast_event
@@ -766,6 +766,42 @@ class PrinterViewSet(viewsets.ModelViewSet):
             Category.objects.filter(id__in=category_ids).update(printer=printer)
 
         return Response({'status': 'Kategoriyalar yangilandi'})
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: StatusMessageSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Printerga IP manzil kiritilmagan (virtual printer)."),
+            502: OpenApiResponse(ErrorDetailSerializer, description="Printerga ulanib bo'lmadi."),
+        },
+    )
+    @action(detail=True, methods=['post'], url_path='test-print')
+    def test_print(self, request, pk=None):
+        """
+        Jismoniy printerni sozlashda tekshirish: ESC/POS test chekni sinxron
+        yuboradi (lotin/kirill kodlash namunalari, ustun eni, avtokesish).
+        Ataylab task navbatiga qo'ymaydi - sozlayotgan odam natijani darhol
+        bilishi kerak; 5s timeout so'rovni cheklab turadi.
+        """
+        printer = self.get_object()
+        if not printer.is_network:
+            return Response(
+                {'detail': "Bu printerga IP manzil kiritilmagan - avval ip_address maydonini to'ldiring."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = escpos.render_test_ticket(
+            printer_name=printer.name,
+            endpoint=f"{printer.ip_address}:{printer.port}",
+            width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
+        )
+        try:
+            escpos.send_tcp(printer.ip_address.strip(), printer.port, payload, timeout=5.0)
+        except OSError as exc:
+            return Response(
+                {'detail': f"Printerga ulanib bo'lmadi ({printer.ip_address}:{printer.port}): {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response({'status': 'Test chek yuborildi'})
 
 
 class PrintJobViewSet(viewsets.ModelViewSet):
