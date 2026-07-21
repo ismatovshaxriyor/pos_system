@@ -10,7 +10,8 @@ gunicorn
 django-cors-headers
 django-jazzmin==3.0.1
 PyJWT
-cryptography
+cryptography>=41.0.0
+setuptools
 psutil
 requests
 channels==4.3.2

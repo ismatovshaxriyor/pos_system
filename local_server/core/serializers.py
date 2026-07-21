@@ -5,17 +5,58 @@ from rest_framework import serializers
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, Notification, RestaurantConfig, Attendance, TableZone,
-    Printer, PrintJob,
+    Printer, PrintJob, Customer, DebtTransaction,
+    Supplier, Ingredient, ProductIngredient, Purchase, PurchaseItem, StockMovement,
 )
 
 TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
 
 class UserSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(required=True, allow_blank=False)
+    # write_only - hech qachon javobda qaytmaydi. Faqat manager/waiter uchun
+    # ishlatiladi (pastga, validate()ga qarang) - kassir/afitsiant (PIN+
+    # qurilma orqali kiruvchi rollar) uchun haqiqiy password o'rnatilsa,
+    # DeviceTokenAuthentication'ni butunlay chetlab, /api/auth/login/ orqali
+    # qurilma tekshiruvisiz kirish imkoni ochilib qolar edi (User.pin_hash
+    # yonidagi izohga qarang - local_server/core/models.py).
+    password = serializers.CharField(write_only=True, required=False, allow_blank=False)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'first_name', 'last_name', 'role')
+        fields = ('id', 'username', 'first_name', 'last_name', 'role', 'password')
+
+    def validate(self, attrs):
+        role = attrs.get('role', getattr(self.instance, 'role', None))
+        has_password = 'password' in attrs
+        if role == 'cashier':
+            if has_password:
+                raise serializers.ValidationError({
+                    'password': "Kassir uchun parol o'rnatilmaydi - registratsiya kodi orqali PIN beriladi.",
+                })
+        elif role in ('manager', 'waiter'):
+            if self.instance is None and not has_password:
+                raise serializers.ValidationError({
+                    'password': "Menejer/ofitsiant yaratishda parol majburiy.",
+                })
+        return attrs
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        user = super().update(instance, validated_data)
+        if password:
+            user.set_password(password)
+            user.save(update_fields=['password'])
+        return user
 
 class TableZoneSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,6 +91,25 @@ class TableSerializer(serializers.ModelSerializer):
         if request and active_order.waiter_id == request.user.id:
             return 'occupied_by_me'
         return 'occupied'
+
+class LiveTableSalesSerializer(serializers.Serializer):
+    """
+    Kassir jonli stol-sotuvlari javobi (GET /api/tables/live-sales/). Faqat
+    o'qish/hujjatlash uchun - summalar view'da calculate_order_financials
+    orqali hisoblanadi.
+    """
+    table_id = serializers.IntegerField()
+    table_name = serializers.CharField()
+    zone = serializers.CharField(allow_null=True)
+    order_id = serializers.IntegerField()
+    waiter = serializers.CharField(allow_null=True)
+    guest_count = serializers.IntegerField()
+    item_count = serializers.IntegerField()
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    final_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2)
+    balance_due = serializers.DecimalField(max_digits=12, decimal_places=2)
+    opened_at = serializers.DateTimeField()
 
 class StaffDeviceSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -165,12 +225,51 @@ class DiscountSerializer(serializers.Serializer):
     discount_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'))
     discount_reason = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
 
+class CustomerSlimSerializer(serializers.ModelSerializer):
+    """Buyurtma ichida nested - balansni oshkor qilmaydi (afitsiant order o'qishida ko'rmasin)."""
+    class Meta:
+        model = Customer
+        fields = ('id', 'first_name', 'last_name', 'phone')
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = (
+            'id', 'first_name', 'last_name', 'phone', 'note', 'balance',
+            'is_active', 'created_at', 'updated_at',
+        )
+        # balance faqat kreditga-yopish/qarz-to'lash oqimi orqali o'zgaradi -
+        # client to'g'ridan-to'g'ri yozolmaydi (aks holda qarz hisobi buzilardi).
+        read_only_fields = ('balance',)
+
+class DebtTransactionSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = DebtTransaction
+        fields = (
+            'id', 'customer', 'amount', 'txn_type', 'order', 'method',
+            'note', 'created_by', 'created_at',
+        )
+        read_only_fields = fields
+
+class CreditCloseSerializer(serializers.Serializer):
+    """`close_on_credit` action so'rov tanasi."""
+    customer_id = serializers.IntegerField()
+
+class RepaymentSerializer(serializers.Serializer):
+    """`CustomerViewSet.repay` so'rov tanasi."""
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0.01'))
+    method = serializers.ChoiceField(choices=Payment.METHOD_CHOICES, default='cash')
+    note = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
     waiter = UserSerializer(read_only=True)
     cashier = UserSerializer(read_only=True)
     table = TableSerializer(read_only=True)
+    customer = CustomerSlimSerializer(read_only=True)
 
     table_id = serializers.PrimaryKeyRelatedField(
         queryset=Table.objects.all(), source='table', write_only=True, required=False, allow_null=True
@@ -184,7 +283,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'sync_uuid', 'table', 'table_id', 'waiter', 'cashier', 'order_type', 'total_amount', 'tax_amount', 'service_charge',
+            'id', 'sync_uuid', 'table', 'table_id', 'waiter', 'cashier', 'customer', 'order_type', 'total_amount', 'tax_amount', 'service_charge',
             'discount_amount', 'discount_reason', 'final_amount', 'amount_paid', 'balance_due',
             'status', 'note', 'guest_count', 'items', 'payments', 'created_at',
         )
@@ -225,6 +324,126 @@ class CheckInSerializer(serializers.Serializer):
 class CheckOutSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+
+
+# ==============================================================================
+# OMBOR (Inventory)
+# ==============================================================================
+
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supplier
+        fields = ('id', 'name', 'phone', 'note', 'is_active', 'created_at', 'updated_at')
+
+
+class IngredientSlimSerializer(serializers.ModelSerializer):
+    """Nested joylar uchun yengil ko'rinish (retsept/kirim/harakat ichida)."""
+    class Meta:
+        model = Ingredient
+        fields = ('id', 'name', 'unit')
+
+
+class IngredientSerializer(serializers.ModelSerializer):
+    supplier = SupplierSerializer(read_only=True)
+    supplier_id = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.all(), source='supplier', write_only=True, required=False, allow_null=True,
+    )
+    is_low = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Ingredient
+        fields = (
+            'id', 'name', 'unit', 'current_stock', 'min_stock', 'cost_price',
+            'supplier', 'supplier_id', 'is_low', 'is_active', 'created_at', 'updated_at',
+        )
+        # Zaxira faqat harakat (kirim/sotuv/tuzatish) orqali o'zgaradi - ledger
+        # yaxlitligi uchun. Boshlang'ich qoldiqni `adjust` action bilan qo'yiladi.
+        read_only_fields = ('current_stock',)
+
+
+class RecipeItemSerializer(serializers.ModelSerializer):
+    """Retsept qatori (ProductIngredient)."""
+    product = serializers.PrimaryKeyRelatedField(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_deleted=False), source='product', write_only=True,
+    )
+    ingredient = IngredientSlimSerializer(read_only=True)
+    ingredient_id = serializers.PrimaryKeyRelatedField(
+        queryset=Ingredient.objects.all(), source='ingredient', write_only=True,
+    )
+
+    class Meta:
+        model = ProductIngredient
+        fields = ('id', 'product', 'product_id', 'ingredient', 'ingredient_id', 'quantity')
+
+
+class PurchaseItemSerializer(serializers.ModelSerializer):
+    ingredient = IngredientSlimSerializer(read_only=True)
+    ingredient_id = serializers.PrimaryKeyRelatedField(
+        queryset=Ingredient.objects.all(), source='ingredient', write_only=True,
+    )
+
+    class Meta:
+        model = PurchaseItem
+        fields = ('id', 'ingredient', 'ingredient_id', 'quantity', 'unit_cost')
+
+
+class PurchaseSerializer(serializers.ModelSerializer):
+    items = PurchaseItemSerializer(many=True)
+    supplier = SupplierSerializer(read_only=True)
+    supplier_id = serializers.PrimaryKeyRelatedField(
+        queryset=Supplier.objects.all(), source='supplier', write_only=True, required=False, allow_null=True,
+    )
+    total_cost = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = Purchase
+        fields = ('id', 'supplier', 'supplier_id', 'note', 'items', 'total_cost', 'created_at')
+        read_only_fields = ('created_at',)
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Kirimda kamida bitta ingredient bo'lishi kerak.")
+        return value
+
+    def create(self, validated_data):
+        # Zaxirani qo'llash (StockMovement + current_stock) viewset perform_create'da
+        # services.apply_purchase orqali - bu yerda faqat hujjat + qatorlar yaratiladi.
+        items_data = validated_data.pop('items')
+        purchase = Purchase.objects.create(**validated_data)
+        PurchaseItem.objects.bulk_create([
+            PurchaseItem(purchase=purchase, **item) for item in items_data
+        ])
+        return purchase
+
+
+class StockMovementSerializer(serializers.ModelSerializer):
+    ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)
+    created_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = StockMovement
+        fields = (
+            'id', 'ingredient', 'ingredient_name', 'quantity', 'movement_type',
+            'order', 'purchase', 'note', 'created_by', 'created_at',
+        )
+        read_only_fields = fields
+
+
+class StockAdjustSerializer(serializers.Serializer):
+    """`IngredientViewSet.adjust` so'rov tanasi: new_quantity YOKI delta (bittasi)."""
+    new_quantity = serializers.DecimalField(max_digits=12, decimal_places=3, required=False)
+    delta = serializers.DecimalField(max_digits=12, decimal_places=3, required=False)
+    note = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+
+    def validate(self, attrs):
+        has_new = attrs.get('new_quantity') is not None
+        has_delta = attrs.get('delta') is not None
+        if has_new == has_delta:
+            raise serializers.ValidationError(
+                "new_quantity yoki delta - aynan bittasini bering.",
+            )
+        return attrs
 
 
 class PrintJobSerializer(serializers.ModelSerializer):

@@ -153,6 +153,14 @@ class RenewView(APIView):
                 {"token": token, "expires_at": expires_at.isoformat()}
                 for token, expires_at in tokens
             ],
+            # ActivationView bilan bir xil sabab: agar bu yerda qaytarilmasa,
+            # LICENSE_PRIVATE_KEY almashtirilganda (rotatsiya) allaqachon
+            # faollashtirilgan Bola'lar eski public_key'ni abadiy keshlab
+            # qolar edi - keyingi tokenlar YANGI kalit bilan imzolanadi,
+            # lekin ular eski kalit bilan tekshirilib, kill-switch noto'g'ri
+            # bloklab qo'yardi. Har muvaffaqiyatli renew shu bilan tokenlar
+            # VA public_key'ni birga (mos holda) yangilaydi.
+            "public_key": get_public_key_pem(),
             "detail": "Token muvaffaqiyatli yangilandi.",
         }, status=status.HTTP_200_OK)
 

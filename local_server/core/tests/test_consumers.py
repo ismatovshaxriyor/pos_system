@@ -9,13 +9,23 @@ IN_MEMORY_CHANNEL_LAYERS = {
     'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
 }
 
+# AllowedHostsOriginValidator (config/asgi.py) qat'iy tekshiradi: Origin
+# header umuman bo'lmasa (WebsocketCommunicator sukut bo'yicha yubormaydi),
+# ALLOWED_HOSTS'da '*' bo'lmagan holda ulanish TokenAuthMiddleware'gacha
+# yetib bormasdan rad etiladi. Bu haqiqiy brauzer-klient uchun to'g'ri
+# himoya, lekin test muhitida ALLOWED_HOSTS cheklangan (.env.example:
+# localhost,127.0.0.1) - shu sabab muvaffaqiyatli ulanish kutilgan testlar
+# mos Origin header'ini o'zi yuborishi kerak.
+ORIGIN_HEADERS = [(b'origin', b'http://localhost')]
+
 
 @override_settings(CHANNEL_LAYERS=IN_MEMORY_CHANNEL_LAYERS)
 class EventsConsumerTests(TransactionTestCase):
     # WebsocketCommunicator + database_sync_to_async alohida DB ulanish
     # konteksti bilan ishlaydi - TestCase'ning tashqi atomic tranzaksiyasi
     # bilan birga ishlatilsa ulanish "yopilib qoladi". TransactionTestCase
-    # (truncate-based) shu muammoni oldini oladi.    def setUp(self):
+    # (truncate-based) shu muammoni oldini oladi.
+    def setUp(self):
         import unittest.mock as mock
         self.license_patcher = mock.patch('licensing.middleware.is_license_blocked', return_value=False)
         self.license_patcher.start()
@@ -43,7 +53,9 @@ class EventsConsumerTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_valid_token_connects_and_receives_broadcast(self):
-        communicator = WebsocketCommunicator(application, f"/ws/events/?token={self.token.key}")
+        communicator = WebsocketCommunicator(
+            application, f"/ws/events/?token={self.token.key}", headers=ORIGIN_HEADERS,
+        )
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
@@ -65,7 +77,9 @@ class EventsConsumerTests(TransactionTestCase):
             user=self.user, device_id='ws-device', is_active=True,
         )
 
-        communicator = WebsocketCommunicator(application, f"/ws/events/?token={self.token.key}")
+        communicator = WebsocketCommunicator(
+            application, f"/ws/events/?token={self.token.key}", headers=ORIGIN_HEADERS,
+        )
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 

@@ -1,5 +1,7 @@
+import logging
 import re
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth.hashers import make_password, check_password
 from django.core.cache import cache
@@ -9,6 +11,8 @@ from django.utils.crypto import get_random_string
 from rest_framework.authtoken.models import Token
 
 from .models import DeviceRegistrationCode, StaffDevice, User
+
+logger = logging.getLogger(__name__)
 
 CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # 0/O, 1/I kabi chalkash belgilar chiqarib tashlangan
 CODE_TTL = timedelta(minutes=15)
@@ -380,16 +384,20 @@ def send_order_to_kitchen(order):
     
     # Faqat void bo'lmagan va chop etilmagan taomlarni olish
     items_to_print = order.items.filter(is_printed=False, is_voided=False).select_related('product__category__printer')
-    if not items_to_print.exists():
+    # Ombor sarfini shu ro'yxatdan hisoblaymiz - is_printed pastda True'ga
+    # o'zgargach queryset qayta baholansa bo'sh chiqadi, shuning uchun ro'yxatga
+    # materializatsiya qilamiz (bir marta - grouping ham, consumption ham shundan).
+    printed_items = list(items_to_print)
+    if not printed_items:
         return []
 
     # Printer bo'yicha guruhlash
     printer_groups = {}
-    
+
     # Asosiy printerni topish yoki generatsiya qilish
     default_printer = Printer.objects.filter(is_active=True).first()
 
-    for item in items_to_print:
+    for item in printed_items:
         printer = None
         if item.product.category and item.product.category.printer:
             printer = item.product.category.printer
@@ -451,7 +459,16 @@ def send_order_to_kitchen(order):
                 'items': items_snapshot,
                 'created_at': job.created_at.isoformat() if job.created_at else timezone.now().isoformat()
             })
-            
+
+    # Ombor: oshxonaga yuborilgan (sotilgan) taomlar bo'yicha ingredient
+    # zaxirasini kamaytirish. Xatolik POS/kitchen oqimini TO'XTATMASLIGI kerak -
+    # zaxira ikkilamchi ledger, chop etish esa kritik. Log ERROR handler orqali
+    # Ona'ga ham yetib boradi.
+    try:
+        consume_stock_for_items(printed_items, order=order)
+    except Exception:
+        logger.exception("Ombor zaxirasini kamaytirishda xatolik (order #%s)", order.id)
+
     return created_jobs
 
 # ==============================================================================
@@ -509,3 +526,143 @@ def calculate_order_financials(order, context=None):
     balance_due = max(final_amount - amount_paid, Decimal('0'))
 
     return total_amount, final_amount, balance_due
+
+
+# ==============================================================================
+# QARZ DAFTAR (Customer debt ledger)
+# ==============================================================================
+
+def record_credit_sale(*, order, customer, amount, created_by):
+    """
+    Buyurtma kreditga yopilganda: `DebtTransaction(credit_sale, +amount)` yaratadi
+    va `Customer.balance` ni F() bilan atomik oshiradi. Chaqiruvchi (view) buyurtma
+    qatorini `select_for_update` bilan qulflagan bo'lishi kutiladi.
+    """
+    from django.db.models import F
+    from .models import Customer, DebtTransaction
+
+    DebtTransaction.objects.create(
+        customer=customer, amount=amount, txn_type='credit_sale',
+        order=order, created_by=created_by,
+    )
+    Customer.objects.filter(pk=customer.pk).update(balance=F('balance') + amount)
+
+
+def record_repayment(*, customer, amount, method, created_by, note=''):
+    """
+    Mijoz qarzni to'laganda: `DebtTransaction(repayment, -amount)` yaratadi va
+    `Customer.balance` ni F() bilan atomik kamaytiradi. Chaqiruvchi (view)
+    mijoz qatorini qulflab, `amount <= balance` ekanini tekshirgan bo'lishi kutiladi.
+    """
+    from django.db.models import F
+    from .models import Customer, DebtTransaction
+
+    DebtTransaction.objects.create(
+        customer=customer, amount=-amount, txn_type='repayment',
+        method=method, created_by=created_by, note=note,
+    )
+    Customer.objects.filter(pk=customer.pk).update(balance=F('balance') - amount)
+
+
+# ==============================================================================
+# OMBOR (Inventory: consumption, kirim, tuzatish, past-zaxira ogohlantirish)
+# ==============================================================================
+
+def _notify_low_stock(ingredient):
+    """Ingredient min_stock'dan pastga tushganda menejerlarga bildirishnoma + WS."""
+    from .models import Notification
+    from .realtime import broadcast_event
+
+    message = (
+        f"Zaxira kam qoldi: {ingredient.name} - {ingredient.current_stock} "
+        f"{ingredient.unit} (chegara: {ingredient.min_stock})"
+    )
+    Notification.objects.create(
+        recipient=None, notif_type='low_stock', message=message,
+        payload={'ingredient_id': ingredient.id, 'current_stock': str(ingredient.current_stock)},
+    )
+    broadcast_event('low_stock', {'ingredient_id': ingredient.id, 'message': message})
+
+
+def consume_stock_for_items(items, *, order=None, created_by=None):
+    """
+    Oshxonaga yuborilgan (sotilgan) taomlar uchun retsept bo'yicha ingredient
+    zaxirasini kamaytiradi. Retsepti yo'q mahsulot - kamaytirmaydi. Zaxira
+    tugasa ham SOTUVNI TO'XTATMAYDI (foydalanuvchi qarori: ogohlantir, lekin
+    sot) - faqat birinchi marta `min_stock`dan pastga tushganda past-zaxira
+    ogohlantiradi. Har sarf uchun `StockMovement(sale, -)` yoziladi.
+
+    `items` - materializatsiyalangan OrderItem ro'yxati (queryset emas), chunki
+    chaqiruvchi (`send_order_to_kitchen`) uni is_printed o'zgargandan keyin
+    beradi.
+    """
+    from .models import Ingredient, ProductIngredient, StockMovement
+
+    crossed_low = []
+    with transaction.atomic():
+        for item in items:
+            recipe = ProductIngredient.objects.filter(product_id=item.product_id)
+            for line in recipe:
+                consumed = line.quantity * item.quantity
+                if consumed <= 0:
+                    continue
+                ingredient = Ingredient.objects.select_for_update().get(pk=line.ingredient_id)
+                was_ok = ingredient.current_stock >= ingredient.min_stock
+                ingredient.current_stock = ingredient.current_stock - consumed
+                ingredient.save(update_fields=['current_stock', 'updated_at'])
+                StockMovement.objects.create(
+                    ingredient=ingredient, quantity=-consumed, movement_type='sale',
+                    order=order, created_by=created_by,
+                )
+                if was_ok and ingredient.current_stock < ingredient.min_stock:
+                    crossed_low.append(ingredient)
+
+    # Bildirishnoma/WS tranzaksiyadan keyin - commit qilingan holatni aks ettiradi.
+    for ingredient in crossed_low:
+        _notify_low_stock(ingredient)
+
+
+def apply_purchase(purchase, *, created_by=None):
+    """
+    Kirim hujjatini qo'llaydi: har `PurchaseItem` uchun `StockMovement(purchase, +)`
+    yaratadi, `Ingredient.current_stock` ni oshiradi va `cost_price` ni yangilaydi
+    (oxirgi kirim narxi). BIR MARTA chaqirilishi kerak (create paytida) -
+    idempotent emas.
+    """
+    from .models import Ingredient, StockMovement
+
+    with transaction.atomic():
+        for pi in purchase.items.select_related('ingredient'):
+            ingredient = Ingredient.objects.select_for_update().get(pk=pi.ingredient_id)
+            ingredient.current_stock = ingredient.current_stock + pi.quantity
+            if pi.unit_cost and pi.unit_cost > 0:
+                ingredient.cost_price = pi.unit_cost
+            ingredient.save(update_fields=['current_stock', 'cost_price', 'updated_at'])
+            StockMovement.objects.create(
+                ingredient=ingredient, quantity=pi.quantity, movement_type='purchase',
+                purchase=purchase, created_by=created_by, note=purchase.note,
+            )
+
+
+def adjust_stock(ingredient, *, new_quantity=None, delta=None, note='', created_by=None):
+    """
+    Inventarizatsiya/qo'lda tuzatish. `new_quantity` berilsa - absolyut yangi
+    qoldiqqa keltiradi (delta o'zi hisoblanadi); `delta` berilsa - shuncha
+    o'zgartiradi (musbat/manfiy). `StockMovement(adjustment, delta)` yoziladi.
+    Bittasi berilishi shart (serializer tekshiradi). Yangilangan ingredientni qaytaradi.
+    """
+    from .models import Ingredient, StockMovement
+
+    with transaction.atomic():
+        ingredient = Ingredient.objects.select_for_update().get(pk=ingredient.pk)
+        if new_quantity is not None:
+            change = Decimal(new_quantity) - ingredient.current_stock
+        else:
+            change = Decimal(delta)
+        ingredient.current_stock = ingredient.current_stock + change
+        ingredient.save(update_fields=['current_stock', 'updated_at'])
+        StockMovement.objects.create(
+            ingredient=ingredient, quantity=change, movement_type='adjustment',
+            note=note, created_by=created_by,
+        )
+    return ingredient

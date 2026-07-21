@@ -352,7 +352,24 @@ def _load_pem(file_env, inline_env, default=''):
 
 
 # App / licensing settings
-APP_VERSION = os.environ.get('APP_VERSION', '0.1.0')
+# Versiya IMAGE ichiga joylashtiriladi (`local_server/VERSION` fayli, BASE_DIR
+# ostida - Dockerfile `COPY . /app/` bilan olib kiradi, dev'da `.:/app` bind-
+# mount orqali ko'rinadi). Fayl asosiy manba: shu tarzda Watchtower yangi image
+# tortib konteynerni qayta yaratganda heartbeat'da hisobot qilinadigan
+# `app_version` avtomatik yangilanadi - boshqa mashinaning `.env` fayliga
+# tegmasdan. Aks holda `.env`da pin qilingan APP_VERSION yangi image tortilsa
+# ham eski versiyani ko'rsatib turib, "update keldimi?" tekshiruvini buzardi.
+# Env override faqat VERSION fayli topilmaganda zaxira sifatida ishlaydi.
+def _read_app_version():
+    try:
+        text = (BASE_DIR / 'VERSION').read_text(encoding='utf-8').strip()
+        if text:
+            return text
+    except OSError:
+        pass
+    return os.environ.get('APP_VERSION', '0.0.0')
+
+APP_VERSION = _read_app_version()
 ONA_SERVER_URL = os.environ.get('ONA_SERVER_URL', 'http://host.docker.internal:8001')
 
 if not DEBUG and not ONA_SERVER_URL.startswith('https://'):
@@ -391,6 +408,13 @@ JAZZMIN_SETTINGS = {
         "core.Notification": "fas fa-bell",
         "core.RestaurantConfig": "fas fa-cogs",
         "core.Attendance": "fas fa-user-check",
+        "core.Customer": "fas fa-user-friends",
+        "core.DebtTransaction": "fas fa-hand-holding-usd",
+        "core.Supplier": "fas fa-truck",
+        "core.Ingredient": "fas fa-carrot",
+        "core.ProductIngredient": "fas fa-mortar-pestle",
+        "core.Purchase": "fas fa-dolly-flatbed",
+        "core.StockMovement": "fas fa-exchange-alt",
         "authtoken.TokenProxy": "fas fa-key",
         "licensing.ErrorLog": "fas fa-exclamation-triangle",
         "licensing.LicenseToken": "fas fa-id-card",

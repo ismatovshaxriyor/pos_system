@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt \
+RUN pip install --default-timeout=100 --retries 10 -r requirements.txt \
     && pip install "Cython>=3.0,<4.0" setuptools
 
 COPY . /app/
@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --default-timeout=100 --retries 10 -r requirements.txt
 
 # Builder bosqichidan faqat tayyor natija ko'chiriladi: .so fayllar +
 # kompilyatsiya qilinmagan qolgan barcha .py fayllar (core, config,

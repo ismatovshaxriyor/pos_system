@@ -184,6 +184,20 @@ class RenewTests(TestCase):
         self.assertIn('tokens', response.data)
         self.assertGreater(len(response.data['tokens']), 0)
 
+    def test_renew_returns_current_public_key(self):
+        # Bola bu qiymatni LicenseState.public_key'ga saqlaydi - agar bu
+        # yerda qaytmasa, Ona'da LICENSE_PRIVATE_KEY rotatsiya qilinganda
+        # allaqachon faollashtirilgan Bola'lar eski (endi mos kelmaydigan)
+        # kalitni abadiy keshlab qolib, yangi tokenlarni tekshira olmay
+        # noto'g'ri bloklanib qolar edi.
+        response = self.client.post(
+            self.url, {"hardware_hash": "a" * 64},
+            content_type='application/json', **self._auth(),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('public_key', response.data)
+        self.assertIn('BEGIN PUBLIC KEY', response.data['public_key'])
+
     def test_renew_wrong_hardware(self):
         response = self.client.post(
             self.url, {"hardware_hash": "b" * 64},

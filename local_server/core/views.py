@@ -1,6 +1,7 @@
 import uuid
 import zoneinfo
 from datetime import date as date_cls, datetime, time, timedelta
+from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -15,17 +16,17 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from . import services
-from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob
+from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob, Customer
 from .permissions import IsAdminStaff, IsManagerOrAdmin
 from .realtime import broadcast_event
 from .serializers import (
     UserSerializer, TableSerializer, CategorySerializer,
     ProductSerializer, OrderSerializer, OrderItemSerializer,
-    PaymentSerializer, DiscountSerializer,
+    PaymentSerializer, DiscountSerializer, CreditCloseSerializer,
     StaffDeviceSerializer, NotificationSerializer,
     RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
     RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
-    TableZoneSerializer, PrinterSerializer, PrintJobSerializer,
+    TableZoneSerializer, PrinterSerializer, PrintJobSerializer, LiveTableSalesSerializer,
 )
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
@@ -81,6 +82,60 @@ class TableViewSet(viewsets.ModelViewSet):
     queryset = Table.objects.all()
     serializer_class = TableSerializer
     permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
+
+    @extend_schema(
+        request=None,
+        responses={200: LiveTableSalesSerializer(many=True)},
+    )
+    @action(detail=False, methods=['get'], url_path='live-sales')
+    def live_sales(self, request):
+        """
+        Kassir uchun jonli stol-sotuvlari xaritasi: har bir BAND stol
+        (`new`/`in_progress` buyurtmali) uchun joriy buyurtma summasi. Summalar
+        `services.calculate_order_financials` orqali hisoblanadi - anti-piracy
+        multiplier hisobga olinadi (aks holda bloklangan litsenziyada raqamlar
+        xato bo'lardi). WS `table_status_changed` eventi kelganda klient shu
+        endpoint'ni qayta so'raydi (payload yengil "qayta so'rang" signali).
+
+        Faqat kassir/menejer uchun - afitsiantga boshqa stollardagi summalarni
+        ochib qo'ymaslik uchun (TableSerializer.status ham xuddi shu sababdan
+        so'rovchiga nisbiy). Menejer hammasini ko'radi.
+        """
+        if request.user.role not in ('cashier', 'manager'):
+            return Response({'detail': "Faqat kassir yoki menejer uchun."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Litsenziya konteksti (anti-piracy multiplier) global va so'rov davomida
+        # o'zgarmaydi - bir marta olib, har buyurtmaga uzatamiz (aks holda har
+        # stol uchun qayta o'qilardi).
+        from licensing.jwt_utils import LicenseContext
+        license_ctx = LicenseContext.from_active_state()
+
+        active_orders = Order.objects.filter(
+            status__in=('new', 'in_progress'), table__isnull=False,
+        ).select_related('table', 'table__zone', 'waiter').prefetch_related('items', 'payments')
+
+        rows = []
+        for order in active_orders:
+            total, final, balance = services.calculate_order_financials(order, context=license_ctx)
+            # Prefetch qilingan to'lovlardan hisoblaymiz - qo'shimcha so'rovsiz.
+            amount_paid = sum(
+                (p.amount for p in order.payments.all() if not p.is_voided), Decimal('0'),
+            )
+            rows.append({
+                'table_id': order.table_id,
+                'table_name': order.table.name,
+                'zone': order.table.zone.name if order.table.zone else None,
+                'order_id': order.id,
+                'waiter': order.waiter.first_name if order.waiter else None,
+                'guest_count': order.guest_count,
+                'item_count': sum(i.quantity for i in order.items.all() if not i.is_voided),
+                'total_amount': total,
+                'final_amount': final,
+                'amount_paid': amount_paid,
+                'balance_due': balance,
+                'opened_at': order.created_at,
+            })
+        return Response(LiveTableSalesSerializer(rows, many=True).data)
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -138,7 +193,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         # Diqqat: bu override bor ekan, @action(permission_classes=...) bu
         # ViewSet'da ISHLAMAYDI - action darajasidagi ruxsatlar faqat shu
         # yerda e'lon qilinadi.
-        if self.action in ('set_discount', 'cancel'):
+        if self.action in ('set_discount', 'cancel', 'close_on_credit'):
             return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
         return [permissions.IsAuthenticated()]
 
@@ -259,6 +314,61 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response({'status': 'Order closed successfully'})
 
     @extend_schema(
+        request=CreditCloseSerializer,
+        responses={
+            200: OrderSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Buyurtma allaqachon yopilgan yoki qarzi yo'q."),
+            404: OpenApiResponse(ErrorDetailSerializer, description="Mijoz topilmadi."),
+        },
+    )
+    # Ruxsat get_permissions()'da (IsManagerOrAdmin) - qarzga yozish moliyaviy
+    # jihatdan nozik amal, chegirma/bekor qilish bilan bir xil darajada.
+    @action(detail=True, methods=['post'], url_path='close-on-credit')
+    def close_on_credit(self, request, pk=None):
+        """
+        Buyurtmani mijozga (kreditga) yozib yopadi: qolgan qarz mijoz balansiga
+        qo'shiladi (`DebtTransaction(credit_sale)`), buyurtma `completed` bo'ladi.
+        Avval qisman naqd to'lov qo'shilgan bo'lsa - faqat QOLGAN qarz yoziladi.
+        Strict `close` (to'liq to'lov talab qiladi) o'zgarmaydi.
+        """
+        order = self.get_object()
+
+        serializer = CreditCloseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        customer = get_object_or_404(
+            Customer, pk=serializer.validated_data['customer_id'], is_active=True,
+        )
+
+        with transaction.atomic():
+            order = Order.objects.select_for_update().get(pk=order.pk)
+            if order.status in ORDER_FINISHED_STATUSES:
+                return Response(
+                    {'detail': 'Order already completed or cancelled'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            _, _, balance_due = services.calculate_order_financials(order)
+            if balance_due <= 0:
+                return Response(
+                    {'detail': "Buyurtmada qarz yo'q - oddiy yopish (close) dan foydalaning."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            services.record_credit_sale(
+                order=order, customer=customer, amount=balance_due, created_by=request.user,
+            )
+            order.customer = customer
+            order.status = 'completed'
+            order.cashier = request.user
+            order.save(update_fields=['customer', 'status', 'cashier', 'updated_at'])
+
+        broadcast_event('order_updated', {'order_id': order.id})
+        if order.table_id:
+            broadcast_event('table_status_changed', {'table_id': order.table_id})
+
+        return Response(OrderSerializer(order, context={'request': request}).data)
+
+    @extend_schema(
         request=None,
         responses={
             200: StatusMessageSerializer,
@@ -354,6 +464,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             services.send_order_to_kitchen(order)
 
         broadcast_event('order_updated', {'order_id': order.id})
+        # Stol summasi o'zgardi - kassirning jonli stol-sotuvlari xaritasi
+        # /api/tables/live-sales/ ni qayta so'rashi uchun signal.
+        if order.table_id:
+            broadcast_event('table_status_changed', {'table_id': order.table_id})
 
         return Response({'status': 'Item added'}, status=status.HTTP_201_CREATED)
 
@@ -406,6 +520,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         broadcast_event('order_updated', {'order_id': order.id})
+        # To'lov stolning qolgan qarzini o'zgartirdi - jonli stol-sotuvlari signal.
+        if order.table_id:
+            broadcast_event('table_status_changed', {'table_id': order.table_id})
 
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
@@ -461,6 +578,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                 },
             )
             broadcast_event('discount_applied', {'order_id': order.id, 'message': message})
+            # Chegirma stol summasini o'zgartirdi - jonli stol-sotuvlari signal.
+            if order.table_id:
+                broadcast_event('table_status_changed', {'table_id': order.table_id})
 
         return Response(OrderSerializer(order, context={'request': request}).data)
 

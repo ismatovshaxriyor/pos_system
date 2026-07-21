@@ -49,6 +49,12 @@ def renew_license_token(self):
     state.token_expires_at = parse_datetime(tokens[0]['expires_at'])
     state.pending_tokens = tokens[1:]
     state.last_renewed_at = timezone.now()
+    # Ona LICENSE_PRIVATE_KEY'ni almashtirgan (kalit rotatsiyasi) bo'lsa ham
+    # kill-switch noto'g'ri bloklab qolmasligi uchun - yuqoridagi yangi
+    # tokenlar YANGI kalit bilan imzolangan, shu public_key ham aynan o'sha
+    # javobdan, ikkalasi doim mos holda birga yangilanadi.
+    if data.get('public_key'):
+        state.public_key = data['public_key']
     state.save()
     logger.info("Litsenziya tokeni muvaffaqiyatli yangilandi (%d ta oldindan tayyor).", len(tokens))
 

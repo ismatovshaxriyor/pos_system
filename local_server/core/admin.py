@@ -7,6 +7,8 @@ from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
     RestaurantConfig, Attendance, TableZone, Printer, PrintJob,
+    Customer, DebtTransaction,
+    Supplier, Ingredient, ProductIngredient, Purchase, PurchaseItem, StockMovement,
 )
 
 
@@ -102,11 +104,18 @@ class TableAdmin(SimpleHistoryAdmin):
 class CategoryAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'printer', 'is_synced')
 
+class ProductIngredientInline(admin.TabularInline):
+    model = ProductIngredient
+    extra = 1
+    autocomplete_fields = ('ingredient',)
+
+
 @admin.register(Product)
 class ProductAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'category', 'price', 'is_available', 'is_synced')
     list_filter = ('category', 'is_available', 'is_synced')
     search_fields = ('name', 'barcode')
+    inlines = [ProductIngredientInline]
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -143,6 +152,71 @@ class OrderAdmin(SimpleHistoryAdmin):
     @admin.display(description="Qarzdorlik")
     def balance_due_display(self, obj):
         return obj.balance_due
+
+
+class DebtTransactionInline(admin.TabularInline):
+    model = DebtTransaction
+    extra = 0
+    fields = ('created_at', 'txn_type', 'amount', 'method', 'order', 'note', 'created_by')
+    readonly_fields = ('created_at', 'created_by')
+
+
+@admin.register(Customer)
+class CustomerAdmin(SimpleHistoryAdmin):
+    list_display = ('first_name', 'last_name', 'phone', 'balance', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('first_name', 'last_name', 'phone')
+    readonly_fields = ('balance',)
+    inlines = [DebtTransactionInline]
+
+
+@admin.register(DebtTransaction)
+class DebtTransactionAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'customer', 'txn_type', 'amount', 'method', 'order', 'created_by', 'created_at')
+    list_filter = ('txn_type', 'method', 'created_at')
+    search_fields = ('customer__first_name', 'customer__last_name', 'customer__phone')
+
+
+@admin.register(Supplier)
+class SupplierAdmin(SimpleHistoryAdmin):
+    list_display = ('name', 'phone', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'phone')
+
+
+@admin.register(Ingredient)
+class IngredientAdmin(SimpleHistoryAdmin):
+    list_display = ('name', 'unit', 'current_stock', 'min_stock', 'cost_price', 'supplier', 'is_active')
+    list_filter = ('unit', 'is_active', 'supplier')
+    search_fields = ('name',)
+    readonly_fields = ('current_stock',)
+
+
+@admin.register(ProductIngredient)
+class ProductIngredientAdmin(SimpleHistoryAdmin):
+    list_display = ('product', 'ingredient', 'quantity')
+    search_fields = ('product__name', 'ingredient__name')
+    autocomplete_fields = ('product', 'ingredient')
+
+
+class PurchaseItemInline(admin.TabularInline):
+    model = PurchaseItem
+    extra = 1
+    autocomplete_fields = ('ingredient',)
+
+
+@admin.register(Purchase)
+class PurchaseAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'supplier', 'total_cost', 'created_by', 'created_at')
+    list_filter = ('supplier', 'created_at')
+    inlines = [PurchaseItemInline]
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'ingredient', 'movement_type', 'quantity', 'order', 'purchase', 'created_by', 'created_at')
+    list_filter = ('movement_type', 'created_at')
+    search_fields = ('ingredient__name',)
 
 
 @admin.register(RestaurantConfig)

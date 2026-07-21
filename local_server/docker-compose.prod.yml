@@ -125,8 +125,20 @@ services:
 
   # Faqat ichki tarmoqda ishlaydi (port ochilmagan) - update_app buyrug'i
   # licensing.tasks orqali http://watchtower:8080/v1/update ga so'rov yuboradi.
+  #
+  # `containrrr/watchtower` emas: bu image 2023-11'dan beri yangilanmagan
+  # (loyiha asosan tashlab qo'yilgan) va uning ichidagi Docker API client
+  # eskirgan (v1.25) - zamonaviy Docker Engine (v1.40+ talab qiladi) bilan
+  # "client version too old" xatosi bilan darhol yiqiladi (`restart:
+  # unless-stopped` uni abadiy qayta-qayta yiqilib turishga majburlaydi -
+  # HTTP API hech qachon ko'tarilmaydi). Jonli sinovda (mahalliy registry +
+  # haqiqiy /v1/update chaqiruvi bilan) tasdiqlangan: `containrrr/watchtower`
+  # bilan update_app butunlay ishlamaydi, `nickfedor/watchtower` (faol
+  # qo'llab-quvvatlanadigan community fork, Docker API v1.55 bilan to'g'ri
+  # ishlaydi) bilan esa web+celery_worker+celery_beat to'liq va toza qayta
+  # yaratiladi.
   watchtower:
-    image: containrrr/watchtower
+    image: nickfedor/watchtower:latest
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

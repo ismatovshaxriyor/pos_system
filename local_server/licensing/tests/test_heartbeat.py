@@ -158,3 +158,38 @@ class RenewLicenseTokenTests(TestCase):
         state = LicenseState.load()
         self.assertEqual(state.jwt_token, "token-1")
         self.assertEqual(state.pending_tokens, tokens[1:])
+
+    @patch('licensing.tasks.OnaClient.renew')
+    def test_renewal_updates_cached_public_key(self, mock_renew):
+        # Ona LICENSE_PRIVATE_KEY'ni rotatsiya qilgan bo'lsa, yangi
+        # tokenlar yangi kalit bilan imzolangan - shu tokenlarni keyinchalik
+        # tekshirish uchun keshlangan public_key ham shu javobdan yangilanishi
+        # shart, aks holda kill-switch eski kalit bilan tekshirib, yaroqli
+        # yangi tokenni ham "yaroqsiz" deb bloklab qo'yardi.
+        self._activated_state(public_key='OLD-KEY-PEM')
+        now = timezone.now()
+        tokens = [
+            {"token": "token-1", "expires_at": (now + timezone.timedelta(days=7)).isoformat()},
+        ]
+        mock_renew.return_value = _mock_response(
+            200, {"tokens": tokens, "detail": "ok", "public_key": "NEW-KEY-PEM"},
+        )
+
+        renew_license_token.run()
+
+        state = LicenseState.load()
+        self.assertEqual(state.public_key, "NEW-KEY-PEM")
+
+    @patch('licensing.tasks.OnaClient.renew')
+    def test_renewal_without_public_key_in_response_keeps_existing(self, mock_renew):
+        # Eski Ona versiyasi (public_key hali qo'shilmagan) bilan ham
+        # buzilmasligi kerak.
+        self._activated_state(public_key='OLD-KEY-PEM')
+        now = timezone.now()
+        tokens = [{"token": "token-1", "expires_at": (now + timezone.timedelta(days=7)).isoformat()}]
+        mock_renew.return_value = _mock_response(200, {"tokens": tokens, "detail": "ok"})
+
+        renew_license_token.run()
+
+        state = LicenseState.load()
+        self.assertEqual(state.public_key, "OLD-KEY-PEM")

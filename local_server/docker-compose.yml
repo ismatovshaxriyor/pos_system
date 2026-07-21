@@ -54,7 +54,8 @@ services:
       - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
       - LICENSE_ENFORCEMENT=0
       - HARDWARE_ID_OVERRIDE=dev-local-machine
-      - APP_VERSION=0.1.0
+      # APP_VERSION endi image ichidagi local_server/VERSION faylidan olinadi
+      # (config/settings.py) - env kerak emas, bind-mount orqali ko'rinadi.
     depends_on:
       - db
       - redis
@@ -80,7 +81,8 @@ services:
       - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
       - LICENSE_ENFORCEMENT=0
       - HARDWARE_ID_OVERRIDE=dev-local-machine
-      - APP_VERSION=0.1.0
+      # APP_VERSION endi image ichidagi local_server/VERSION faylidan olinadi
+      # (config/settings.py) - env kerak emas, bind-mount orqali ko'rinadi.
     depends_on:
       - db
       - redis
@@ -107,7 +109,8 @@ services:
       - LICENSE_PUBLIC_KEY_FILE=/app/keys/license_public.pem
       - LICENSE_ENFORCEMENT=0
       - HARDWARE_ID_OVERRIDE=dev-local-machine
-      - APP_VERSION=0.1.0
+      # APP_VERSION endi image ichidagi local_server/VERSION faylidan olinadi
+      # (config/settings.py) - env kerak emas, bind-mount orqali ko'rinadi.
     depends_on:
       - db
       - redis

@@ -203,7 +203,10 @@ class Order(BaseModel):
     table = models.ForeignKey(Table, related_name='orders', on_delete=models.SET_NULL, null=True, blank=True)
     waiter = models.ForeignKey(User, related_name='orders_taken', on_delete=models.SET_NULL, null=True)
     cashier = models.ForeignKey(User, related_name='orders_cashed', on_delete=models.SET_NULL, null=True, blank=True)
-    
+    # Kreditga (qarzga) yopilganda bog'lanadi - qolgan summa shu mijoz balansiga
+    # yoziladi (qarz daftar). String referens - Customer quyiroqda e'lon qilingan.
+    customer = models.ForeignKey('Customer', related_name='orders', on_delete=models.SET_NULL, null=True, blank=True)
+
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES, default='dine_in')
     tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     service_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -288,6 +291,62 @@ class Payment(BaseModel):
         return f"{self.amount} ({self.method}) - Order #{self.order_id}"
 
 
+class Customer(BaseModel):
+    """
+    Qarz daftar mijozi. `balance` - joriy umumiy qarz qoldig'i (denormalizatsiya,
+    `DebtTransaction.amount` yig'indisi bilan bir xil tutiladi, har doim
+    tranzaksiya ichida F() bilan atomik yangilanadi). Musbat balans = mijoz
+    restoranga qarzdor.
+    """
+    first_name = models.CharField(max_length=100, verbose_name='Ism')
+    last_name = models.CharField(max_length=100, blank=True, default='', verbose_name='Familya')
+    # Ixtiyoriy - bo'sh bo'lsa regex tekshiruvi run_validators'da o'tkazib
+    # yuboriladi (bo'sh qiymat empty_values ichida). User bilan bir xil format.
+    phone = models.CharField(
+        max_length=15, blank=True, default='', db_index=True,
+        validators=[User.phone_regex], verbose_name='Telefon',
+    )
+    note = models.TextField(blank=True, default='')
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('-balance', 'first_name')
+        verbose_name = 'Mijoz (qarz daftar)'
+        verbose_name_plural = 'Mijozlar (qarz daftar)'
+
+    def __str__(self):
+        name = f"{self.first_name} {self.last_name}".strip()
+        return f"{name} ({self.phone})" if self.phone else name
+
+
+class DebtTransaction(BaseModel):
+    """
+    Mijoz qarzi harakatlari - append-only ledger. `Customer.balance = Σ amount`.
+    `amount` ishorali: `credit_sale` = +（buyurtma kreditga yopildi),
+    `repayment` = − (mijoz qarzni to'ladi), `adjustment` = ± (qo'lda tuzatish).
+    """
+    TXN_TYPE_CHOICES = (
+        ('credit_sale', 'Kreditga sotuv'),
+        ('repayment', "Qarz to'lash"),
+        ('adjustment', 'Tuzatish'),
+    )
+    customer = models.ForeignKey(Customer, related_name='debt_transactions', on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # ishorali
+    txn_type = models.CharField(max_length=20, choices=TXN_TYPE_CHOICES)
+    order = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, related_name='debt_transactions')
+    method = models.CharField(max_length=20, blank=True, default='')  # repayment uchun (cash/card/other)
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = [models.Index(fields=['customer', 'created_at'])]
+
+    def __str__(self):
+        return f"{self.customer} {self.txn_type} {self.amount}"
+
+
 class RestaurantConfig(BaseModel):
     """
     Restoranning umumiy sozlamalari (singleton).
@@ -345,5 +404,144 @@ class PrintJob(BaseModel):
 
     def __str__(self):
         return f"Job #{self.id} - Printer: {self.printer.name} (Order #{self.order_id})"
+
+
+# ==============================================================================
+# OMBOR (Inventory: ingredient + retsept + kirim + harakat ledger)
+# ==============================================================================
+
+class Supplier(BaseModel):
+    """Ta'minotchi (xomashyo yetkazib beruvchi)."""
+    name = models.CharField(max_length=200, verbose_name='Nomi')
+    phone = models.CharField(max_length=15, blank=True, default='', validators=[User.phone_regex])
+    note = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = "Ta'minotchi"
+        verbose_name_plural = "Ta'minotchilar"
+
+    def __str__(self):
+        return self.name
+
+
+class Ingredient(BaseModel):
+    """
+    Ombordagi yagona zaxira birligi (xomashyo YOKI to'g'ridan-to'g'ri sotiladigan
+    mahsulot uchun ham). `current_stock` - joriy qoldiq (denormalizatsiya,
+    `StockMovement.quantity` yig'indisi bilan bir xil tutiladi, har doim
+    tranzaksiya ichida `select_for_update` bilan yangilanadi). `min_stock` -
+    past-zaxira ogohlantirish chegarasi. `cost_price` - oxirgi kirim narxi
+    (birlik uchun, tannarx/foyda hisobida ishlatiladi).
+    """
+    UNIT_CHOICES = (
+        ('kg', 'Kilogramm'),
+        ('g', 'Gramm'),
+        ('l', 'Litr'),
+        ('ml', 'Millilitr'),
+        ('dona', 'Dona'),
+    )
+    name = models.CharField(max_length=200, verbose_name='Nomi')
+    unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='dona', verbose_name='Birlik')
+    current_stock = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Joriy qoldiq')
+    min_stock = models.DecimalField(max_digits=12, decimal_places=3, default=0, verbose_name='Minimal qoldiq')
+    cost_price = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name='Tannarx (birlik)')
+    supplier = models.ForeignKey(Supplier, null=True, blank=True, on_delete=models.SET_NULL, related_name='ingredients')
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = 'Ingredient (ombor)'
+        verbose_name_plural = 'Ingredientlar (ombor)'
+
+    @property
+    def is_low(self):
+        return self.current_stock < self.min_stock
+
+    def __str__(self):
+        return f"{self.name} ({self.current_stock} {self.unit})"
+
+
+class ProductIngredient(BaseModel):
+    """
+    Retsept qatori: bitta `Product`ning 1 donasiga kerak bo'ladigan ingredient
+    miqdori. To'g'ridan-to'g'ri sotiladigan mahsulot (suv, gazak) = 1 ta
+    ingredientli retsept - shu tarzda bitta zaxira mexanizmi (Ingredient +
+    StockMovement) ikkala holatni ham qoplaydi.
+    """
+    product = models.ForeignKey(Product, related_name='recipe', on_delete=models.CASCADE)
+    # PROTECT - retseptda ishlatilayotgan ingredientni tasodifan o'chirib
+    # bo'lmasin (avval retseptdan olib tashlash kerak).
+    ingredient = models.ForeignKey(Ingredient, related_name='used_in', on_delete=models.PROTECT)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3, verbose_name='1 mahsulotga miqdor')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['product', 'ingredient'], name='uniq_product_ingredient'),
+        ]
+        verbose_name = 'Retsept qatori'
+        verbose_name_plural = 'Retsept qatorlari'
+
+    def __str__(self):
+        return f"{self.product.name}: {self.quantity} {self.ingredient.unit} {self.ingredient.name}"
+
+
+class Purchase(BaseModel):
+    """Ta'minotchidan kirim hujjati (bir nechta ingredient bitta xaridda)."""
+    supplier = models.ForeignKey(Supplier, null=True, blank=True, on_delete=models.SET_NULL, related_name='purchases')
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Kirim (xarid)'
+        verbose_name_plural = 'Kirimlar (xaridlar)'
+
+    @property
+    def total_cost(self):
+        return sum((i.quantity * i.unit_cost for i in self.items.all()), Decimal('0'))
+
+    def __str__(self):
+        return f"Purchase #{self.id} - {self.supplier or 'Nomalum'}"
+
+
+class PurchaseItem(BaseModel):
+    purchase = models.ForeignKey(Purchase, related_name='items', on_delete=models.CASCADE)
+    ingredient = models.ForeignKey(Ingredient, related_name='purchase_items', on_delete=models.PROTECT)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"{self.quantity} {self.ingredient.unit} {self.ingredient.name}"
+
+
+class StockMovement(BaseModel):
+    """
+    Ombor harakati - append-only ledger. `Ingredient.current_stock = Σ quantity`.
+    `quantity` ishorali: purchase = +, sale = −, adjustment = ±, waste = −.
+    """
+    MOVEMENT_TYPE_CHOICES = (
+        ('purchase', 'Kirim'),
+        ('sale', 'Sotuv'),
+        ('adjustment', 'Tuzatish'),
+        ('waste', 'Yoqotish'),
+    )
+    ingredient = models.ForeignKey(Ingredient, related_name='movements', on_delete=models.CASCADE)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)  # ishorali
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPE_CHOICES)
+    order = models.ForeignKey(Order, null=True, blank=True, on_delete=models.SET_NULL, related_name='stock_movements')
+    purchase = models.ForeignKey(Purchase, null=True, blank=True, on_delete=models.SET_NULL, related_name='movements')
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = [models.Index(fields=['ingredient', 'created_at'])]
+        verbose_name = 'Ombor harakati'
+        verbose_name_plural = 'Ombor harakatlari'
+
+    def __str__(self):
+        return f"{self.ingredient.name} {self.movement_type} {self.quantity}"
 
 
