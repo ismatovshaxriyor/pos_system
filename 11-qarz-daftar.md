@@ -24,7 +24,7 @@ PATCH  /api/customers/{id}/           → tahrirlash (faqat menejer)
 DELETE /api/customers/{id}/           → o'chirish (faqat menejer)
 ```
 
-**Ruxsat:** o'qish — istalgan autentifikatsiyalangan xodim; yozish (yaratish/tahrirlash/o'chirish) — faqat `manager`.
+**Ruxsat:** o'qish (ro'yxat/bitta mijoz) — `cashier` yoki `manager`; yozish (yaratish/tahrirlash/o'chirish) — faqat `manager`. **Ofitsiant (`waiter`) qarz daftariga umuman kira olmaydi** (ro'yxat/o'qish ham `403`) — mijoz balansi/PII/qarz tarixi afitsiantdan yopiq (buyurtma ichida ham `customer` faqat ism/telefon ko'rsatiladi, balanssiz).
 
 **Qidiruv / filtr:**
 - `?search=<matn>` — ism/familya/telefon bo'yicha qidiruv.
@@ -62,7 +62,7 @@ POST /api/customers/{id}/repay/
 
 Mijoz qarzni to'laganda balansdan ayiradi va `DebtTransaction(repayment)` yozadi.
 
-**Ruxsat:** istalgan autentifikatsiyalangan xodim (kassir ham qabul qila oladi — bu POST bo'lsa-da menejer-gated emas).
+**Ruxsat:** `cashier` yoki `manager` (qarz to'lovi kassa oynasida qabul qilinadi). Ofitsiant `403` oladi.
 
 **Javob (200):** yangilangan `Customer` obyekti (kamaygan `balance` bilan).
 
@@ -75,6 +75,8 @@ GET /api/customers/{id}/transactions/
 ```
 
 Mijozning barcha qarz harakatlari (kreditga sotuv + to'lovlar), eng yangisi birinchi. **Sahifalanmaydi** — to'g'ridan-to'g'ri massiv.
+
+**Ruxsat:** `cashier` yoki `manager` (afitsiant emas).
 
 **Javob (200):**
 ```json
