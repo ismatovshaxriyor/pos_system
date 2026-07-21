@@ -1,0 +1,11 @@
+# Bu branch faqat qo'lda yozilgan Markdown API hujjatlarini saqlashi kerak.
+# Quyidagilar main'dan tasodifan (to'g'ridan-to'g'ri checkout orqali) sizib
+# kelgan sirlar/artefaktlar bo'lgani uchun ataylab bloklanadi - CLAUDE.md
+# bu branch'ni faqat `git worktree add` orqali tahrirlashni buyuradi.
+keys/
+*.pem
+backups/
+media/
+celerybeat-schedule
+celerybeat.pid
+.DS_Store
