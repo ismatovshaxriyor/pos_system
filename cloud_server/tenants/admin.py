@@ -123,6 +123,7 @@ class RestaurantAdmin(admin.ModelAdmin):
     readonly_fields = ('is_online',)
     inlines = [RestaurantAdminAccountInline, RestaurantStatusInline]
     actions = [
+        'action_release_version',
         'action_block_system', 'action_unblock_system',
         'action_force_license_renew', 'action_update_app', 'action_mark_paid',
     ]
@@ -226,6 +227,50 @@ class RestaurantAdmin(admin.ModelAdmin):
             f"{count} ta restoranga yangilanish yuborildi "
             "(desired_version maydoni bo'sh bo'lganlar o'tkazib yuborildi).",
         )
+
+    @admin.action(description="⬆️ Tanlangan Bolalarga YANGI VERSIYA yuborish (update)")
+    def action_release_version(self, request, queryset):
+        """
+        Bitta amalда butun fleet'ni yangilash: versiyani BIR MARTA kiritasiz,
+        tanlangan barcha FAOL restoranlarga `desired_version` o'rnatiladi VA
+        `update_app` buyrug'i navbatga qo'yiladi. Bola heartbeat orqali buyruqni
+        oladi -> o'z Watchtower'iga `:stable` image'ni tortishni buyuradi.
+        Rollout `app_version` `desired_version`ga tenglashganda tasdiqlanadi
+        (`app_version_display` yashil bo'ladi). Faol emas restoranlar o'tkazib
+        yuboriladi (bloklangan/o'chirilgan Bolaga update yubormaymiz).
+        """
+        active = queryset.filter(is_active=True)
+        if 'apply' in request.POST:
+            version = (request.POST.get('version') or '').strip()
+            if not version:
+                self.message_user(
+                    request, "Versiya kiritilmadi - hech narsa yuborilmadi.", level=messages.ERROR,
+                )
+                return
+            count = 0
+            for restaurant in active:
+                restaurant.desired_version = version
+                restaurant.save(update_fields=['desired_version'])
+                RemoteCommand.objects.create(
+                    restaurant=restaurant, command_type='update_app', payload={"version": version},
+                )
+                count += 1
+            self.message_user(
+                request,
+                f"{count} ta faol Bolaga '{version}' versiyasi yuborildi. "
+                "Rollout app_version shu versiyaga tenglashganda tasdiqlanadi.",
+            )
+            return
+        # Oraliq sahifa: versiyani bir marta so'raymiz (barcha tanlanganlar uchun).
+        from django.template.response import TemplateResponse
+        return TemplateResponse(request, 'admin/release_version.html', {
+            'title': "Yangi versiya yuborish",
+            'active_restaurants': active,
+            'skipped_inactive': queryset.count() - active.count(),
+            'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+            'selected': list(queryset.values_list('pk', flat=True)),
+            'opts': self.model._meta,
+        })
 
 
 @admin.register(RestaurantAdminAccount)

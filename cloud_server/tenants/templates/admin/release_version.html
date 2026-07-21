@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <form method="post">{% csrf_token %}
+    <p>Tanlangan <b>{{ active_restaurants|length }}</b> ta <b>faol</b> Bolaga yuboriladigan versiyani kiriting.
+       Ular <code>update_app</code> buyrug'ini olib, Watchtower orqali <code>:stable</code> image'ni tortadi.</p>
+
+    {% if skipped_inactive %}
+      <p style="color:#c0392b;">Diqqat: {{ skipped_inactive }} ta faol emas restoran o'tkazib yuboriladi
+         (bloklangan/o'chirilgan Bolaga update yuborilmaydi).</p>
+    {% endif %}
+
+    <ul>
+      {% for r in active_restaurants %}
+        <li>{{ r.name }} — hozirgi maqsad versiya: <code>{{ r.desired_version|default:"—" }}</code></li>
+      {% empty %}
+        <li><i>Faol restoran tanlanmagan.</i></li>
+      {% endfor %}
+    </ul>
+
+    <p>
+      <label for="id_version"><b>Versiya:</b></label>
+      <input type="text" name="version" id="id_version" placeholder="masalan: 0.1.2" required autofocus>
+    </p>
+
+    {% for pk in selected %}
+      <input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="action_release_version">
+    <input type="hidden" name="apply" value="1">
+
+    <div class="submit-row">
+      <input type="submit" value="Yuborish" class="default">
+      <a href="{% url 'admin:tenants_restaurant_changelist' %}" class="button cancel-link">Bekor qilish</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

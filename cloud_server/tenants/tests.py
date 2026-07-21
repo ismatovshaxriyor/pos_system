@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Restaurant, RestaurantAdminAccount, License, ErrorLog
+from .models import Restaurant, RestaurantAdminAccount, License, ErrorLog, RemoteCommand
 
 User = get_user_model()
 
@@ -187,3 +187,57 @@ class ErrorLogAdminActionTests(TestCase):
     def test_has_add_permission_is_false(self):
         response = self.client.get(reverse('admin:tenants_errorlog_add'))
         self.assertEqual(response.status_code, 403)
+
+
+class ReleaseVersionActionTests(TestCase):
+    """
+    'Tanlangan Bolalarga YANGI VERSIYA yuborish' amali: bir marta versiya
+    kiritiladi -> tanlangan barcha FAOL restoranlarga desired_version
+    o'rnatiladi VA update_app buyrug'i navbatga qo'yiladi. Faol emaslar
+    o'tkazib yuboriladi.
+    """
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username='ona_release', email='rel@example.com', password='pass12345',
+        )
+        self.client.force_login(self.superuser)
+        self.r1 = Restaurant.objects.create(name="Restoran A")
+        self.r2 = Restaurant.objects.create(name="Restoran B")
+        self.inactive = Restaurant.objects.create(name="Bloklangan", is_active=False)
+        self.changelist_url = reverse('admin:tenants_restaurant_changelist')
+
+    def _post(self, pks, extra=None):
+        data = {'action': 'action_release_version', '_selected_action': [str(p) for p in pks]}
+        data.update(extra or {})
+        return self.client.post(self.changelist_url, data, follow=True)
+
+    def test_intermediate_page_asks_for_version_and_sends_nothing(self):
+        # 'apply' yo'q -> oraliq sahifa qaytadi, hali hech qanday buyruq yo'q.
+        response = self._post([self.r1.pk, self.r2.pk])
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="version"')
+        self.assertEqual(RemoteCommand.objects.count(), 0)
+
+    def test_apply_sets_desired_version_and_enqueues_update_for_active(self):
+        response = self._post(
+            [self.r1.pk, self.r2.pk, self.inactive.pk],
+            {'apply': '1', 'version': '0.1.2'},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        for r in (self.r1, self.r2):
+            r.refresh_from_db()
+            self.assertEqual(r.desired_version, '0.1.2')
+            cmd = RemoteCommand.objects.get(restaurant=r, command_type='update_app')
+            self.assertEqual(cmd.payload, {'version': '0.1.2'})
+
+        # Faol emas restoranга tegilmaydi.
+        self.inactive.refresh_from_db()
+        self.assertEqual(self.inactive.desired_version, '')
+        self.assertFalse(RemoteCommand.objects.filter(restaurant=self.inactive).exists())
+
+    def test_apply_without_version_sends_nothing(self):
+        response = self._post([self.r1.pk], {'apply': '1', 'version': '   '})
+        messages = list(response.context['messages'])
+        self.assertEqual(messages[0].level, django_messages.ERROR)
+        self.assertEqual(RemoteCommand.objects.count(), 0)

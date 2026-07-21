@@ -1,0 +1,58 @@
+name: Release local_server (Bola) image
+
+# "Yangi versiya chiqarish" = `v*` teg push qilish (masalan `git tag v0.1.2 && git push --tags`)
+# yoki Actions'dan qo'lda ishga tushirish. Bu ish local_server prod image'ini qurib
+# ghcr.io'ga push qiladi; keyin Ona admin'dagi "Tanlangan Bolalarga YANGI VERSIYA
+# yuborish" amali orqali fleet'ga tarqatasiz. Image tegi VERSION faylidan olinadi
+# (config/settings.py o'sha faylni o'qiydi - image va hisobot qilinadigan versiya
+# doim mos bo'ladi).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kichik harfli owner + VERSION o'qish
+        id: meta
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "version=$(tr -d '[:space:]' < local_server/VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: ghcr.io'ga login
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build va push (:stable + :<version>)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./local_server
+          file: ./local_server/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/pos-local:stable
+            ghcr.io/${{ steps.meta.outputs.owner }}/pos-local:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Xulosa
+        run: |
+          echo "### Reliz tayyor :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "Image: \`ghcr.io/${{ steps.meta.outputs.owner }}/pos-local:${{ steps.meta.outputs.version }}\` (+ \`:stable\`)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Endi Ona admin -> Restaurants -> hammasini tanlab -> **\"Tanlangan Bolalarga YANGI VERSIYA yuborish\"** -> \`${{ steps.meta.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
