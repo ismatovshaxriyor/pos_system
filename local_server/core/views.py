@@ -274,6 +274,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         if client_sync_uuid is not None:
             extra['sync_uuid'] = client_sync_uuid
         order = serializer.save(waiter=self.request.user, **extra)
+        if order.status == 'in_progress':
+            broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
 

@@ -170,6 +170,33 @@ class OrderLogicTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_create_order_with_items_dispatches_print_jobs(self):
+        url = reverse('order-list')
+        payload = {
+            "table_id": self.table.id,
+            "items": [
+                {"product_id": self.product.id, "quantity": 2, "note": "Oshxonaga test"}
+            ]
+        }
+        response = self.client.post(
+            url, payload, content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 201)
+        
+        # Verify order exists, has status 'in_progress', and items are created
+        order_id = response.data['id']
+        order = Order.objects.get(id=order_id)
+        self.assertEqual(order.status, 'in_progress')
+        self.assertEqual(order.items.count(), 1)
+        self.assertEqual(order.items.first().product_id, self.product.id)
+        self.assertEqual(order.items.first().quantity, 2)
+        self.assertEqual(order.items.first().note, "Oshxonaga test")
+        
+        # Verify a print job was created for this order
+        self.assertTrue(order.print_jobs.exists())
+        print_job = order.print_jobs.first()
+        self.assertEqual(print_job.status, 'pending')
+
     def test_product_delete_is_soft_and_blocks_ordering(self):
         del_url = reverse('product-detail', args=[self.product.id])
         response = self.client.delete(del_url, **_auth_header(self.manager))

@@ -264,7 +264,7 @@ class RepaymentSerializer(serializers.Serializer):
     note = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True, read_only=True)
+    items = OrderItemSerializer(many=True, required=False)
     payments = PaymentSerializer(many=True, read_only=True)
     waiter = UserSerializer(read_only=True)
     cashier = UserSerializer(read_only=True)
@@ -294,6 +294,33 @@ class OrderSerializer(serializers.ModelSerializer):
             'total_amount', 'waiter', 'cashier', 'discount_amount', 'discount_reason',
             'status', 'tax_amount', 'service_charge',
         )
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        from django.db import transaction
+        from . import services
+
+        with transaction.atomic():
+            order = super().create(validated_data)
+            
+            for item_data in items_data:
+                product = item_data['product']
+                quantity = item_data.get('quantity', 1)
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=quantity,
+                    price=product.price,
+                    note=item_data.get('note', ''),
+                    modifiers=item_data.get('modifiers') or {},
+                )
+            
+            if items_data:
+                order.status = 'in_progress'
+                order.save(update_fields=['status', 'updated_at'])
+                services.send_order_to_kitchen(order)
+                
+        return order
 
 
 class RestaurantConfigSerializer(serializers.ModelSerializer):
