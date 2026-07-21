@@ -12,10 +12,27 @@ Printerlarni yaratish, tahrirlash va ularga kategoriya bog'lash. Safariy yoki Ka
 | Maydon | Turi | O'qish/Yozish | Izoh |
 |---|---|---|---|
 | `id` | int | o'qish | |
-| `name` | string | majburiy | printer nomi (masalan: "Asosiy printer", "Bar printeri") |
-| `ip_address` | string | ixtiyoriy | printerning IP manzili (kelajakdagi tarmog' uchun) |
-| `port` | int | ixtiyoriy (default `9100`) | printer porti |
+| `name` | string | majburiy | printer nomi (masalan: "Asosiy printer", "Bar printeri") — jismoniy chekda sarlavha sifatida ham chiqadi |
+| `ip_address` | string | ixtiyoriy | **Bo'sh** — virtual printer: chek faqat KDS ekranida ko'rinadi, qo'lda mark-printed qilinadi. **To'ldirilgan** — jismoniy ESC/POS termoprinter: server chekni shu manzilga TCP orqali o'zi yuboradi (quyida 1.1-bo'lim) |
+| `port` | int | ixtiyoriy (default `9100`) | jismoniy printerning raw TCP porti (ESC/POS standarti — 9100) |
+| `chars_per_line` | int | ixtiyoriy (default `48`) | bir qatordagi belgilar soni: 80mm qog'oz (masalan Xprinter XP-Q80A) — `48`, 58mm — `32` |
 | `is_active` | bool | ixtiyoriy (default `true`) | printerning faollik holati |
+
+### 1.1. Jismoniy ESC/POS printer oqimi (`ip_address` to'ldirilgan bo'lsa)
+
+Buyurtma oshxonaga yuborilganda (`start` / `add_item`) server `PrintJob` yaratgach chekni **o'zi avtomatik** printerga yuboradi — ilova hech narsa qilishi shart emas:
+
+* Muvaffaqiyatda job holati o'z-o'zidan `printed` bo'ladi va tarmoqqa `print_job_updated` WS signali ketadi (ya'ni bu signal endi faqat planshetlardan emas, serverdan avtomatik ham keladi).
+* Ulanish xatosida server ~5/15/45 soniya oralatib qayta urinadi; baribir chiqmasa job `failed` bo'ladi, barcha menejerlarga `print_failed` bildirishnomasi keladi (qarang [`04-devices-and-notifications.md`](04-devices-and-notifications.md)) va chekni KDS ekranidan qo'lda chiqarish mumkinligicha qoladi.
+* 30 daqiqadan oshiq navbatda qolib ketgan chek **qayta chop etilmaydi** — to'g'ridan-to'g'ri `failed` qilinadi (kechikkan chek oshxonani chalg'itadi).
+* Virtual printerlarning (`ip_address` bo'sh) navbatiga server umuman tegmaydi — eski qo'lda oqim o'zgarishsiz.
+
+### Test chek chiqarish (printerni sozlashda)
+Jismoniy printer to'g'ri ulanganini darhol tekshirish uchun — kodlash namunalari (lotin/kirill), ustun eni chizig'i va avtokesish bilan test chek yuboradi. Sinxron ishlaydi (natija javobda darhol keladi).
+* **Endpoint:** `POST /api/printers/{id}/test-print/`
+* **Javob (200 OK):** `{"status": "Test chek yuborildi"}`
+* **Xato (400):** `{"detail": "Bu printerga IP manzil kiritilmagan - avval ip_address maydonini to'ldiring."}` — virtual printerda test chekning ma'nosi yo'q.
+* **Xato (502):** `{"detail": "Printerga ulanib bo'lmadi (192.168.1.50:9100): ..."}` — IP/port noto'g'ri, printer o'chiq yoki boshqa tarmoqda.
 
 ### Printerga bog'lash mumkin bo'lgan kategoriyalar ro'yxatini olish
 Printerni sozlayotgan xodim qaysi kategoriyalarni unga yo'naltirishi mumkinligini bilishi uchun mo'ljallangan yengil ro'yxat endpointi.
@@ -137,7 +154,7 @@ Menejer yoki Ofitsiant buyurtmani boshlaganda (`start`) yoki faol buyurtmaga tao
 ```
 
 ### B. Chop etish topshirig'i yangilanishi: `print_job_updated`
-Biror stansiya topshiriq holatini yangilasa (`printed` yoki `failed`), boshqa planshetlar o'z ekranini sinxronlash uchun ushbu signalni qabul qiladi:
+Biror stansiya topshiriq holatini yangilasa (`printed` yoki `failed`), boshqa planshetlar o'z ekranini sinxronlash uchun ushbu signalni qabul qiladi. Jismoniy (IP'li) printer joblari uchun bu signal **serverning o'zidan avtomatik** ham keladi — chek termoprinterdan muvaffaqiyatli chiqqanda (`printed`) yoki barcha urinishlar tugab job yiqilganda (`failed`):
 
 ```json
 {

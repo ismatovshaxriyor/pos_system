@@ -84,6 +84,7 @@ POST /api/notifications/{id}/mark_read/
 |---|---|---|---|
 | `price_changed` | Istalgan menejer mahsulot narxini o'zgartirganda (o'zgartirgan menejerga ham yuboriladi — istisno yo'q) | Barcha menejer (`recipient=null`, umumiy) | `product_id`, `old_price`, `new_price`, `changed_by` (user id) |
 | `discount_applied` | Istalgan menejer buyurtmaga chegirma qo'llaganda (`POST /api/orders/{id}/set_discount/`, qarang [`03-orders.md`](03-orders.md)) | Barcha menejer (`recipient=null`, umumiy) | `order_id`, `old_discount`, `new_discount`, `changed_by` (user id) |
+| `print_failed` | Jismoniy (IP'li) printerga chek barcha urinishlardan keyin ham chiqmaganda (qarang [`09-printers.md`](09-printers.md)) | Barcha menejer (`recipient=null`, umumiy) | `job_id`, `printer_id`, `order_id` |
 
 Bu infratuzilma **qayta ishlatiladigan** qilib qurilgan — kelajakda yangi bildirishnoma turlari (masalan "yangi buyurtma", "smena tugadi" va h.k.) shu bir xil `GET /api/notifications/` orqali keladi, ilova tomonda faqat `notif_type` bo'yicha filtrlash/UI ko'rsatish kifoya, yangi endpoint kutish shart emas. Tanimagan `notif_type` qiymatlarini ilova generik ko'rinishda (`message`ni ko'rsatib) render qilishi tavsiya etiladi — kelajakda yangi tur qo'shilsa eski ilova versiyasi ham "buzilmasdan" ishlashda davom etadi.
 
