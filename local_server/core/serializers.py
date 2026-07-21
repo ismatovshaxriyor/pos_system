@@ -193,6 +193,7 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = ('is_deleted',)
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)
     product = ProductSerializer(read_only=True)
     # Soft-delete qilingan mahsulotni yangi buyurtmaga qo'shib bo'lmaydi -
     # menyudan olib tashlangan, lekin eski OrderItem'lar PROTECT tufayli
@@ -321,6 +322,57 @@ class OrderSerializer(serializers.ModelSerializer):
                 services.send_order_to_kitchen(order)
                 
         return order
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        from django.db import transaction
+        from . import services
+
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            
+            if items_data is not None:
+                existing_items = {item.id: item for item in instance.items.all()}
+                keep_item_ids = []
+                new_items_created = False
+                
+                for item_data in items_data:
+                    item_id = item_data.get('id')
+                    product = item_data.get('product')
+                    quantity = item_data.get('quantity', 1)
+                    note = item_data.get('note', '')
+                    modifiers = item_data.get('modifiers') or {}
+                    
+                    if item_id and item_id in existing_items:
+                        item = existing_items[item_id]
+                        item.quantity = quantity
+                        item.note = note
+                        item.modifiers = modifiers
+                        if product:
+                            item.product = product
+                        item.save()
+                        keep_item_ids.append(item.id)
+                    else:
+                        if product:
+                            item = OrderItem.objects.create(
+                                order=instance,
+                                product=product,
+                                quantity=quantity,
+                                price=product.price,
+                                note=note,
+                                modifiers=modifiers,
+                            )
+                            keep_item_ids.append(item.id)
+                            new_items_created = True
+                            
+                for item_id, item in existing_items.items():
+                    if item_id not in keep_item_ids:
+                        item.delete()
+                        
+                if new_items_created and instance.status == 'in_progress':
+                    services.send_order_to_kitchen(instance)
+                    
+        return instance
 
 
 class RestaurantConfigSerializer(serializers.ModelSerializer):

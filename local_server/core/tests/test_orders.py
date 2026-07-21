@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from core.models import Category, Order, Product, Table, User
+from core.models import Category, Order, OrderItem, Product, Table, User
 from core.views import RESTAURANT_TZ
 
 def _auth_header(user):
@@ -196,6 +196,43 @@ class OrderLogicTests(TestCase):
         self.assertTrue(order.print_jobs.exists())
         print_job = order.print_jobs.first()
         self.assertEqual(print_job.status, 'pending')
+
+    def test_update_order_with_items_modifies_correctly(self):
+        # Create an order with one item
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        item1 = OrderItem.objects.create(
+            order=order, product=self.product, quantity=1, price=self.product.price, is_printed=True
+        )
+
+        url = reverse('order-detail', args=[order.id])
+        payload = {
+            "items": [
+                {"id": item1.id, "product_id": self.product.id, "quantity": 5, "note": "Yangilangan matn"},
+                {"product_id": self.product.id, "quantity": 2, "note": "Yangi taom"}
+            ]
+        }
+        response = self.client.patch(
+            url, payload, content_type='application/json', **_auth_header(self.manager)
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Check item1 updated correctly
+        item1.refresh_from_db()
+        self.assertEqual(item1.quantity, 5)
+        self.assertEqual(item1.note, "Yangilangan matn")
+
+        # Check new item created
+        self.assertEqual(order.items.count(), 2)
+        new_item = order.items.exclude(id=item1.id).get()
+        self.assertEqual(new_item.quantity, 2)
+        self.assertEqual(new_item.note, "Yangi taom")
+        self.assertTrue(new_item.is_printed)
+
+        # Check print jobs: should print only the new item
+        print_jobs = order.print_jobs.all()
+        # Since send_order_to_kitchen was called during update for the new item, it should create a new PrintJob
+        self.assertEqual(print_jobs.count(), 1)
+        self.assertEqual(print_jobs.first().items_snapshot[0]['note'], "Yangi taom")
 
     def test_product_delete_is_soft_and_blocks_ordering(self):
         del_url = reverse('product-detail', args=[self.product.id])
