@@ -50,6 +50,7 @@ services:
     command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
     env_file: .env
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - RUN_MIGRATIONS=1
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
@@ -77,6 +78,7 @@ services:
     command: celery -A config worker --loglevel=info --concurrency=2
     env_file: .env
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
     volumes:
@@ -107,6 +109,7 @@ services:
     command: celery -A config beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     env_file: .env
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
     volumes:
