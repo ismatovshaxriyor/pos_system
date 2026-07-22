@@ -905,14 +905,3 @@ class KitchenDashboardView(TemplateView):
         return token.key
 
 
-class TestPingView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request):
-        return Response({
-            "status": "ok",
-            "message": "Test endpoint v0.1.6 is working successfully!",
-            "version": settings.APP_VERSION,
-        })
-
-
