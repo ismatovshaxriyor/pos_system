@@ -3,6 +3,7 @@ import zoneinfo
 from datetime import date as date_cls, datetime, time, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
