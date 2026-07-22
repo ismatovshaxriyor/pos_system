@@ -41,6 +41,7 @@ services:
 
   web:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
+    platform: linux/amd64
     # WebSocket (Django Channels) uchun ASGI server kerak - gunicorn+WSGI
     # WS ulanishlarni xizmat qila olmaydi. Daphne yagona-processli async,
     # bitta restoranning real yukiga (bir necha o'nlab xodim qurilmasi)
@@ -72,6 +73,7 @@ services:
 
   celery_worker:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
+    platform: linux/amd64
     command: celery -A config worker --loglevel=info --concurrency=2
     env_file: .env
     environment:
@@ -97,6 +99,7 @@ services:
 
   celery_beat:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
+    platform: linux/amd64
     # --schedule /tmp'da bo'lishi shart: konteyner read_only, beat esa jadval
     # faylini (default: /app/celerybeat-schedule) yozib turadi - aks holda
     # boot'da crash. /tmp - tmpfs; restart'da yo'qolishi zararsiz, jadval
@@ -142,7 +145,6 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.docker/config.json:/config.json:ro
     environment:
       - WATCHTOWER_HTTP_API_UPDATE=true
       - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}

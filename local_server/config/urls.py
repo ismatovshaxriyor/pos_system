@@ -43,10 +43,12 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 
-    # Product/Category rasmlari. django.views.static.serve DEBUG'ga qarab
+    # Static va media fayllar. django.views.static.serve DEBUG'ga qarab
     # o'chib qolmaydi (django.contrib.staticfiles'dan farqli) - shart,
-    # chunki bu yerda nginx yo'q, daphne hammasini o'zi xizmat qiladi
-    # (bitta restoran ko'lamida yetarli - docs/3'dagi Nginx rejasi hali
-    # amalga oshirilmagan).
+    # chunki daphne `runserver`ni override qilib, staticfiles app'ining
+    # avtomatik static-serving'ini o'chiradi. Shuning uchun ham static,
+    # ham media fayllarni daphne o'zi xizmat qiladi (bitta restoran
+    # ko'lamida yetarli - docs/3'dagi Nginx rejasi hali amalga oshirilmagan).
+    re_path(r'^static/(?P<path>.*)$', serve_static, {'document_root': settings.STATIC_ROOT}),
     re_path(r'^media/(?P<path>.*)$', serve_static, {'document_root': settings.MEDIA_ROOT}),
 ]
