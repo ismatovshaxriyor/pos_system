@@ -221,6 +221,8 @@ class HeartbeatView(APIView):
             "restaurant": restaurant.name,
             "license_active": license_active,
             "desired_version": restaurant.desired_version,
+            "telegram_bot_token": restaurant.telegram_bot_token,
+            "telegram_chat_id": restaurant.telegram_chat_id,
             "commands": [
                 {"id": str(c.id), "command_type": c.command_type, "payload": c.payload}
                 for c in pending_commands

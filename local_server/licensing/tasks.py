@@ -87,6 +87,19 @@ def send_heartbeat():
 
     data = response.json()
 
+    tg_token = data.get('telegram_bot_token')
+    tg_chat = data.get('telegram_chat_id')
+    if tg_token is not None or tg_chat is not None:
+        state_updated = False
+        if tg_token is not None and state.telegram_bot_token != tg_token:
+            state.telegram_bot_token = tg_token
+            state_updated = True
+        if tg_chat is not None and state.telegram_chat_id != tg_chat:
+            state.telegram_chat_id = tg_chat
+            state_updated = True
+        if state_updated:
+            state.save()
+
     if data.get('license_active') is False:
         if state.blocked_reason != 'remote_command':
             state.is_blocked = True

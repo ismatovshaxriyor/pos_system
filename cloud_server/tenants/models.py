@@ -12,6 +12,8 @@ class Restaurant(models.Model):
     last_seen = models.DateTimeField(null=True, blank=True)
     is_online = models.BooleanField(default=False)
     desired_version = models.CharField(max_length=50, blank=True, default='')
+    telegram_bot_token = models.CharField(max_length=200, blank=True, default='', help_text="Fail-safe Telegram bot tokeni")
+    telegram_chat_id = models.CharField(max_length=100, blank=True, default='', help_text="Fail-safe Telegram admin/group chat_id")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

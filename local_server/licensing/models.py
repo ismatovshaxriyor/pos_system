@@ -41,6 +41,9 @@ class LicenseState(models.Model):
     restaurant_id = models.UUIDField(null=True, blank=True)
     restaurant_name = models.CharField(max_length=200, blank=True, default='')
 
+    telegram_bot_token = models.CharField(max_length=200, blank=True, default='')
+    telegram_chat_id = models.CharField(max_length=100, blank=True, default='')
+
     token_expires_at = models.DateTimeField(null=True, blank=True)
     activated_at = models.DateTimeField(null=True, blank=True)
     last_renewed_at = models.DateTimeField(null=True, blank=True)
