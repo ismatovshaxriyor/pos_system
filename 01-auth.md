@@ -79,9 +79,9 @@ Authorization: Token <manager_token>
 
 ---
 
-## 3. Kassirlar uchun planshetda tezkor PIN orqali kirish
+## 3. Kassirlar uchun planshetda tezkor PIN orqali kirish (Shift Swap)
 
-Kassirlar kassa planshetida/ekranida tezkor ishlash uchun faqat o'zlarining 6 xonali PIN kodlarini kiritadilar:
+Kassirlar kassa planshetida/ekranida tezkor ishlash uchun faqat o'zlarining 6 xonali PIN kodlarini kiritadilar. Bitta kassa planshetida bir nechta kassirlar smenani almashtirib ishlashi (`Shift Swap`) to'liq qo'llab-quvvatlanadi (1-kassir smenani yakunlab 2-kassir kelganda, 2-kassir ayni shu kassa planshetida o'z PIN kodi bilan kirib ishlab ketaveradi):
 
 ```
 POST /api/auth/pin-login/
@@ -106,6 +106,7 @@ Content-Type: application/json
     }
   }
   ```
+
 
 ---
 
@@ -184,16 +185,17 @@ Authorization: Token <admin_token>
 * **Javob (`201 Created`):**
   ```json
   {
-    "code": "7K9M2XQP",
+    "code": "482915",
     "expires_at": "2026-07-20T12:15:00Z",
     "user": {"id": 6, "username": "+998909998877", "first_name": "Kassir", "last_name": "1", "role": "cashier"}
   }
   ```
-  `code` — 8 belgili, chalkash harflar (`0`/`O`, `1`/`I` va h.k.) chiqarib tashlangan alifbodan. **15 daqiqa** amal qiladi (`expires_at`). Qayta chaqirilsa — eski (hali ishlatilmagan) kod bekor bo'lib, yangisi yaratiladi.
+  `code` — **6-xonali raqamli kod**. **15 daqiqa** amal qiladi (`expires_at`). Qayta chaqirilsa — eski (hali ishlatilmagan) kod bekor bo'lib, yangisi yaratiladi.
 * **Xatolik (`400`):** `is_staff=True` (ya'ni `manager`) foydalanuvchi uchun kod so'ralsa — menejerga kod kerak emas, u parol bilan kiradi:
   ```json
   {"detail": "Admin foydalanuvchi uchun PIN kirish kerak emas."}
   ```
+
 
 ---
 
@@ -207,12 +209,13 @@ Content-Type: application/json
 
 {
   "phone": "+998909998877",
-  "code": "7K9M2XQP",
+  "code": "482915",
   "device_id": "kassa-plansheti-uuid-123",
   "pin": "123456",
   "device_label": "Kassa 1 - planshet"
 }
 ```
+
 
 `device_label` ixtiyoriy. `device_id`ni ilova o'zi generatsiya qilib doimiy saqlashi kerak (`flutter_secure_storage`) — shu qadamdan keyin kerak bo'lmaydi, kunlik kirish endi to'g'ridan-to'g'ri 3-bo'limdagi `pin-login`.
 
