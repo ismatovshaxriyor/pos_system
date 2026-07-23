@@ -60,12 +60,15 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @extend_schema(
+        summary="Xodim uchun 6-xonali bir martalik ro'yxatdan o'tish kodi yaratish",
+        description="Menejer tomonidan kassir/xodim uchun 15 daqiqalik 6-xonali raqamli ro'yxatdan o'tish kodi generatsiya qilinadi.",
         request=None,
         responses={
             201: RegistrationCodeResponseSerializer,
             400: OpenApiResponse(ErrorDetailSerializer, description="Admin foydalanuvchi uchun kod yaratib bo'lmaydi."),
         },
     )
+
     @action(detail=True, methods=['post'], url_path='generate-registration-code')
     def generate_registration_code(self, request, pk=None):
         user = self.get_object()

@@ -46,14 +46,16 @@ class WaiterLoginView(APIView):
 
 class DeviceRegisterView(APIView):
     """
-    Xodim admin bergan bir martalik kodni telefonida kiritib, o'z
-    qurilmasini birinchi marta tasdiqlaydi va PIN o'rnatadi. Muvaffaqiyatli
-    bo'lsa darhol token qaytaradi - qayta login qilish shart emas.
+    Xodim menejer bergan 6-xonali bir martalik kodni kiritib o'z
+    planshetini birinchi marta tasdiqlaydi va 6-xonali PIN o'rnatadi.
+    Muvaffaqiyatli bo'lsa darhol token qaytaradi.
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
+        summary="Xodim planshetini ro'yxatdan o'tkazish (6-xonali kod bilan)",
+        description="Menejer bergan 6-xonali bir martalik ro'yxatdan o'tish kodini planshetda kiritib xodim shaxsiy 6-xonali PIN kodi o'rnatadi.",
         request=DeviceRegisterSerializer,
         responses={
             201: AuthTokenResponseSerializer,
@@ -80,11 +82,16 @@ class DeviceRegisterView(APIView):
 
 
 class PinLoginView(APIView):
-    """Xodimning kunlik kirishi - faqat device_id + PIN, telefon raqami shart emas."""
+    """
+    Kassa planshetida PIN orqali login. Bitta kassa planshetida bir nechta
+    kassirlar smenani almashtirib ishlashi (Shift Swap) to'liq qo'llab-quvvatlanadi.
+    """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
+        summary="Kassa planshetida PIN orqali login (Shift Swap)",
+        description="Kassir yoki xodim kassa planshetida o'zining 6-xonali PIN kodini kiritadi. 1-kassir smenani yakunlab 2-kassir kelganda, 2-kassir o'z PIN kodi bilan kassa planshetida uzluksiz login qilib ketaveradi.",
         request=PinLoginSerializer,
         responses={
             200: AuthTokenResponseSerializer,
@@ -103,3 +110,4 @@ class PinLoginView(APIView):
             return Response({"detail": exc.message}, status=exc.status)
 
         return Response({"token": token.key, "user": UserSerializer(user).data})
+
