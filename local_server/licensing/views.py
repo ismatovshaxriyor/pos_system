@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, UTC
 
 import requests
@@ -16,6 +17,8 @@ from .hardware import get_hardware_fingerprint
 from .jwt_utils import verify_token, LicenseTokenError
 from .models import LicenseState
 from .serializers import ActivateSerializer, ApplyOfflineTokenSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def _provision_admin_user(admin_data):
@@ -74,7 +77,12 @@ class ActivateView(APIView):
         except ValueError:
             # Ona o'rnidagi proxy/tunnel (masalan cloudflared) HTML xato
             # sahifasi qaytargan bo'lishi mumkin - foydalanuvchiga 500
-            # o'rniga tushunarli xabar.
+            # o'rniga tushunarli xabar beramiz hamda batafsil log yozamiz.
+            logger.error(
+                "Ona serverdan kutilmagan javob keldi (status=%s): %s",
+                response.status_code,
+                response.text[:200] if response.text else '',
+            )
             return Response(
                 {"detail": "Ona serverdan kutilmagan javob keldi. Birozdan so'ng qayta urining."},
                 status=status.HTTP_502_BAD_GATEWAY,
