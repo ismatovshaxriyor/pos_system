@@ -193,3 +193,26 @@ class StatusView(APIView):
             "blocked_reason": state.blocked_reason,
             "server_time": timezone.now(),
         })
+
+
+class DiscoveryView(APIView):
+    """
+    Mobil/Flutter mijozlar tarmoqda mDNS orqali topgan IP manzilining
+    aynan haqiqiy Bola server ekanini va uning metama'lumotlarini tekshirishi
+    uchun ochiq ping endpointi (`GET /api/discovery/`).
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        state = LicenseState.load()
+        return Response({
+            "service": "pos-bola",
+            "version": "1.0.0",
+            "activated": bool(state and state.activated_at),
+            "restaurant_id": str(state.restaurant_id) if state and state.restaurant_id else None,
+            "restaurant_name": state.restaurant_name if state else "Faollashtirilmagan Server",
+            "is_blocked": state.is_blocked if state else False,
+            "server_time": timezone.now(),
+        })
+

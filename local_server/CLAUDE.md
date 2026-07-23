@@ -1,6 +1,7 @@
 # local_server — guidance for Claude Code
 
-This file loads automatically when working with files under `local_server/`. See the repo-root `CLAUDE.md` for the two-project overview, and `local_server/core/CLAUDE.md` for the `core` app's architecture.
+This file loads automatically when working with files under `local_server/`. See `DEPLOY.md` for full deployment & mDNS auto-discovery setup, repo-root `CLAUDE.md` for the two-project overview, and `local_server/core/CLAUDE.md` for the `core` app's architecture.
+
 
 ### Dev commands (port 8000, Postgres 127.0.0.1:15432, Redis 127.0.0.1:16379)
 ```bash

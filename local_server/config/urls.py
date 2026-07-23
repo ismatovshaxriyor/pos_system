@@ -23,6 +23,7 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 from core.auth_views import DeviceRegisterView, PinLoginView, WaiterLoginView
 from core.views import KitchenDashboardView
+from licensing.views import DiscoveryView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -31,7 +32,9 @@ urlpatterns = [
 
     # API endpoints
     path('api/', include('core.urls')),
+    path('api/discovery/', DiscoveryView.as_view(), name='api-discovery'),
     path('api/auth/login/', obtain_auth_token, name='api_token_auth'),
+
     # Admin (is_staff) - yuqoridagi telefon+parol bilan kiradi. Boshqa xodim
     # (manager/cashier/waiter) - qurilmaga bog'langan PIN bilan, shu ikkitasi:
     path('api/auth/device/register/', DeviceRegisterView.as_view(), name='auth-device-register'),
