@@ -10,11 +10,19 @@ import DemoModal from './components/DemoModal';
 import Footer from './components/Footer';
 import LoadingScreen from './components/LoadingScreen';
 import NotFound from './components/NotFound';
+import RestaurantMenu from './components/RestaurantMenu';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+
+  // Subdomain tenant detection (e.g. test-restaurant.hamrohpos.uz)
+  const hostname = window.location.hostname.toLowerCase();
+  const parts = hostname.split('.');
+  const systemSubdomains = ['admin', 'api', 'www', 'app', 'localhost', '127'];
+  const isTenantSubdomain = parts.length >= 3 && parts[parts.length - 2] === 'hamrohpos' && parts[parts.length - 1] === 'uz' && !systemSubdomains.includes(parts[0]);
+  const tenantSubdomain = isTenantSubdomain ? parts[0] : null;
 
   useEffect(() => {
     // Initial preloader timeout for smooth UX transition
@@ -40,6 +48,11 @@ export default function App() {
 
   if (isLoading) {
     return <LoadingScreen />;
+  }
+
+  // Render Customer Digital Menu & Payment UI for restaurant subdomains
+  if (tenantSubdomain) {
+    return <RestaurantMenu subdomain={tenantSubdomain} />;
   }
 
   // Handle 404 for unknown paths (e.g. /404, /unknown, etc.)
