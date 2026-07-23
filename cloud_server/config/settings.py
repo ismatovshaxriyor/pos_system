@@ -70,6 +70,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'sync.middleware.DomainRoutingMiddleware',
     # gunicorn'ning o'zi static fayllarni xizmat qilmaydi va bu yerda
     # nginx yo'q (docs/3'dagi reja hali amalga oshirilmagan) - whitenoise
     # ularni to'g'ridan-to'g'ri WSGI qatlamida siqib/keshlab beradi.
