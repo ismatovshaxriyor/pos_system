@@ -128,13 +128,22 @@ services:
   # yoki DNS A-record'ni to'g'ridan-to'g'ri EC2 IP'ga bog'lash shart emas
   # (local_server'dagi Bola tunnel pattern bilan bir xil - docs/4).
   # SSL Cloudflare tomonida - bu instance sertifikat boshqarishi shart
-  # emas. Ingress qoidasi (hamrohpos.uz -> http://web:8001) Cloudflare
-  # Zero Trust dashboardida sozlanadi, token faqat autentifikatsiya qiladi.
+  # emas. Ingress qoidasi (hamrohpos.uz -> http://website:80) Cloudflare
+  # Zero Trust dashboardida sozlanadi, Nginx frontend va backend (web:8001) ni bog'laydi.
   website:
     build:
       context: ../website
       dockerfile: Dockerfile
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      web:
+        condition: service_healthy
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -142,6 +151,8 @@ services:
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       web:
+        condition: service_healthy
+      website:
         condition: service_healthy
 
 volumes:

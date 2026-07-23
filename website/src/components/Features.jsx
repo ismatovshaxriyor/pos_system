@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Printer, Smartphone, CloudSync, Zap, CreditCard, X, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Printer, Smartphone, RefreshCw, Zap, CreditCard, X, CheckCircle2 } from 'lucide-react';
 
 export default function Features() {
   const [selectedFeature, setSelectedFeature] = useState(null);
@@ -46,7 +46,7 @@ export default function Features() {
     },
     {
       id: 4,
-      icon: CloudSync,
+      icon: RefreshCw,
       title: "Masofaviy Sotuv Nazorati",
       desc: "Dunyoning istalgan nuqtasidan hamrohpos.uz saytiga kirib, restoraningiz tushumi, sotilgan taomlar va kunlik foydani telefoningizda ko'rib turasiz.",
       tag: "Masofaviy Boshqaruv",
