@@ -32,15 +32,15 @@ class ServiceError(Exception):
 
 def generate_registration_code(user, created_by):
     """
-    Admin generatsiya qiladi, xodim telefonida bir marta kiritadi. PIN
-    bilan kiruvchi (is_staff=False) xodim uchun - admin hisobi parol bilan
+    Admin generatsiya qiladi, xodim planshetida kiritadi. 6-xonali raqamli kod.
+    PIN bilan kiruvchi (is_staff=False) xodim uchun - admin hisobi parol bilan
     kiradi, unga registratsiya kodi kerak emas.
     """
     if user.is_staff:
         raise ServiceError("Admin foydalanuvchi uchun PIN kirish kerak emas.")
 
     DeviceRegistrationCode.objects.filter(user=user, used_at__isnull=True).delete()
-    code = get_random_string(8, allowed_chars=CODE_ALPHABET)
+    code = get_random_string(6, allowed_chars='0123456789')
     return DeviceRegistrationCode.objects.create(
         user=user, code=code, created_by=created_by,
         expires_at=timezone.now() + CODE_TTL,
@@ -148,15 +148,32 @@ def verify_pin_login(device_id, pin):
         raise ServiceError("Juda ko'p noto'g'ri urinish. Birozdan so'ng qayta urining.", status=429)
 
     device = StaffDevice.objects.filter(device_id=device_id, is_active=True, is_approved=True).select_related('user').first()
-    if not device or not check_password(pin, device.user.pin_hash):
+    if not device:
+        _register_failure(device_id)
+        raise ServiceError("Qurilma yoki PIN noto'g'ri.")
+
+    matched_user = None
+    if device.user and device.user.pin_hash and check_password(pin, device.user.pin_hash):
+        matched_user = device.user
+    else:
+        candidate_users = User.objects.filter(is_active=True, is_staff=False).exclude(pin_hash='')
+        for user in candidate_users:
+            if check_password(pin, user.pin_hash):
+                matched_user = user
+                break
+
+    if not matched_user:
         _register_failure(device_id)
         raise ServiceError("Qurilma yoki PIN noto'g'ri.")
 
     _clear_failures(device_id)
+    if device.user != matched_user:
+        device.user = matched_user
     device.last_login_at = timezone.now()
-    device.save(update_fields=['last_login_at', 'updated_at'])
-    token, _ = Token.objects.get_or_create(user=device.user)
-    return device.user, token
+    device.save(update_fields=['user', 'last_login_at', 'updated_at'])
+    token, _ = Token.objects.get_or_create(user=matched_user)
+    return matched_user, token
+
 
 
 import math

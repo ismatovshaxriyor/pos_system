@@ -175,3 +175,24 @@ class PinLoginViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 429)
+
+
+    def test_shift_switch_another_cashier_login_on_same_device(self):
+        # Kassir 2 yaratamiz va unga boshqa 6-xonali PIN o'rnatamiz
+        cashier2 = User.objects.create_user(username='+998900000004', role='cashier')
+        cashier2.pin_hash = make_password('654321')
+        cashier2.save(update_fields=['pin_hash'])
+
+        # Kassir 2 ayni shu kassa planshetida (device-9) o'z PIN kodi bilan kiradi
+        response = self.client.post(
+            self.url, {"device_id": "device-9", "pin": "654321"}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('token', response.data)
+        self.assertEqual(response.data['user']['username'], cashier2.username)
+
+        # StaffDevice endi Kassir 2 ga o'tgan bo'lishi kerak
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.user, cashier2)
+
