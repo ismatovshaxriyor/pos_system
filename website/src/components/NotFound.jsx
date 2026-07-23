@@ -38,16 +38,6 @@ export default function NotFound({ onGoHome }) {
             <Home className="w-4 h-4" />
             <span>Bosh Sahifaga Qaytish</span>
           </button>
-
-          <a
-            href="https://hamrohpos.uz/api/docs/"
-            target="_blank"
-            rel="noreferrer"
-            className="w-full btn-emerald py-3.5 rounded-xl text-xs font-bold font-mono tracking-wider flex items-center justify-center gap-2 block"
-          >
-            <HelpCircle className="w-4 h-4 text-[#e3c282]" />
-            <span>API Hujjatlarini Ko'rish</span>
-          </a>
         </div>
 
         <div className="pt-2 text-[10px] font-mono text-[#adcdc3]/60">

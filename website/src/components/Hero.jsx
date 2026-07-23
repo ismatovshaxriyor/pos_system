@@ -29,7 +29,7 @@ export default function Hero({ onOpenDemo }) {
         <div className="flex justify-center mb-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full glass-card border border-[#e3c282]/40 text-[11px] sm:text-xs font-mono text-[#e3c282] shadow-md">
             <span className="w-2 h-2 rounded-full bg-[#e3c282] animate-pulse-ring" />
-            <span>Rasmiy Server: hamrohpos.uz — Ona-Bola (Cloud-Local) POS</span>
+            <span>Hamroh POS — Restoranlar Uchun Ishonchli Kassa Tizimi</span>
           </div>
         </div>
 
@@ -40,7 +40,7 @@ export default function Hero({ onOpenDemo }) {
           </h1>
 
           <p className="text-lg sm:text-xl text-[#adcdc3] max-w-2xl mx-auto leading-relaxed">
-            <strong className="text-white font-semibold">Hamroh POS</strong> — RS256 JWT litsenziyalash, ESC/POS oshxona printerlari, xodimlar davomati va bulutli boshqaruvni o'z ichiga olgan zamonaviy restora POS tizimi.
+            <strong className="text-white font-semibold">Hamroh POS</strong> — 100% offlayn kassa ishonchliligi, tezkor oshxona printerlari, xodimlar davomati va bulutli boshqaruvni o'z ichiga olgan zamonaviy restoran POS tizimi.
           </p>
 
           {/* CTA Buttons */}
@@ -65,15 +65,15 @@ export default function Hero({ onOpenDemo }) {
           <div className="pt-8 flex flex-wrap justify-center gap-6 text-xs text-[#adcdc3]/80 font-mono">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#e3c282]" />
-              <span>100% Offlayn Islomiy/RS256 JWT</span>
+              <span>Internet O'chganda Ham To'xtovsiz Kassa</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#e3c282]" />
-              <span>ESC/POS Chek Printer TCP 9100</span>
+              <span>Tezkor Oshxona Chek Printerlari</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#e3c282]" />
-              <span>Geofencing Xodim Davomati</span>
+              <span>Xodimlarni PIN va Geolokatsiya Nazorati</span>
             </div>
           </div>
         </div>
@@ -91,7 +91,7 @@ export default function Hero({ onOpenDemo }) {
                   <div className="w-3 h-3 rounded-full bg-green-500/80" />
                 </div>
                 <span className="font-mono text-xs text-[#e3c282] font-semibold">
-                  HAMROH POS — Kassa Terminali #01 (Stol VIP-03)
+                  HAMROH POS — Kassa Oynasi (Stol VIP-03)
                 </span>
               </div>
 
@@ -109,12 +109,12 @@ export default function Hero({ onOpenDemo }) {
                   {isOfflineMode ? (
                     <>
                       <WifiOff className="w-3.5 h-3.5 text-amber-400" />
-                      <span>OFFLAYN (Local Server Aktiv)</span>
+                      <span>Internet Yo'q (Offlayn Ishlamoqda)</span>
                     </>
                   ) : (
                     <>
                       <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>ONLAYN (Cloud Sync: hamrohpos.uz)</span>
+                      <span>Internet Bor (Sinxronlangan)</span>
                     </>
                   )}
                 </button>

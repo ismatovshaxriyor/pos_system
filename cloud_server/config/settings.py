@@ -31,11 +31,15 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-cloud-pos-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '0') == '1'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+if '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.extend(['.hamrohpos.uz', '.ismatov.uz', '.example.uz', 'localhost', '127.0.0.1'])
 
 CSRF_TRUSTED_ORIGINS = [
-    origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin
+    origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
 ]
+if not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = ['https://*.hamrohpos.uz', 'https://*.ismatov.uz', 'https://*.example.uz', 'http://localhost', 'http://127.0.0.1']
 CORS_ALLOW_ALL_ORIGINS = True
 
 if os.environ.get('SECURE_PROXY_SSL_HEADER', '0') == '1':

@@ -108,7 +108,7 @@ export default function InteractiveDemo() {
               }`}
             >
               <Monitor className="w-4 h-4" />
-              <span>3. Cloud Ona Admin</span>
+              <span>3. Markaziy Boshqaruv Paneli</span>
             </button>
           </div>
         </div>
@@ -296,51 +296,51 @@ export default function InteractiveDemo() {
             </div>
           )}
 
-          {/* TAB 3: CLOUD ONA ADMIN */}
+          {/* TAB 3: MASOFAVIY BOSHQARUV */}
           {activeTab === 'cloud' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center pb-4 border-b border-[#adcdc3]/10">
                 <div>
-                  <h3 className="text-lg font-bold text-white font-serif-display">Ona Cloud Admin Panel (hamrohpos.uz)</h3>
-                  <p className="text-xs text-[#adcdc3]">Barcha restoranlar, litsenziyalar va xatolar jurnali markaziy nazorati</p>
+                  <h3 className="text-lg font-bold text-white font-serif-display">Markaziy Boshqaruv Paneli (hamrohpos.uz)</h3>
+                  <p className="text-xs text-[#adcdc3]">Barcha restoran va filiallar sotuvi hamda kunlik tushumlar nazorati</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Server className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-mono text-emerald-400">Cloud Online (v0.3.0)</span>
+                  <span className="text-xs font-mono text-emerald-400">Tizim Ishlamoqda</span>
                 </div>
               </div>
 
               {/* Stats row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="glass-card p-4 rounded-xl space-y-1">
-                  <span className="text-[11px] font-mono text-[#adcdc3]">Faol Restoranlar:</span>
-                  <div className="text-2xl font-bold text-white font-mono">14 ta Bola</div>
+                  <span className="text-[11px] font-mono text-[#adcdc3]">Ulangan Restoranlar:</span>
+                  <div className="text-2xl font-bold text-white font-mono">14 ta Restoran</div>
                 </div>
                 <div className="glass-card p-4 rounded-xl space-y-1">
-                  <span className="text-[11px] font-mono text-[#adcdc3]">Litsenziya Holati:</span>
-                  <div className="text-2xl font-bold text-[#e3c282] font-mono">100% RS256 JWT</div>
+                  <span className="text-[11px] font-mono text-[#adcdc3]">Litsenziya Himoyasi:</span>
+                  <div className="text-2xl font-bold text-[#e3c282] font-mono">100% Himoyalangan</div>
                 </div>
                 <div className="glass-card p-4 rounded-xl space-y-1">
-                  <span className="text-[11px] font-mono text-[#adcdc3]">Xatolar Jurnali:</span>
-                  <div className="text-2xl font-bold text-emerald-400 font-mono">0 Ochiq Xato</div>
+                  <span className="text-[11px] font-mono text-[#adcdc3]">Tizim Holati:</span>
+                  <div className="text-2xl font-bold text-emerald-400 font-mono">Xatosiz Ishlamoqda</div>
                 </div>
               </div>
 
               {/* Sample Fleet list */}
               <div className="glass-card p-4 rounded-xl space-y-3">
-                <h4 className="text-xs font-mono text-[#e3c282] uppercase">Ulanib Turgan Restoranlar Floti:</h4>
+                <h4 className="text-xs font-mono text-[#e3c282] uppercase">Ulangan Restoranlar Ro'yxati:</h4>
                 <div className="space-y-2 text-xs font-mono">
                   {[
-                    { name: 'Afsona Restaurant (Toshkent)', ver: 'v0.3.0', status: 'ONLAYN', expire: '2026-08-31' },
-                    { name: 'Rayhon National Food (Samarqand)', ver: 'v0.3.0', status: 'ONLAYN', expire: '2026-09-15' },
-                    { name: 'Choyxona #1 (Farg\'ona)', ver: 'v0.2.9', status: 'OFLAYN (Cache Active)', expire: '2026-08-10' },
+                    { name: 'Afsona Restaurant (Toshkent)', ver: 'Hamroh POS', status: 'ULANGAN', expire: '2026-08-31' },
+                    { name: 'Rayhon National Food (Samarqand)', ver: 'Hamroh POS', status: 'ULANGAN', expire: '2026-09-15' },
+                    { name: 'Choyxona #1 (Farg\'ona)', ver: 'Hamroh POS', status: 'OFFLAYN REJIMDA', expire: '2026-08-10' },
                   ].map((r, idx) => (
                     <div key={idx} className="flex justify-between items-center p-2.5 rounded-lg bg-[#001712]/50 border border-[#adcdc3]/10">
                       <span className="text-white font-semibold">{r.name}</span>
                       <div className="flex items-center gap-4">
                         <span className="text-[#adcdc3]">{r.ver}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] ${
-                          r.status.includes('ONLAYN') ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'
+                          r.status.includes('ULANGAN') ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'
                         }`}>
                           {r.status}
                         </span>

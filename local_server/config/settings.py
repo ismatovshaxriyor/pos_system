@@ -31,12 +31,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-oqs8bohdzf4x7z&139z7v
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '0') == '1'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+if '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.extend(['.hamrohpos.uz', '.ismatov.uz', '.example.uz', 'localhost', '127.0.0.1'])
 
-# Cloudflare Tunnel orqali masofaviy admin kirish uchun (docs/4) - tunnel
-# domenini shu yerga qo'shing (masalan: https://filial1.tizimingiz.uz).
 CSRF_TRUSTED_ORIGINS = [
-    origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin
+    origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()
 ]
 
 if os.environ.get('SECURE_PROXY_SSL_HEADER', '0') == '1':

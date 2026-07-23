@@ -21,7 +21,7 @@ export default function Navbar({ onOpenDemo }) {
                 Hamroh POS
               </span>
               <span className="text-[10px] text-[#adcdc3]/70 font-mono tracking-wider uppercase">
-                Ona-Bola Arxitekturasi
+                Restoran Boshqaruv Tizimi
               </span>
             </div>
           </a>
@@ -35,7 +35,7 @@ export default function Navbar({ onOpenDemo }) {
               Interaktiv Demo
             </a>
             <a href="#arxitektura" className="hover:text-[#e3c282] transition-colors">
-              Arxitektura
+              Ishlash Tartibi
             </a>
             <a href="#tariflar" className="hover:text-[#e3c282] transition-colors">
               Tariflar
@@ -99,7 +99,7 @@ export default function Navbar({ onOpenDemo }) {
             onClick={() => setIsOpen(false)}
             className="block px-3 py-2 rounded-lg text-base text-[#c7eade] hover:bg-[#1a3a32]/50 hover:text-[#e3c282]"
           >
-            Arxitektura
+            Ishlash Tartibi
           </a>
           <a
             href="#tariflar"

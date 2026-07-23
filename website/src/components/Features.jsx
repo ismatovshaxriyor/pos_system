@@ -1,42 +1,42 @@
 import React from 'react';
-import { ShieldCheck, Printer, Smartphone, CloudSync, Zap, CreditCard, Lock, Cpu, Clock } from 'lucide-react';
+import { ShieldCheck, Printer, Smartphone, CloudSync, Zap, CreditCard } from 'lucide-react';
 
 export default function Features() {
   const featuresList = [
     {
       icon: ShieldCheck,
-      title: "100% Offlayn Ishonchlilik (RS256 JWT)",
-      desc: "Internet haftalab uzilib qolsa ham kassa to'xtamaydi. Ona serverdan olingan pre-issued RS256 JWT tokenlar to'plami mahalliy ravishda offlayn tekshiriladi.",
-      tag: "Arxitektura"
+      title: "100% Offlayn Ishonchlilik",
+      desc: "Internet haftalab uzilib qolsa ham kassa to'xtamaydi. Xavfsiz raqamli kalitlar tufayli restoraningiz offlayn rejimda ham 100% uzluksiz ishlaydi.",
+      tag: "Offlayn Tizim"
     },
     {
       icon: Printer,
-      title: "Oshxona Printerlari (ESC/POS TCP 9100)",
-      desc: "Taom toifalari bo'yicha (Milliy, Kabab, Bar) tegishli chek printerlariga avtomatik yo'naltirish va Uzbek-Latin CP866 qo'llab-quvvatlash.",
+      title: "Oshxona va Bar Chek Printerlari",
+      desc: "Taom toifalari bo'yicha (Milliy, Kabab, Bar) tegishli oshxona printerlariga biletlar soniyada yetkaziladi va Uzbek-Latin alifbosida chop etiladi.",
       tag: "Oshxona"
     },
     {
       icon: Smartphone,
-      title: "PIN-Kod va Qurilma Identifikatsiyasi",
-      desc: "Xodimlar faqat menejer tasdiqlagan qurilma va 6 xonali PIN bilan tizimga kiradi. Noqonuniy kirishlar va qurilmalarni bir zumda bloklash imkoniyati.",
+      title: "PIN-Kod va Qurilma Xavfsizligi",
+      desc: "Xodimlar faqat menejer tasdiqlagan qurilma va shaxsiy PIN-kod bilan kiradi. Ruxsatsiz kirishlarning oldi olinadi va qurilmalarni masofadan bloklash mumkin.",
       tag: "Xavfsizlik"
     },
     {
       icon: CloudSync,
-      title: "Ona Cloud Markaziy Boshqaruv",
-      desc: "hamrohpos.uz domeni orqali barcha filiallar metrikalari (CPU/RAM, tushumlar, sotuv statistikasi) va masofaviy komandalar (Update, Block).",
+      title: "Markaziy Bulutli Boshqaruv (Cloud)",
+      desc: "hamrohpos.uz bulut paneli orqali barcha filiallar tushumlari, sotuv statistikasi va texnik holati yagona ekrandan boshqariladi.",
       tag: "Bulut"
     },
     {
       icon: Zap,
-      title: "Real-Vaqt WebSocket Pushes",
-      desc: "Daphne/Channels va WebSocket orqali stollar holati, narxlar va oshxona buyurtmalari kassa va planchetlar o'rtasida soniyada yangilanadi.",
+      title: "Lahzalik Real-Vaqt Yangilanishlar",
+      desc: "Stollar holati, narxlar va oshxona buyurtmalari kassa va afitsiant planchetlari o'rtasida soniyada zudlik bilan yangilanadi.",
       tag: "Tezkorlik"
     },
     {
       icon: CreditCard,
-      title: "Split Payments & Qarz Daftari",
-      desc: "Bitta buyurtmani naqd va karta aralash to'lash, doimiy mijozlar uchun qarz daftari va menejer tasdig'i bilan chegirmalar berish.",
+      title: "Aralash To'lovlar va Qarz Daftari",
+      desc: "Bitta buyurtmani naqd va plastik karta aralash to'lash, doimiy mijozlar uchun qarz daftari yuritish hamda menejer chegirmalari nazorati.",
       tag: "Moliya"
     }
   ];

@@ -21,7 +21,7 @@ export default function Footer() {
             </div>
 
             <p className="text-[#adcdc3]/80 leading-relaxed text-[11px]">
-              Restoran va qahvaxonalar uchun 100% offlayn chidamli, RS256 JWT litsenziyalangan hamda bulutli Ona-Bola POS tizimi.
+              Restoran va qahvaxonalar uchun internet bo'lmasada to'xtamaydigan, ishonchli kassa va masofaviy boshqaruv tizimi.
             </p>
           </div>
 
@@ -31,7 +31,7 @@ export default function Footer() {
             <ul className="space-y-2 text-[#adcdc3]/80">
               <li><a href="#imkoniyatlar" className="hover:text-[#e3c282]">Imkoniyatlar</a></li>
               <li><a href="#demo" className="hover:text-[#e3c282]">Interaktiv Demo</a></li>
-              <li><a href="#arxitektura" className="hover:text-[#e3c282]">Ona-Bola Arxitekturasi</a></li>
+              <li><a href="#arxitektura" className="hover:text-[#e3c282]">Ishlash Tartibi</a></li>
               <li><a href="#tariflar" className="hover:text-[#e3c282]">Tariflar va Narxlar</a></li>
               <li><a href="#litsenziya" className="hover:text-[#e3c282]">Litsenziyani Tekshirish</a></li>
             </ul>
@@ -39,12 +39,11 @@ export default function Footer() {
 
           {/* Docs & API */}
           <div className="space-y-3">
-            <h4 className="text-[#e3c282] font-bold uppercase text-xs">Hujjatlar & Integratsiya</h4>
+            <h4 className="text-[#e3c282] font-bold uppercase text-xs">Qo'llanma & Ma'lumot</h4>
             <ul className="space-y-2 text-[#adcdc3]/80">
-              <li><a href="https://hamrohpos.uz/api/docs/" target="_blank" rel="noreferrer" className="hover:text-[#e3c282]">Cloud Swagger API Reference</a></li>
-              <li><a href="#arxitektura" className="hover:text-[#e3c282]">RS256 JWT Litsenziyalash</a></li>
-              <li><a href="#imkoniyatlar" className="hover:text-[#e3c282]">ESC/POS TCP 9100 Qo'llanmasi</a></li>
-              <li><a href="#imkoniyatlar" className="hover:text-[#e3c282]">Haversine Geofencing Davomat</a></li>
+              <li><a href="#arxitektura" className="hover:text-[#e3c282]">Litsenziya va Xavfsizlik</a></li>
+              <li><a href="#imkoniyatlar" className="hover:text-[#e3c282]">Oshxona Printerlarini Ulash</a></li>
+              <li><a href="#imkoniyatlar" className="hover:text-[#e3c282]">Xodimlarning Davomati Nazorati</a></li>
             </ul>
           </div>
 
@@ -75,7 +74,7 @@ export default function Footer() {
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[#adcdc3]/60 text-[10px]">
           <span>© 2026 Hamroh POS (hamrohpos.uz). Barcha huquqlar himoyalangan.</span>
-          <span className="mt-2 sm:mt-0 font-mono">Bosh server versiyasi: v0.3.0</span>
+          <span className="mt-2 sm:mt-0 font-mono">Hamroh POS Restoran Tizimi</span>
         </div>
       </div>
     </footer>

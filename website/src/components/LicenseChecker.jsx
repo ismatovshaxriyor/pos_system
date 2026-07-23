@@ -20,7 +20,7 @@ export default function LicenseChecker() {
       status: apiRes.status,
       restaurant: apiRes.restaurant || 'Restoran Nomi',
       expiresAt: apiRes.expires_at ? new Date(apiRes.expires_at).toLocaleString() : 'Noma\'lum',
-      hardwareHash: apiRes.hardware_bound ? 'Bog\'langan' : 'Bog\'lanmagan',
+      deviceStatus: apiRes.hardware_bound ? 'Kassaga Biriktirilgan (Himoyalangan)' : 'Erkin Qurilma',
       message: apiRes.detail || ''
     });
   };
@@ -40,7 +40,7 @@ export default function LicenseChecker() {
               Litsenziya Holatini Tekshirish
             </h2>
             <p className="text-xs sm:text-sm text-[#adcdc3]">
-              Litsenziya kalitingizni (masalan: <code className="text-[#e3c282] font-mono font-bold">DEMO-7777-OKAY</code>) kiriting va uning RS256 amal qilish muddatini tekshiring.
+              Litsenziya kalitingizni (masalan: <code className="text-[#e3c282] font-mono font-bold">DEMO-7777-OKAY</code>) kiriting va uning amal qilish muddatini tekshiring.
             </p>
           </div>
 
@@ -109,8 +109,8 @@ export default function LicenseChecker() {
                   <span>Amal qilish: <strong className="text-white">{result.expiresAt}</strong></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-[#e3c282]" />
-                  <span>Hardware Hash: <strong className="text-white">{result.hardwareHash}</strong></span>
+                  <ShieldCheck className="w-4 h-4 text-[#e3c282]" />
+                  <span>Kassa Qurilmasi: <strong className="text-white">{result.deviceStatus}</strong></span>
                 </div>
               </div>
             </div>
