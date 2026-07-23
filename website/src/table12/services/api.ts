@@ -70,7 +70,7 @@ export async function fetchPublicMenu(): Promise<Dish[] | null> {
       });
     });
 
-    return dishes.length > 0 ? dishes : null;
+    return dishes;
   } catch (error) {
     console.warn('[PublicMenu] Could not connect to local_server API:', error);
     return null;

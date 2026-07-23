@@ -104,13 +104,26 @@ export const MenuScreen: React.FC = () => {
         </div>
 
         {/* Dish Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
-          {filteredDishes.map((dish) => {
-            const isFav = favorites.includes(dish.id);
-            const qty = quantities[dish.id] || 1;
-            const isAdded = addedIds[dish.id];
+        {filteredDishes.length === 0 ? (
+          <div className="glass-card rounded-2xl p-12 text-center border border-[#E3C282]/30 max-w-md mx-auto my-12">
+            <span className="material-symbols-outlined text-[#E3C282] text-5xl mb-4">
+              restaurant_menu
+            </span>
+            <h3 className="font-serif-display font-semibold text-2xl text-[#E3C282] mb-2">
+              Hozircha taomlar mavjud emas
+            </h3>
+            <p className="font-sans-body text-xs text-[#C1C8C4] opacity-80">
+              Restoran menyusiga hali taomlar qo'shilmadi yoki tanlangan kategoriya bo'sh.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
+            {filteredDishes.map((dish) => {
+              const isFav = favorites.includes(dish.id);
+              const qty = quantities[dish.id] || 1;
+              const isAdded = addedIds[dish.id];
 
-            return (
+              return (
               <div
                 key={dish.id}
                 onClick={() => openDishDetail(dish)}
@@ -217,6 +230,7 @@ export const MenuScreen: React.FC = () => {
             );
           })}
         </div>
+        )}
       </section>
 
       {/* Sommelier Pairing Feature Section */}

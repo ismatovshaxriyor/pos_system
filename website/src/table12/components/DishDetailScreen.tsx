@@ -9,6 +9,7 @@ export const DishDetailScreen: React.FC = () => {
     setPortionSize,
     addToCart,
     openDishDetail,
+    dishes,
     t
   } = useApp();
 
@@ -20,7 +21,7 @@ export const DishDetailScreen: React.FC = () => {
 
   const totalPrice = basePrice * quantity;
 
-  const similarDishes = MENU_DISHES.filter((d) => d.id !== selectedDish.id).slice(0, 2);
+  const similarDishes = dishes.filter((d) => d.id !== selectedDish.id).slice(0, 2);
 
   return (
     <div className="relative pb-36 animate-in fade-in duration-300">
