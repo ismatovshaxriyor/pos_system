@@ -268,13 +268,22 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+def _read_latest_release_version():
+    version_file = BASE_DIR.parent / 'local_server' / 'VERSION'
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return os.environ.get('LATEST_RELEASE_VERSION', '0.3.0')
+
+
+LATEST_RELEASE_VERSION = _read_latest_release_version()
+
 # Jazzmin Admin Settings
 JAZZMIN_SETTINGS = {
     "site_title": "Mother Cloud Admin",
-    "site_header": "Cloud POS Server",
-    "site_brand": "HQ POS Manager",
-    "welcome_sign": "Welcome to the Mother POS Admin",
-    "copyright": "POS System Cloud HQ",
+    "site_header": f"Cloud POS (v{LATEST_RELEASE_VERSION})",
+    "site_brand": f"HQ POS Manager (v{LATEST_RELEASE_VERSION})",
+    "welcome_sign": f"Mother POS Admin — Oxirgi versiya: v{LATEST_RELEASE_VERSION}",
+    "copyright": f"POS System Cloud HQ (v{LATEST_RELEASE_VERSION})",
     "search_model": ["tenants.Restaurant", "tenants.License"],
     "show_ui_builder": False,
     "icons": {
@@ -293,6 +302,7 @@ JAZZMIN_SETTINGS = {
     "default_icon_parents": "fas fa-folder",
     "default_icon_children": "fas fa-circle",
 }
+
 
 JAZZMIN_UI_TWEAKS = {
     "theme": "darkly",

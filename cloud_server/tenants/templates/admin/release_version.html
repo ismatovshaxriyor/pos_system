@@ -5,6 +5,12 @@
     <p>Tanlangan <b>{{ active_restaurants|length }}</b> ta <b>faol</b> Bolaga yuboriladigan versiyani kiriting.
        Ular <code>update_app</code> buyrug'ini olib, Watchtower orqali <code>:stable</code> image'ni tortadi.</p>
 
+    {% if latest_version %}
+      <p style="background:#1b4332; color:#d8f3dc; padding:8px 12px; border-radius:6px; font-weight:bold;">
+         🚀 Oxirgi chiqarilgan versiya: <code>v{{ latest_version }}</code>
+      </p>
+    {% endif %}
+
     {% if skipped_inactive %}
       <p style="color:#c0392b;">Diqqat: {{ skipped_inactive }} ta faol emas restoran o'tkazib yuboriladi
          (bloklangan/o'chirilgan Bolaga update yuborilmaydi).</p>
@@ -19,9 +25,10 @@
     </ul>
 
     <p>
-      <label for="id_version"><b>Versiya:</b></label>
-      <input type="text" name="version" id="id_version" placeholder="masalan: 0.1.2" required autofocus>
+      <label for="id_version"><b>Yangi versiya:</b></label>
+      <input type="text" name="version" id="id_version" value="{{ latest_version|default:'' }}" placeholder="masalan: 0.3.0" required autofocus>
     </p>
+
 
     {% for pk in selected %}
       <input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">

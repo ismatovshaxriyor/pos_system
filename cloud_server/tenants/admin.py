@@ -261,16 +261,19 @@ class RestaurantAdmin(admin.ModelAdmin):
                 "Rollout app_version shu versiyaga tenglashganda tasdiqlanadi.",
             )
             return
-        # Oraliq sahifa: versiyani bir marta so'raymiz (barcha tanlanganlar uchun).
+        from django.conf import settings
         from django.template.response import TemplateResponse
+        latest_version = getattr(settings, 'LATEST_RELEASE_VERSION', '0.3.0')
         return TemplateResponse(request, 'admin/release_version.html', {
-            'title': "Yangi versiya yuborish",
+            'title': f"Yangi versiya yuborish (Oxirgi versiya: v{latest_version})",
+            'latest_version': latest_version,
             'active_restaurants': active,
             'skipped_inactive': queryset.count() - active.count(),
             'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
             'selected': list(queryset.values_list('pk', flat=True)),
             'opts': self.model._meta,
         })
+
 
 
 @admin.register(RestaurantAdminAccount)
