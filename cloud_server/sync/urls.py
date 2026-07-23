@@ -1,5 +1,8 @@
 from django.urls import path
-from .views import HeartbeatView, ActivationView, RenewView, CommandResultView, ErrorLogView, OrderSyncView
+from .views import (
+    HeartbeatView, ActivationView, RenewView, CommandResultView, ErrorLogView,
+    OrderSyncView, PublicStatsView, PublicLicenseCheckView, PublicDemoRequestView,
+)
 
 urlpatterns = [
     path('activate/', ActivationView.as_view(), name='sync-activate'),
@@ -8,4 +11,10 @@ urlpatterns = [
     path('commands/<uuid:command_id>/result/', CommandResultView.as_view(), name='sync-command-result'),
     path('error-logs/', ErrorLogView.as_view(), name='sync-error-logs'),
     path('orders/', OrderSyncView.as_view(), name='sync-orders'),
+    
+    # Public Website (hamrohpos.uz) APIs
+    path('public/stats/', PublicStatsView.as_view(), name='public-stats'),
+    path('public/check-license/', PublicLicenseCheckView.as_view(), name='public-check-license'),
+    path('public/demo-request/', PublicDemoRequestView.as_view(), name='public-demo-request'),
 ]
+

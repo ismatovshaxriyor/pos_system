@@ -1,41 +1,28 @@
 import React, { useState } from 'react';
 import { Search, ShieldCheck, AlertCircle, CheckCircle2, Key, Calendar, Cpu, HardDrive } from 'lucide-react';
+import { checkLicense } from '../services/api';
 
 export default function LicenseChecker() {
   const [licenseKey, setLicenseKey] = useState('');
   const [result, setResult] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  const handleCheck = (e) => {
+  const handleCheck = async (e) => {
     e.preventDefault();
     if (!licenseKey.trim()) return;
 
     setIsSearching(true);
     setResult(null);
 
-    setTimeout(() => {
-      setIsSearching(false);
-      const cleanKey = licenseKey.trim().toUpperCase();
-
-      if (cleanKey.includes('EXPIRED') || cleanKey.includes('INACTIVE')) {
-        setResult({
-          status: 'expired',
-          restaurant: 'Muddati O\'tgan Test Restoran',
-          expiresAt: '2026-06-30 23:59',
-          hardwareHash: 'c712-48aa-b912-45df',
-          message: 'Litsenziya muddati tugagan. Muddatni uzaytirish uchun to\'lovni amalga oshiring.'
-        });
-      } else {
-        setResult({
-          status: 'active',
-          restaurant: 'Afsona National Restaurant (Toshkent)',
-          expiresAt: '2026-12-31 23:59',
-          hardwareHash: 'a89f-21bc-940a-11ef',
-          batchTokens: 4,
-          message: 'Litsenziya to\'liq FAOL va RS256 JWT tokenlar to\'plami olingan.'
-        });
-      }
-    }, 600);
+    const apiRes = await checkLicense(licenseKey);
+    setIsSearching(false);
+    setResult({
+      status: apiRes.status,
+      restaurant: apiRes.restaurant || 'Restoran Nomi',
+      expiresAt: apiRes.expires_at ? new Date(apiRes.expires_at).toLocaleString() : 'Noma\'lum',
+      hardwareHash: apiRes.hardware_bound ? 'Bog\'langan' : 'Bog\'lanmagan',
+      message: apiRes.detail || ''
+    });
   };
 
   return (

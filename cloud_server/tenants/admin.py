@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from .models import (
     Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
-    SyncedOrder, SyncedOrderItem, SyncedPayment,
+    SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest,
 )
 from .signals import compute_default_license_expiry
 from sync.jwt_utils import issue_license_token
@@ -504,3 +504,35 @@ class SyncedOrderAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(DemoRequest)
+class DemoRequestAdmin(admin.ModelAdmin):
+    list_display = ('restaurant_name', 'contact_name', 'phone', 'branch_count', 'contacted_badge', 'created_at')
+    list_filter = ('is_contacted', 'created_at')
+    search_fields = ('restaurant_name', 'contact_name', 'phone', 'note')
+    readonly_fields = ('id', 'created_at')
+    actions = ['mark_contacted', 'mark_uncontacted']
+
+    @admin.display(description="Aloqa holati", ordering='is_contacted')
+    def contacted_badge(self, obj):
+        if obj.is_contacted:
+            return format_html(
+                '<span style="color:#fff;background:#22883f;padding:2px 8px;'
+                'border-radius:8px;font-size:11px">Bog\'lanildi</span>'
+            )
+        return format_html(
+            '<span style="color:#fff;background:#c77d00;padding:2px 8px;'
+            'border-radius:8px;font-size:11px">Kutilmoqda</span>'
+        )
+
+    @admin.action(description="Bog'lanildi deb belgilash")
+    def mark_contacted(self, request, queryset):
+        updated = queryset.update(is_contacted=True)
+        self.message_user(request, f"{updated} ta so'rov bog'lanildi deb belgilandi.")
+
+    @admin.action(description="Kutilmoqda holatiga qaytarish")
+    def mark_uncontacted(self, request, queryset):
+        updated = queryset.update(is_contacted=False)
+        self.message_user(request, f"{updated} ta so'rov kutilmoqda holatiga qaytarildi.")
+

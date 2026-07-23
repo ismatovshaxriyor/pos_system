@@ -88,3 +88,16 @@ class OrderSyncBatchSerializer(serializers.Serializer):
         if len(value) > 200:
             raise serializers.ValidationError("Bitta so'rovda ko'pi bilan 200 ta buyurtma yuborilishi mumkin.")
         return value
+
+
+class PublicLicenseCheckSerializer(serializers.Serializer):
+    license_key = serializers.CharField(max_length=40)
+
+
+class DemoRequestSerializer(serializers.Serializer):
+    restaurant_name = serializers.CharField(max_length=200)
+    contact_name = serializers.CharField(max_length=200)
+    phone = serializers.CharField(max_length=50)
+    branch_count = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    note = serializers.CharField(required=False, allow_blank=True, default='')
+

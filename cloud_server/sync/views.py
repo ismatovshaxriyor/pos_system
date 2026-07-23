@@ -1,18 +1,26 @@
 import logging
+import os
+import urllib.request
+import urllib.parse
 
 from django.shortcuts import get_object_or_404
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, throttling
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.core.cache import cache
-from tenants.models import License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment
+from tenants.models import (
+    License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount,
+    ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest,
+)
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token_batch, get_public_key_pem
 from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
-    ErrorLogBatchSerializer, OrderSyncBatchSerializer,
+    ErrorLogBatchSerializer, OrderSyncBatchSerializer, PublicLicenseCheckSerializer,
+    DemoRequestSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -395,3 +403,126 @@ class OrderSyncView(APIView):
             synced_uuids.append(str(order_id))
 
         return Response({"synced_uuids": synced_uuids, "detail": "Buyurtmalar sinxronlashtirildi."}, status=status.HTTP_201_CREATED)
+
+
+def _send_telegram_lead_notification(demo_request):
+    """
+    Veb-saytdan kelgan demo so'rovi va xabarlarni Telegram admin botiga yuboradi.
+    """
+    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
+    if not bot_token or not chat_id:
+        return
+
+    text = (
+        f"🚨 <b>YANGI DEMO SO'ROV (hamrohpos.uz)</b>\n\n"
+        f"🏢 <b>Restoran:</b> {demo_request.restaurant_name}\n"
+        f"👤 <b>Aloqa shaxsi:</b> {demo_request.contact_name}\n"
+        f"📞 <b>Telefon:</b> {demo_request.phone}\n"
+        f"📊 <b>Kassa soni:</b> {demo_request.branch_count or '1 ta'}\n"
+    )
+    if demo_request.note:
+        text += f"📝 <b>Izoh:</b> {demo_request.note}\n"
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = urllib.parse.urlencode({
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': 'HTML',
+    }).encode('utf-8')
+    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        logger.warning("Telegram lead notification yuborishda xato: %s", e)
+
+
+class PublicStatsView(APIView):
+    """
+    Veb-sayt (hamrohpos.uz) uchun ommaviy tizim statistikasi.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
+
+    def get(self, request):
+        active_count = Restaurant.objects.filter(is_active=True).count()
+        online_count = Restaurant.objects.filter(is_online=True).count()
+        release_version = getattr(settings, 'LATEST_RELEASE_VERSION', '0.3.0')
+
+        return Response({
+            "active_restaurants": active_count,
+            "online_restaurants": online_count,
+            "app_version": release_version,
+            "status": "operational",
+        }, status=status.HTTP_200_OK)
+
+
+class PublicLicenseCheckView(APIView):
+    """
+    Veb-sayt (hamrohpos.uz) orqali litsenziya kalitini tekshirish.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
+
+    def post(self, request):
+        serializer = PublicLicenseCheckSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        key = serializer.validated_data['license_key'].strip()
+
+        try:
+            license_obj = License.objects.select_related('restaurant').get(key__iexact=key)
+        except License.DoesNotExist:
+            return Response({
+                "status": "not_found",
+                "detail": "Kiritilgan litsenziya kaliti topilmadi."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        is_expired = license_obj.expires_at < now
+        is_valid = license_obj.is_active and not is_expired
+
+        # Restoran nomini anonimlashtirish (masalan Rayhon ***)
+        name = license_obj.restaurant.name
+        name_parts = name.split()
+        masked_name = name_parts[0] + " ***" if len(name_parts) > 1 else name[:3] + "***"
+
+        return Response({
+            "status": "active" if is_valid else ("expired" if is_expired else "inactive"),
+            "restaurant": masked_name,
+            "expires_at": license_obj.expires_at.isoformat(),
+            "hardware_bound": bool(license_obj.hardware_hash),
+            "detail": "Litsenziya to'liq faol." if is_valid else ("Litsenziya muddati tugagan." if is_expired else "Litsenziya nofaol.")
+        }, status=status.HTTP_200_OK)
+
+
+class PublicDemoRequestView(APIView):
+    """
+    Veb-saytdan (hamrohpos.uz) demoga so'rov qabul qilish va Telegram xabarnomasi yuborish.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
+
+    def post(self, request):
+        serializer = DemoRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        demo_req = DemoRequest.objects.create(
+            restaurant_name=data['restaurant_name'],
+            contact_name=data['contact_name'],
+            phone=data['phone'],
+            branch_count=data.get('branch_count', ''),
+            note=data.get('note', ''),
+        )
+
+        # Telegram botga admin bildirishnomasi
+        _send_telegram_lead_notification(demo_req)
+
+        return Response({
+            "id": str(demo_req.id),
+            "detail": "So'rovingiz muvaffaqiyatli qabul qilindi. Mutaxassisimiz tez orada siz bilan bog'lanadi."
+        }, status=status.HTTP_201_CREATED)
+

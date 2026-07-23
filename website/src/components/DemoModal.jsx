@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Phone, Building, User, Send, ShieldCheck } from 'lucide-react';
+import { sendDemoRequest } from '../services/api';
 
 export default function DemoModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({
@@ -8,12 +9,16 @@ export default function DemoModal({ isOpen, onClose }) {
     phone: '+998 ',
     branchCount: '1 ta kassa'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    await sendDemoRequest(formData);
+    setIsSubmitting(false);
     setIsSubmitted(true);
   };
 
@@ -109,10 +114,11 @@ export default function DemoModal({ isOpen, onClose }) {
 
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="w-full btn-gold py-3.5 rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 mt-4 text-xs shadow-xl"
               >
                 <Send className="w-4 h-4" />
-                <span>So'rovni Yuborish</span>
+                <span>{isSubmitting ? 'Yuborilmoqda...' : 'So\'rovni Yuborish'}</span>
               </button>
             </form>
           </div>

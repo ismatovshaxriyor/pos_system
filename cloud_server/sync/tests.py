@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from tenants.models import (
     License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
-    SyncedOrder,
+    SyncedOrder, DemoRequest,
 )
 from tenants.tasks import mark_offline_restaurants
 from tenants.signals import compute_default_license_expiry
@@ -671,3 +671,47 @@ class OrderSyncTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertTrue(SyncedOrder.objects.filter(id=payload['sync_uuid']).exists())
+
+
+class PublicApiTests(TestCase):
+    def test_public_stats(self):
+        url = reverse('public-stats')
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('active_restaurants', resp.data)
+        self.assertIn('app_version', resp.data)
+
+    def test_public_license_check_active(self):
+        restaurant = Restaurant.objects.create(name="Rayhon Food")
+        license_obj = restaurant.license
+        license_obj.hardware_hash = "a" * 64
+        license_obj.expires_at = timezone.now() + timedelta(days=30)
+        license_obj.save()
+
+        url = reverse('public-check-license')
+        resp = self.client.post(
+            url, {"license_key": license_obj.key}, content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['status'], 'active')
+
+    def test_public_license_check_not_found(self):
+        url = reverse('public-check-license')
+        resp = self.client.post(
+            url, {"license_key": "NONEXISTENT-KEY"}, content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_public_demo_request(self):
+        url = reverse('public-demo-request')
+        payload = {
+            "restaurant_name": "Afsona Kafe",
+            "contact_name": "Vali Rahimov",
+            "phone": "+998901234567",
+            "branch_count": "2 ta kassa",
+            "note": "Demoga so'rov"
+        }
+        resp = self.client.post(url, payload, content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(DemoRequest.objects.filter(restaurant_name="Afsona Kafe").exists())
+

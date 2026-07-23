@@ -103,15 +103,15 @@ export default function Pricing({ onOpenDemo }) {
           {plans.map((p, idx) => (
             <div
               key={idx}
-              className={`glass-card p-8 rounded-2xl flex flex-col justify-between space-y-6 relative transition-all ${
+              className={`glass-card glass-card-hover p-8 rounded-2xl flex flex-col justify-between space-y-6 relative transition-all ${
                 p.isPopular
-                  ? 'border-2 border-[#e3c282] gold-border-glow bg-gradient-to-b from-[#1a3a32]/60 to-[#001712]/90 transform md:-translate-y-2'
-                  : 'border-[#e3c282]/20 hover:border-[#e3c282]/50'
+                  ? 'gradient-border-gold gold-border-glow bg-gradient-to-b from-[#1a3a32]/80 to-[#001712]/95 transform md:-translate-y-2'
+                  : 'border-[#e3c282]/20 hover:border-[#e3c282]/60'
               }`}
             >
               {p.isPopular && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full btn-gold text-[11px] font-bold font-mono tracking-wider flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-[#001712]" />
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full btn-gold text-[11px] font-bold font-mono tracking-wider flex items-center gap-1 shadow-lg">
+                  <Sparkles className="w-3.5 h-3.5 text-[#001712] animate-pulse" />
                   <span>ENG OMMABOP TARIF</span>
                 </div>
               )}

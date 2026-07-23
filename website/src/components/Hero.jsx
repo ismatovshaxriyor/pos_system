@@ -1,28 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wifi, WifiOff, ShieldCheck, Printer, ArrowRight, Play, CheckCircle2, ShoppingBag, CreditCard, Layers } from 'lucide-react';
+import { fetchPublicStats } from '../services/api';
 
 export default function Hero({ onOpenDemo }) {
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [stats, setStats] = useState({ active_restaurants: 14, online_restaurants: 12, app_version: '0.3.0' });
   const [cartItems, setCartItems] = useState([
     { id: 1, name: 'Osh Palov (Lazer)', price: 45000, qty: 2 },
     { id: 2, name: 'Somsa Go\'shtli', price: 12000, qty: 4 },
     { id: 3, name: 'Ko\'k Choy', price: 5000, qty: 1 },
   ]);
 
+  useEffect(() => {
+    fetchPublicStats().then(setStats);
+  }, []);
+
   const totalAmount = cartItems.reduce((acc, i) => acc + i.price * i.qty, 0);
 
   return (
-    <section className="relative pt-12 pb-24 overflow-hidden oriental-pattern-overlay">
-      {/* Glow Effects */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-[#e3c282]/10 blur-[140px] rounded-full pointer-events-none" />
-      <div className="absolute top-1/3 right-10 w-[350px] h-[350px] bg-[#adcdc3]/10 blur-[120px] rounded-full pointer-events-none" />
+    <section className="relative pt-10 sm:pt-16 pb-20 sm:pb-28 overflow-hidden oriental-pattern-overlay">
+      {/* Optimized Floating Glow Effects */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] sm:w-[600px] h-[320px] sm:h-[400px] bg-[#e3c282]/10 blur-[120px] rounded-full pointer-events-none animate-float-slow" />
+      <div className="absolute top-1/3 right-5 w-[250px] sm:w-[350px] h-[250px] sm:h-[350px] bg-[#adcdc3]/10 blur-[100px] rounded-full pointer-events-none animate-float-slow" style={{ animationDelay: '3.5s' }} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 animate-fade-in-up">
         
         {/* Top Tag Badge */}
         <div className="flex justify-center mb-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card border border-[#e3c282]/40 text-xs font-mono text-[#e3c282]">
-            <span className="w-2 h-2 rounded-full bg-[#e3c282] animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full glass-card border border-[#e3c282]/40 text-[11px] sm:text-xs font-mono text-[#e3c282] shadow-md">
+            <span className="w-2 h-2 rounded-full bg-[#e3c282] animate-pulse-ring" />
             <span>Rasmiy Server: hamrohpos.uz — Ona-Bola (Cloud-Local) POS</span>
           </div>
         </div>

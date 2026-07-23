@@ -216,3 +216,24 @@ class SyncedPayment(models.Model):
 
     def __str__(self):
         return f"{self.amount} ({self.method}) - Order {self.order.id}"
+
+
+class DemoRequest(models.Model):
+    """
+    Veb-sayt (hamrohpos.uz) orqali demoga kelgan so'rovlar va xabarlar.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    restaurant_name = models.CharField(max_length=200)
+    contact_name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=50)
+    branch_count = models.CharField(max_length=50, blank=True, default='')
+    note = models.TextField(blank=True, default='')
+    is_contacted = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.restaurant_name} - {self.contact_name} ({self.phone})"
+

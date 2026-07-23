@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     background-color: #001712;
     color: #c7eade;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
   }
 }
 
@@ -24,28 +29,31 @@
 
 /* Glassmorphism Cards */
 .glass-card {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   background: rgba(26, 58, 50, 0.22);
   border: 1px solid rgba(227, 194, 130, 0.22);
+  will-change: transform, border-color, box-shadow;
 }
 
 .glass-card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
 }
 
 .glass-card-hover:hover {
-  border-color: rgba(227, 194, 130, 0.55);
-  box-shadow: 0 0 30px rgba(227, 194, 130, 0.18);
-  transform: translateY(-2px);
+  border-color: rgba(227, 194, 130, 0.6);
+  box-shadow: 0 0 35px rgba(227, 194, 130, 0.2);
+  transform: translateY(-4px) scale(1.008);
 }
 
 .gold-border-glow {
-  box-shadow: 0 0 20px rgba(227, 194, 130, 0.2);
+  box-shadow: 0 0 25px rgba(227, 194, 130, 0.22);
 }
 
 .emerald-glow {
-  box-shadow: 0 0 30px rgba(173, 205, 195, 0.15);
+  box-shadow: 0 0 35px rgba(173, 205, 195, 0.18);
 }
 
 .text-gradient-gold {
@@ -60,18 +68,75 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* Animated Conic Border Gradient for Featured Cards */
+.gradient-border-gold {
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.gradient-border-gold::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(90deg, #e3c282, #adcdc3, #b89146, #e3c282);
+  background-size: 300% 300%;
+  border-radius: inherit;
+  z-index: -1;
+  animation: border-gradient-move 4s linear infinite;
+}
+
+@keyframes border-gradient-move {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Buttons with Shimmer & Glow */
 .btn-gold {
+  position: relative;
   background: linear-gradient(135deg, #e3c282 0%, #c49f57 100%);
   color: #001712;
   font-weight: 600;
-  transition: all 0.25s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s ease,
+              background 0.2s ease;
   box-shadow: 0 4px 20px rgba(227, 194, 130, 0.3);
+  overflow: hidden;
+}
+
+.btn-gold::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    60deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 70%
+  );
+  transform: rotate(30deg) translate(-100%, -100%);
+  transition: transform 0.6s ease;
+}
+
+.btn-gold:hover::after {
+  transform: rotate(30deg) translate(100%, 100%);
 }
 
 .btn-gold:hover {
   background: linear-gradient(135deg, #f0d59e 0%, #d4ae66 100%);
-  box-shadow: 0 6px 25px rgba(227, 194, 130, 0.45);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 30px rgba(227, 194, 130, 0.55);
+  transform: translateY(-2px);
+}
+
+.btn-gold:active {
+  transform: translateY(0);
 }
 
 .btn-emerald {
@@ -86,6 +151,7 @@
   background: rgba(173, 205, 195, 0.22);
   border-color: rgba(173, 205, 195, 0.6);
   color: #ffffff;
+  transform: translateY(-1px);
 }
 
 /* Hide Scrollbar */
@@ -95,15 +161,82 @@
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Animations */
-@keyframes pulse-gold {
-  0% { transform: scale(0.97); opacity: 0.6; }
-  50% { transform: scale(1.03); opacity: 1; }
-  100% { transform: scale(0.97); opacity: 0.6; }
+/* Highly Optimized GPU Animations */
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -14px, 0); }
 }
 
-.animate-pulse-gold {
-  animation: pulse-gold 2.5s infinite ease-in-out;
+.animate-float-slow {
+  will-change: transform;
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 0.3; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.animate-pulse-ring {
+  will-change: transform, opacity;
+  animation: pulse-ring 2.5s ease-in-out infinite;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-fade-in-up {
+  will-change: transform, opacity;
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Receipt slide-out animation for Terminal Simulator */
+@keyframes print-receipt {
+  0% { transform: translate3d(0, -20px, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+.animate-print-receipt {
+  will-change: transform, opacity;
+  animation: print-receipt 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Laser beam scanner line across cards */
+@keyframes laser-scan {
+  0% { transform: translate3d(-100%, 0, 0); }
+  100% { transform: translate3d(200%, 0, 0); }
+}
+
+.animate-laser-scan {
+  will-change: transform;
+  animation: laser-scan 3s ease-in-out infinite;
+}
+
+/* Mobile & Reduced Motion Tweaks */
+@media (max-width: 640px) {
+  .glass-card {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -72,15 +72,15 @@ export default function InteractiveDemo() {
           </p>
         </div>
 
-        {/* Tab Buttons */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex p-1.5 rounded-xl glass-card border border-[#e3c282]/30 gap-2">
+        {/* Mobile-Friendly Touch-Scrollable Tab Buttons */}
+        <div className="flex justify-start sm:justify-center mb-8 overflow-x-auto hide-scrollbar pb-2 px-2">
+          <div className="inline-flex p-1.5 rounded-xl glass-card border border-[#e3c282]/30 gap-1.5 shrink-0">
             <button
               onClick={() => setActiveTab('kassa')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold font-mono transition-all ${
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs font-semibold font-mono whitespace-nowrap transition-all duration-200 ${
                 activeTab === 'kassa'
-                  ? 'btn-gold shadow-md'
-                  : 'text-[#adcdc3] hover:text-white'
+                  ? 'btn-gold shadow-md scale-[1.02]'
+                  : 'text-[#adcdc3] hover:text-white hover:bg-[#e3c282]/10'
               }`}
             >
               <ShoppingCart className="w-4 h-4" />
@@ -89,10 +89,10 @@ export default function InteractiveDemo() {
 
             <button
               onClick={() => setActiveTab('oshxona')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold font-mono transition-all ${
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs font-semibold font-mono whitespace-nowrap transition-all duration-200 ${
                 activeTab === 'oshxona'
-                  ? 'btn-gold shadow-md'
-                  : 'text-[#adcdc3] hover:text-white'
+                  ? 'btn-gold shadow-md scale-[1.02]'
+                  : 'text-[#adcdc3] hover:text-white hover:bg-[#e3c282]/10'
               }`}
             >
               <UtensilsCrossed className="w-4 h-4" />
@@ -101,10 +101,10 @@ export default function InteractiveDemo() {
 
             <button
               onClick={() => setActiveTab('cloud')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-semibold font-mono transition-all ${
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs font-semibold font-mono whitespace-nowrap transition-all duration-200 ${
                 activeTab === 'cloud'
-                  ? 'btn-gold shadow-md'
-                  : 'text-[#adcdc3] hover:text-white'
+                  ? 'btn-gold shadow-md scale-[1.02]'
+                  : 'text-[#adcdc3] hover:text-white hover:bg-[#e3c282]/10'
               }`}
             >
               <Monitor className="w-4 h-4" />
