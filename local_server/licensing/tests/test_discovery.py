@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -14,12 +15,13 @@ class DiscoveryViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['service'], 'pos-bola')
-        self.assertEqual(data['version'], '1.0.0')
+        self.assertEqual(data['version'], getattr(settings, 'APP_VERSION', '0.3.0'))
         self.assertFalse(data['activated'])
         self.assertIsNone(data['restaurant_id'])
         self.assertEqual(data['restaurant_name'], 'Faollashtirilmagan Server')
         self.assertFalse(data['is_blocked'])
         self.assertIn('server_time', data)
+
 
     def test_discovery_activated_server(self):
         rest_id = uuid.uuid4()
