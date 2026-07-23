@@ -7,7 +7,7 @@ from .hardware import get_hardware_fingerprint
 from .models import LICENSE_VERIFY_CACHE_KEY, LicenseState
 from .jwt_utils import LicenseContext
 
-EXEMPT_PREFIXES = ('/api/license/',)
+EXEMPT_PREFIXES = ('/api/license/', '/api/public/', '/api/discovery/')
 
 BLOCKED_RESPONSE = {"detail": "Tizim bloklandi. To'lovni amalga oshiring."}
 

@@ -5,7 +5,7 @@ from .views import (
     ProductViewSet, OrderViewSet,
     StaffDeviceViewSet, NotificationViewSet, BootstrapView,
     RestaurantConfigViewSet, AttendanceViewSet, TableZoneViewSet,
-    PrinterViewSet, PrintJobViewSet,
+    PrinterViewSet, PrintJobViewSet, PublicMenuView, PublicTableLiveView, PublicCallWaiterView,
 )
 from .reports import (
     MySalesSummaryView, DashboardView, SalesReportView,
@@ -38,6 +38,9 @@ router.register(r'purchases', PurchaseViewSet, basename='purchase')
 router.register(r'stock-movements', StockMovementViewSet, basename='stockmovement')
 
 urlpatterns = [
+    path('public/menu/', PublicMenuView.as_view(), name='public-menu'),
+    path('public/table/<str:qr_code>/', PublicTableLiveView.as_view(), name='public-table-live'),
+    path('public/table/<str:qr_code>/call-waiter/', PublicCallWaiterView.as_view(), name='public-call-waiter'),
     path('bootstrap/', BootstrapView.as_view(), name='bootstrap'),
     path('reports/my-summary/', MySalesSummaryView.as_view(), name='reports-my-summary'),
     path('reports/dashboard/', DashboardView.as_view(), name='reports-dashboard'),

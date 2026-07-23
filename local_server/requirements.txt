@@ -18,3 +18,4 @@ channels==4.3.2
 channels-redis==4.3.0
 daphne
 django-simple-history
+qrcode==8.0

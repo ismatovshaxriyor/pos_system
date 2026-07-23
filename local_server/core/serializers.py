@@ -535,3 +535,69 @@ class PrintJobSerializer(serializers.ModelSerializer):
         fields = ('id', 'printer', 'printer_name', 'order', 'table_name', 'waiter_name', 'items_snapshot', 'status', 'created_at', 'updated_at')
         read_only_fields = ('id', 'items_snapshot', 'created_at', 'updated_at')
 
+
+# ==============================================================================
+# PUBLIC QR CODE MENU & LIVE TABLE SERIALIZERS
+# ==============================================================================
+
+class PublicProductSerializer(serializers.ModelSerializer):
+    """Mijozlar uchun ochiq taomlar ma'lumoti."""
+    class Meta:
+        model = Product
+        fields = ('id', 'name', 'price', 'image', 'barcode', 'is_available')
+
+
+class PublicCategorySerializer(serializers.ModelSerializer):
+    """Mijozlar uchun ochiq kategoriyalar va ulardagi taomlar menyusi."""
+    products = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ('id', 'name', 'image', 'products')
+
+    def get_products(self, obj):
+        products = obj.products.filter(is_deleted=False, is_available=True)
+        return PublicProductSerializer(products, many=True, context=self.context).data
+
+
+class PublicOrderItemSerializer(serializers.ModelSerializer):
+    """Mijozlar uchun stoldagi buyurtma qilingan taomlar holati."""
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ('id', 'product_name', 'quantity', 'price', 'status', 'modifiers', 'is_printed')
+
+
+class PublicOrderSerializer(serializers.ModelSerializer):
+    """Mijozlar uchun stoldagi faol buyurtma va uning umumiy hisob-kitobi."""
+    items = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = (
+            'id', 'status', 'order_type', 'items',
+            'tax_amount', 'service_charge', 'discount_amount',
+            'total_amount', 'final_amount', 'created_at'
+        )
+
+    def get_items(self, obj):
+        active_items = obj.items.filter(is_voided=False)
+        return PublicOrderItemSerializer(active_items, many=True).data
+
+
+class PublicTableLiveSerializer(serializers.Serializer):
+    """Mijoz QR kodni skanerlaganda qaytadigan stol va undagi jonli hisob-kitob."""
+    table_id = serializers.IntegerField(source='id')
+    table_name = serializers.CharField(source='name')
+    zone_name = serializers.CharField(source='zone.name', default='', allow_null=True)
+    qr_code = serializers.UUIDField()
+    current_order = serializers.SerializerMethodField()
+
+    def get_current_order(self, obj):
+        order = obj.orders.filter(status__in=['new', 'in_progress']).order_by('-created_at').first()
+        if order:
+            return PublicOrderSerializer(order).data
+        return None
+
+

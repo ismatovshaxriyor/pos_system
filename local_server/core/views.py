@@ -28,6 +28,7 @@ from .serializers import (
     RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
     RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
     TableZoneSerializer, PrinterSerializer, PrintJobSerializer, LiveTableSalesSerializer,
+    PublicCategorySerializer, PublicTableLiveSerializer,
 )
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
@@ -112,6 +113,38 @@ class TableViewSet(viewsets.ModelViewSet):
         # o'zgarmaydi - bir marta olib, har buyurtmaga uzatamiz (aks holda har
         # stol uchun qayta o'qilardi).
         from licensing.jwt_utils import LicenseContext
+
+    @action(detail=True, methods=['get'], url_path='qr-code')
+    def qr_code(self, request, pk=None):
+        """
+        Stol uchun QR kod tasvirini (PNG) Zümrad & Oltin brendingida generatsiya qilib beradi.
+        Domain request headers (Host) yoki `domain` query parametri orqali aniqlanadi.
+        """
+        table = self.get_object()
+        domain = request.query_params.get('domain', request.get_host())
+        scheme = 'https' if request.is_secure() or 'hamrohpos.uz' in domain else 'http'
+        qr_url = f"{scheme}://{domain}/table/{table.qr_code}/"
+
+        import io
+        import qrcode
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#001712", back_color="#e3c282")
+
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        from django.http import HttpResponse
+        response = HttpResponse(buffer.getvalue(), content_type='image/png')
+        response['Content-Disposition'] = f'inline; filename="qr_table_{table.id}.png"'
+        return response
         license_ctx = LicenseContext.from_active_state()
 
         active_orders = Order.objects.filter(
@@ -906,5 +939,124 @@ class KitchenDashboardView(TemplateView):
 
         token, _ = Token.objects.get_or_create(user=user)
         return token.key
+
+
+# ==============================================================================
+# PUBLIC QR CODE MENU & LIVE TABLE VIEWS
+# ==============================================================================
+
+class PublicMenuView(APIView):
+    """
+    Ochiq raqamli menyu API: Har qanday mijoz autentifikatsiyasiz menyu
+    va taomlar narxi hamda mavjudligini ko'rishi mumkin.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        summary="Ochiq menyu",
+        description="Barcha aktiv kategoriyalar va ulardagi mavjud taomlar menyusini qaytaradi.",
+        responses={200: PublicCategorySerializer(many=True)}
+    )
+    def get(self, request):
+        categories = Category.objects.all().order_by('name')
+        serializer = PublicCategorySerializer(categories, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+def _get_public_table(qr_code):
+    """
+    qr_code bo'yicha stolni aniqlaydi. Agar qr_code == 'demo' bo'lsa
+    yoki yaroqsiz bo'lsa, bazadagi birinchi faol stolni moslab beradi.
+    """
+    if str(qr_code).lower() == 'demo':
+        table = Table.objects.filter(is_active=True).first()
+        if not table:
+            table = Table.objects.create(name='Demo Stol', is_active=True)
+        return table
+
+    try:
+        table_uuid = uuid.UUID(str(qr_code))
+        return get_object_or_404(Table, qr_code=table_uuid, is_active=True)
+    except (ValueError, TypeError):
+        table = Table.objects.filter(is_active=True).first()
+        if not table:
+            table = Table.objects.create(name='Demo Stol', is_active=True)
+        return table
+
+
+class PublicTableLiveView(APIView):
+    """
+    Ochiq stol holati API: Mijoz stoldagi QR kodni skanerlaganda (qr_code UUID)
+    shu stolning joriy holati va faol buyurtmasidagi narxlarni ko'ra oladi.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        summary="Stolning jonli hisobi",
+        description="QR UUID orqali stolni topadi va undagi faol buyurtma taomlari hamda jami summasini qaytaradi.",
+        responses={200: PublicTableLiveSerializer}
+    )
+    def get(self, request, qr_code):
+        table = _get_public_table(qr_code)
+        serializer = PublicTableLiveSerializer(table, context={'request': request})
+        return Response(serializer.data)
+
+
+class PublicCallWaiterView(APIView):
+    """
+    Mijoz tomonidan stoldan ofitsiantni chaqirish (yoki hisob so'rash) API'si.
+    WebSocket orqali barcha faol afitsiantlar va kassa ekraniga real-vaqtda bildirishnoma yuboradi.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        summary="Ofitsiantni chaqirish",
+        description="QR UUID bo'yicha stolni topib, afitsiant va kassa ekraniga chaqiruv yuboradi.",
+        responses={200: StatusMessageSerializer}
+    )
+    def post(self, request, qr_code):
+        table = _get_public_table(qr_code)
+        reason = request.data.get('reason', 'Ofitsiant chaqiruvi')
+
+        # Active order waiter or general broadcast
+        active_order = table.orders.filter(status__in=['new', 'in_progress']).order_by('-created_at').first()
+        recipient = active_order.waiter if active_order and active_order.waiter else None
+
+        message = f"{table.name} stolidan chaqiruv: {reason}"
+        notif = Notification.objects.create(
+            recipient=recipient,
+            notif_type='system',
+            message=message,
+            payload={
+                'event_type': 'call_waiter',
+                'table_id': table.id,
+                'table_name': table.name,
+                'reason': reason,
+            }
+        )
+
+        broadcast_event(
+            event_type='call_waiter',
+            payload={
+                'notification_id': notif.id,
+                'table_id': table.id,
+                'table_name': table.name,
+                'reason': reason,
+                'message': message,
+                'created_at': timezone.now().isoformat(),
+            }
+        )
+
+        return Response({'status': 'ok', 'message': 'Ofitsiantga xabar yuborildi.'}, status=status.HTTP_200_OK)
+
+
+class QRAppView(TemplateView):
+    """
+    Mijozlar stoldagi QR kodni skanerlaganda ochiladigan React (Vite) Single Page App shabloni.
+    """
+    template_name = 'core/qr_app.html'
+
+
+
 
 

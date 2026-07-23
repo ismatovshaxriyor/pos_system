@@ -22,13 +22,17 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 from rest_framework.authtoken.views import obtain_auth_token
 
 from core.auth_views import DeviceRegisterView, PinLoginView, WaiterLoginView
-from core.views import KitchenDashboardView
+from core.views import KitchenDashboardView, QRAppView
 from licensing.views import DiscoveryView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('kitchen/printers/', KitchenDashboardView.as_view(), name='kitchen-dashboard'),
     path('kitchen/printers/<int:printer_id>/', KitchenDashboardView.as_view(), name='kitchen-dashboard-station'),
+
+    # QR Web App (Mijozlar stoldagi QR kodni skanerlaganda)
+    path('table/<str:qr_code>/', QRAppView.as_view(), name='qr-table-app'),
+    path('menu/', QRAppView.as_view(), name='qr-menu-app'),
 
     # API endpoints
     path('api/', include('core.urls')),

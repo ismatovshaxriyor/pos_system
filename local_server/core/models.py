@@ -152,6 +152,7 @@ class Table(BaseModel):
     name = models.CharField(max_length=50)
     capacity = models.PositiveIntegerField(default=4)
     is_active = models.BooleanField(default=True)
+    qr_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
 
     def __str__(self):
         zone_name = f" ({self.zone.name})" if self.zone else ""

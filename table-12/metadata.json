@@ -1,0 +1,6 @@
+{
+  "name": "Table 12",
+  "description": "Silk & Emerald Authentic Uzbek Fine Dining Experience with live table management, menu, sommelier recommendations, and waiter service.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
