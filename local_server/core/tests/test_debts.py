@@ -59,11 +59,19 @@ class QarzDaftarTests(TestCase):
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.balance, Decimal('20000'))
 
-    def test_close_on_credit_is_manager_gated(self):
+    def test_close_on_credit_allowed_for_cashier(self):
         url = reverse('order-close-on-credit', args=[self.order.id])
         resp = self.client.post(
             url, {'customer_id': self.customer.id},
             content_type='application/json', **_auth_header(self.cashier),
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    def test_close_on_credit_forbidden_for_waiter(self):
+        url = reverse('order-close-on-credit', args=[self.order.id])
+        resp = self.client.post(
+            url, {'customer_id': self.customer.id},
+            content_type='application/json', **_auth_header(self.waiter),
         )
         self.assertEqual(resp.status_code, 403)
 
@@ -103,11 +111,19 @@ class QarzDaftarTests(TestCase):
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.balance, Decimal('10000'))
 
-    def test_customer_create_is_manager_gated(self):
+    def test_customer_create_allowed_for_cashier(self):
         url = reverse('customer-list')
         resp = self.client.post(
             url, {'first_name': 'Yangi', 'phone': '+998907778899'},
             content_type='application/json', **_auth_header(self.cashier),
+        )
+        self.assertEqual(resp.status_code, 201)
+
+    def test_customer_create_forbidden_for_waiter(self):
+        url = reverse('customer-list')
+        resp = self.client.post(
+            url, {'first_name': 'Yangi', 'phone': '+998907778899'},
+            content_type='application/json', **_auth_header(self.waiter),
         )
         self.assertEqual(resp.status_code, 403)
 

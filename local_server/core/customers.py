@@ -24,14 +24,12 @@ class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsCashierOrManager]
 
     def get_permissions(self):
-        # Qarz daftar moliyaviy jihatdan nozik: afitsiant mijoz balansi/PII/
-        # qarz tarixini umuman ko'rmasligi kerak (IsManagerOrAdmin SAFE
-        # metodlarni afitsiantga ham ochib qo'yardi - shuning uchun bu yerda
-        # ishlatilmaydi). O'qish va qarz to'lash (repay) - kassir yoki menejer;
-        # mijoz yaratish/tahrirlash/o'chirish esa faqat menejer.
-        if self.action in ('list', 'retrieve', 'transactions', 'repay'):
-            return [IsCashierOrManager()]
-        return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+        # Qarz daftar: afitsiant mijoz balansi/PII/qarz tarixini ko'rmasligi kerak.
+        # Kassir va menejer mijoz yaratishi, o'qishi, tahrirlashi va qarzini yopishi (repay) mumkin.
+        # Faqat o'chirish (destroy) - menejer/admin uchun.
+        if self.action == 'destroy':
+            return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+        return [IsCashierOrManager()]
 
     def get_queryset(self):
         qs = Customer.objects.all()

@@ -18,7 +18,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from . import escpos, services
 from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob, Customer
-from .permissions import IsAdminStaff, IsManagerOrAdmin
+from .permissions import IsAdminStaff, IsManagerOrAdmin, IsCashierOrManager
 from .realtime import broadcast_event
 from .serializers import (
     UserSerializer, TableSerializer, CategorySerializer,
@@ -109,10 +109,34 @@ class TableViewSet(viewsets.ModelViewSet):
         if request.user.role not in ('cashier', 'manager'):
             return Response({'detail': "Faqat kassir yoki menejer uchun."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Litsenziya konteksti (anti-piracy multiplier) global va so'rov davomida
-        # o'zgarmaydi - bir marta olib, har buyurtmaga uzatamiz (aks holda har
-        # stol uchun qayta o'qilardi).
         from licensing.jwt_utils import LicenseContext
+        license_ctx = LicenseContext.from_active_state()
+
+        active_orders = Order.objects.filter(
+            status__in=('new', 'in_progress'), table__isnull=False,
+        ).select_related('table', 'table__zone', 'waiter').prefetch_related('items', 'payments')
+
+        rows = []
+        for order in active_orders:
+            total, final, balance = services.calculate_order_financials(order, context=license_ctx)
+            amount_paid = sum(
+                (p.amount for p in order.payments.all() if not p.is_voided), Decimal('0'),
+            )
+            rows.append({
+                'table_id': order.table_id,
+                'table_name': order.table.name,
+                'zone': order.table.zone.name if order.table.zone else None,
+                'order_id': order.id,
+                'waiter': order.waiter.first_name if order.waiter else None,
+                'guest_count': order.guest_count,
+                'item_count': sum(i.quantity for i in order.items.all() if not i.is_voided),
+                'total_amount': total,
+                'final_amount': final,
+                'amount_paid': amount_paid,
+                'balance_due': balance,
+                'opened_at': order.created_at,
+            })
+        return Response(LiveTableSalesSerializer(rows, many=True).data)
 
     @action(detail=True, methods=['get'], url_path='qr-code')
     def qr_code(self, request, pk=None):
@@ -145,34 +169,6 @@ class TableViewSet(viewsets.ModelViewSet):
         response = HttpResponse(buffer.getvalue(), content_type='image/png')
         response['Content-Disposition'] = f'inline; filename="qr_table_{table.id}.png"'
         return response
-        license_ctx = LicenseContext.from_active_state()
-
-        active_orders = Order.objects.filter(
-            status__in=('new', 'in_progress'), table__isnull=False,
-        ).select_related('table', 'table__zone', 'waiter').prefetch_related('items', 'payments')
-
-        rows = []
-        for order in active_orders:
-            total, final, balance = services.calculate_order_financials(order, context=license_ctx)
-            # Prefetch qilingan to'lovlardan hisoblaymiz - qo'shimcha so'rovsiz.
-            amount_paid = sum(
-                (p.amount for p in order.payments.all() if not p.is_voided), Decimal('0'),
-            )
-            rows.append({
-                'table_id': order.table_id,
-                'table_name': order.table.name,
-                'zone': order.table.zone.name if order.table.zone else None,
-                'order_id': order.id,
-                'waiter': order.waiter.first_name if order.waiter else None,
-                'guest_count': order.guest_count,
-                'item_count': sum(i.quantity for i in order.items.all() if not i.is_voided),
-                'total_amount': total,
-                'final_amount': final,
-                'amount_paid': amount_paid,
-                'balance_due': balance,
-                'opened_at': order.created_at,
-            })
-        return Response(LiveTableSalesSerializer(rows, many=True).data)
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -230,8 +226,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         # Diqqat: bu override bor ekan, @action(permission_classes=...) bu
         # ViewSet'da ISHLAMAYDI - action darajasidagi ruxsatlar faqat shu
         # yerda e'lon qilinadi.
-        if self.action in ('set_discount', 'cancel', 'close_on_credit'):
+        if self.action in ('set_discount', 'cancel'):
             return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
+        if self.action == 'close_on_credit':
+            return [permissions.IsAuthenticated(), IsCashierOrManager()]
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
