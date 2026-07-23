@@ -36,19 +36,26 @@ jobs:
           username: ${{ secrets.EC2_USER || secrets.SERVER_USER }}
           password: ${{ secrets.EC2_PASSWORD || secrets.EC2_SSH_KEY }}
           script: |
-            set -e
-            cd ~/pos_system/cloud_server
-            # Diqqat: bu script SSH orqali oddiy shell'da ishlaydi - $$ bu
-            # yerda compose-uslubidagi ekranlash EMAS, shell PID bo'lib
-            # ochilib ketadi ($$(date ...) esa syntax error berib butun
-            # deploy'ni to'xtatardi). POSTGRES_USER/POSTGRES_DB - db
-            # konteynerining o'z env'i, host shell'da DB_USER yo'qligiga
-            # bog'liq emas.
-            if [ -n "$(docker compose -f docker-compose.prod.yml ps -q db)" ]; then
+            TARGET_DIR=""
+            for dir in "$HOME/pos_system" "$HOME" "/root/pos_system" "/var/www/pos_system" "$(pwd)"; do
+              if [ -d "$dir/cloud_server" ]; then
+                TARGET_DIR="$dir"
+                break
+              fi
+            done
+
+            if [ -z "$TARGET_DIR" ]; then
+              echo "Error: pos_system repository directory not found on server."
+              exit 1
+            fi
+
+            cd "$TARGET_DIR/cloud_server"
+            if [ -n "$(docker compose -f docker-compose.prod.yml ps -q db 2>/dev/null)" ]; then
               mkdir -p backups
               docker compose -f docker-compose.prod.yml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "backups/pre_deploy_backup_$(date +%F_%H%M%S).sql" || echo "Backup failed"
             fi
-            cd ~/pos_system
+
+            cd "$TARGET_DIR"
             git fetch origin main
             git reset --hard origin/main
             cd cloud_server
