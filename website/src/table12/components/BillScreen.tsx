@@ -82,30 +82,7 @@ export const BillScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quantity controls */}
-                  <div className="flex items-center gap-2 mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => updateCartQuantity(item.dish.id, -1)}
-                      className="w-5 h-5 rounded bg-[#00110D] text-[#E3C282] flex items-center justify-center text-xs hover:bg-[#E3C282]/20"
-                      aria-label="Decrease quantity"
-                    >
-                      -
-                    </button>
-                    <span className="font-sans-body text-xs text-[#C7EADE]">{item.quantity}</span>
-                    <button
-                      onClick={() => updateCartQuantity(item.dish.id, 1)}
-                      className="w-5 h-5 rounded bg-[#00110D] text-[#E3C282] flex items-center justify-center text-xs hover:bg-[#E3C282]/20"
-                      aria-label="Increase quantity"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeFromCart(item.dish.id)}
-                      className="text-[10px] text-red-400 ml-2 hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
+
                 </div>
               );
             })

@@ -194,35 +194,18 @@ export const MenuScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quantity & Add Action */}
+                  {/* Price & Details Action */}
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-[#E3C282]/15">
-                    <div className="flex items-center bg-[#0E2F28] rounded-full px-2.5 py-1 border border-[#E3C282]/20">
-                      <button
-                        onClick={(e) => handleQtyChange(dish.id, -1, e)}
-                        className="text-[#E3C282] p-1 hover:opacity-70"
-                      >
-                        <span className="material-symbols-outlined text-base">remove</span>
-                      </button>
-                      <span className="font-sans-body text-xs font-semibold px-3 text-[#C7EADE]">
-                        {qty}
-                      </span>
-                      <button
-                        onClick={(e) => handleQtyChange(dish.id, 1, e)}
-                        className="text-[#E3C282] p-1 hover:opacity-70"
-                      >
-                        <span className="material-symbols-outlined text-base">add</span>
-                      </button>
-                    </div>
+                    <span className="font-serif-display font-bold text-lg text-[#E3C282]">
+                      {dish.priceUZS.toLocaleString()} <span className="text-xs font-sans-body">UZS</span>
+                    </span>
 
                     <button
-                      onClick={(e) => handleAddDish(dish, e)}
-                      className={`px-7 py-2.5 rounded-full font-sans-body text-xs font-bold tracking-widest transition-all active:scale-95 uppercase ${
-                        isAdded
-                          ? 'bg-[#1A3A32] text-[#E3C282] border border-[#E3C282]'
-                          : 'bg-[#E3C282] text-[#001712] hover:bg-[#FFDEA0]'
-                      }`}
+                      onClick={() => openDishDetail(dish)}
+                      className="px-5 py-2 rounded-full bg-[#E3C282]/15 text-[#E3C282] border border-[#E3C282]/40 font-sans-body text-xs font-bold tracking-widest hover:bg-[#E3C282] hover:text-[#001712] transition-all active:scale-95 uppercase flex items-center gap-1.5"
                     >
-                      {isAdded ? t.added : t.add}
+                      <span>Batafsil</span>
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>
                   </div>
                 </div>

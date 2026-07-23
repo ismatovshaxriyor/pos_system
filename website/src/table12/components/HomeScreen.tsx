@@ -181,10 +181,10 @@ export const HomeScreen: React.FC = () => {
                   </span>
                   <span className="h-px flex-grow bg-[#E3C282]/30 min-w-[30px]" />
                   <button
-                    onClick={() => addToCart(saffronTeaDish)}
+                    onClick={() => setCurrentScreen('menu')}
                     className="font-sans-body text-xs font-bold tracking-widest border border-[#E3C282]/60 px-6 py-2.5 rounded-full hover:bg-[#E3C282] text-[#C7EADE] hover:text-[#001712] transition-colors active:scale-95 uppercase"
                   >
-                    {t.addOrder}
+                    {t.viewMenu}
                   </button>
                 </div>
               </div>
