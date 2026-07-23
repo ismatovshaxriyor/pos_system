@@ -2,6 +2,16 @@
 
 Bu branch **faqat** hujjat (`.md`) fayllaridan iborat — Django manba kodi bu yerda yo'q. `local_server` ("Bola", restoran ichidagi lokal server) API'siga mobil ilovalar (admin / menejer-kassir / ofitsiant) tomonidan ulanish uchun kerak bo'lgan barcha ma'lumot shu yerda.
 
+## ⚠️ So'nggi o'zgarishlar (2026-07-23)
+
+1. **Public QR Menyu & Web App ()** — Stoldagi QR kod orqali mijoz menyuni ko'rishi, stoldagi jonli hisobni kuzatishi va ofitsiant chaqirishi uchun public API (, , ). QR kod brendlangan PNG yuklash: . [](14-qr-menu.md).
+2. **Qarz Daftar Kassir Ruxsatlari** — Kassir ham boshliq ishda bo'lmaganida buyurtmani nasiyaga yopishi (), yangi mijoz yaratishi va qarz to'lovlarini qabul qilishi mumkin (). [](11-qarz-daftar.md).
+
+## ⚠️ So'nggi o'zgarishlar (2026-07-23)
+
+1. **Public QR Menyu & Web App (HamrohPOS)** — Stoldagi QR kod orqali mijoz menyuni ko'rishi, stoldagi jonli hisobni kuzatishi va ofitsiant chaqirishi uchun public API (`/api/public/menu/`, `/api/public/table/{qr_code}/`, `/api/public/table/{qr_code}/call-waiter/`). QR kod brendlangan PNG yuklash: `GET /api/tables/{id}/qr-code/`. [`14-qr-menu.md`](14-qr-menu.md).
+2. **Qarz Daftar Kassir Ruxsatlari** — Kassir ham boshliq ishda bo'lmaganida buyurtmani nasiyaga yopishi (`POST /api/orders/{id}/close-on-credit/`), yangi mijoz yaratishi va qarz to'lovlarini qabul qilishi mumkin (`IsCashierOrManager`). [`11-qarz-daftar.md`](11-qarz-daftar.md).
+
 ## ⚠️ So'nggi o'zgarishlar (2026-07-21) — 5 ta yangi imkoniyat
 
 Beshta yangi funksiya qo'shildi (uchtasi butunlay yangi endpoint to'plamlari):
@@ -58,6 +68,7 @@ Buyurtma oqimi qattiq qayta ishlandi. Frontend uchun eng muhimlari:
 - [`11-qarz-daftar.md`](11-qarz-daftar.md) — Mijozlar, kreditga yopish (`close-on-credit`), qarz balansi va to'lash
 - [`12-ombor.md`](12-ombor.md) — Ombor: ingredient, retsept, kirim, inventarizatsiya, past-zaxira
 - [`13-hisobotlar-dashboard.md`](13-hisobotlar-dashboard.md) — Afitsiant kunlik sotuvi + menejer dashboard/analitika
+- [`14-qr-menu.md`](14-qr-menu.md) — Public QR menyu, jonli stol cheki, ofitsiant chaqiruvi va QR tasvir generatsiyasi
 
 
 ## Tezkor boshlash (bitta misolda barcha oqim)

@@ -18,9 +18,9 @@ Mijozga (qarzga) buyurtma yozib yopish, har mijozning umumiy qarz balansini yuri
 
 ```
 GET    /api/customers/                → ro'yxat (sahifalangan: results ichida)
-POST   /api/customers/                → yaratish (faqat menejer)
+POST   /api/customers/                → yaratish (kassir yoki menejer)
 GET    /api/customers/{id}/           → bitta mijoz
-PATCH  /api/customers/{id}/           → tahrirlash (faqat menejer)
+PATCH  /api/customers/{id}/           → tahrirlash (kassir yoki menejer)
 DELETE /api/customers/{id}/           → o'chirish (faqat menejer)
 ```
 
