@@ -1,8 +1,10 @@
 from datetime import datetime, UTC
 
 import requests
+from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -208,11 +210,12 @@ class DiscoveryView(APIView):
         state = LicenseState.load()
         return Response({
             "service": "pos-bola",
-            "version": "1.0.0",
+            "version": getattr(settings, 'APP_VERSION', '0.3.0'),
             "activated": bool(state and state.activated_at),
             "restaurant_id": str(state.restaurant_id) if state and state.restaurant_id else None,
             "restaurant_name": state.restaurant_name if state else "Faollashtirilmagan Server",
             "is_blocked": state.is_blocked if state else False,
             "server_time": timezone.now(),
         })
+
 

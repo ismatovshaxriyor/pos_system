@@ -12,7 +12,8 @@
     <port>8000</port>
     <txt-record>path=/api/</txt-record>
     <txt-record>service=pos-bola</txt-record>
-    <txt-record>version=1.0.0</txt-record>
+    <txt-record>version=0.3.0</txt-record>
+
   </service>
 </service-group>
 
