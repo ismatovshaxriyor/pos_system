@@ -122,7 +122,7 @@ services:
   # yoki DNS A-record'ni to'g'ridan-to'g'ri EC2 IP'ga bog'lash shart emas
   # (local_server'dagi Bola tunnel pattern bilan bir xil - docs/4).
   # SSL Cloudflare tomonida - bu instance sertifikat boshqarishi shart
-  # emas. Ingress qoidasi (ona.ismatov.uz -> http://web:8001) Cloudflare
+  # emas. Ingress qoidasi (hamrohpos.uz -> http://web:8001) Cloudflare
   # Zero Trust dashboardida sozlanadi, token faqat autentifikatsiya qiladi.
   cloudflared:
     image: cloudflare/cloudflared:latest
