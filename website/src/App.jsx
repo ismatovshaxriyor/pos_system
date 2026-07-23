@@ -17,12 +17,14 @@ export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
-  // Subdomain tenant detection (e.g. test-restaurant.hamrohpos.uz)
+  // Subdomain tenant detection (e.g. test-restaurant.hamrohpos.uz or ?demo=table12 locally)
   const hostname = window.location.hostname.toLowerCase();
   const parts = hostname.split('.');
   const systemSubdomains = ['admin', 'api', 'www', 'app', 'localhost', '127'];
-  const isTenantSubdomain = parts.length >= 3 && parts[parts.length - 2] === 'hamrohpos' && parts[parts.length - 1] === 'uz' && !systemSubdomains.includes(parts[0]);
-  const tenantSubdomain = isTenantSubdomain ? parts[0] : null;
+  const searchParams = new URLSearchParams(window.location.search);
+  const isDemoTable12 = searchParams.get('demo') === 'table12';
+  const isTenantSubdomain = (parts.length >= 3 && parts[parts.length - 2] === 'hamrohpos' && parts[parts.length - 1] === 'uz' && !systemSubdomains.includes(parts[0])) || isDemoTable12;
+  const tenantSubdomain = isTenantSubdomain ? (isDemoTable12 ? 'test-restaurant' : parts[0]) : null;
 
   useEffect(() => {
     // Initial preloader timeout for smooth UX transition

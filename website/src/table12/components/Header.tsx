@@ -27,12 +27,12 @@ export const Header: React.FC = () => {
 
         <button 
           onClick={() => setCurrentScreen('home')}
-          className="flex items-center gap-2 text-left group"
+          className="flex items-center gap-2 text-left group shrink-0"
         >
-          <span className="material-symbols-outlined text-[#E3C282] text-2xl group-hover:scale-105 transition-transform" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <span className="material-symbols-outlined text-[#E3C282] text-2xl group-hover:scale-105 transition-transform shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
             restaurant
           </span>
-          <span className="font-serif-display font-bold text-2xl text-[#E3C282] tracking-tight">
+          <span className="font-serif-display font-bold text-xl sm:text-2xl text-[#E3C282] tracking-tight whitespace-nowrap">
             {t.tableNumber}
           </span>
         </button>

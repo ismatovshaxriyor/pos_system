@@ -62,9 +62,11 @@
 
 /* Material Symbols alignment fix */
 .material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
   vertical-align: middle;
   display: inline-block;
+  white-space: nowrap;
 }
 .material-symbols-outlined.filled {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
