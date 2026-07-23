@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     HeartbeatView, ActivationView, RenewView, CommandResultView, ErrorLogView,
     OrderSyncView, PublicStatsView, PublicLicenseCheckView, PublicDemoRequestView,
+    PublicSubdomainCheckView,
 )
 
 urlpatterns = [
@@ -15,6 +16,7 @@ urlpatterns = [
     # Public Website (hamrohpos.uz) APIs
     path('public/stats/', PublicStatsView.as_view(), name='public-stats'),
     path('public/check-license/', PublicLicenseCheckView.as_view(), name='public-check-license'),
+    path('public/check-subdomain/', PublicSubdomainCheckView.as_view(), name='public-check-subdomain'),
     path('public/demo-request/', PublicDemoRequestView.as_view(), name='public-demo-request'),
 ]
 

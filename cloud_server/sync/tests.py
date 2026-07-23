@@ -8,9 +8,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from django.core.exceptions import ValidationError
 from tenants.models import (
     License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
-    SyncedOrder, DemoRequest,
+    SyncedOrder, DemoRequest, validate_subdomain,
 )
 from tenants.tasks import mark_offline_restaurants
 from tenants.signals import compute_default_license_expiry
@@ -714,4 +715,45 @@ class PublicApiTests(TestCase):
         resp = self.client.post(url, payload, content_type='application/json')
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(DemoRequest.objects.filter(restaurant_name="Afsona Kafe").exists())
+
+
+class SubdomainTests(TestCase):
+    def test_validate_subdomain_success(self):
+        validate_subdomain('sim-sim')
+        validate_subdomain('rayhon123')
+
+    def test_validate_subdomain_reserved(self):
+        with self.assertRaises(ValidationError):
+            validate_subdomain('admin')
+        with self.assertRaises(ValidationError):
+            validate_subdomain('api')
+        with self.assertRaises(ValidationError):
+            validate_subdomain('www')
+
+    def test_validate_subdomain_invalid_chars(self):
+        with self.assertRaises(ValidationError):
+            validate_subdomain('sim_sim!')
+        with self.assertRaises(ValidationError):
+            validate_subdomain('ab')
+
+    def test_public_subdomain_check_available(self):
+        url = reverse('public-check-subdomain') + '?subdomain=sim-sim'
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['available'])
+        self.assertEqual(resp.data['subdomain'], 'sim-sim')
+
+    def test_public_subdomain_check_taken(self):
+        Restaurant.objects.create(name="Sim Sim", subdomain="sim-sim")
+        url = reverse('public-check-subdomain') + '?subdomain=sim-sim'
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.data['available'])
+
+    def test_domain_routing_middleware_tenant_lookup(self):
+        restaurant = Restaurant.objects.create(name="Caravan", subdomain="caravan")
+        resp = self.client.get('/api/sync/public/stats/', HTTP_HOST='caravan.hamrohpos.uz')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.wsgi_request.restaurant, restaurant)
+
 

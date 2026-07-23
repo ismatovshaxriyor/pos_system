@@ -1,11 +1,42 @@
-import uuid
+import re
 import secrets
+import uuid
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+
+RESERVED_SUBDOMAINS = {
+    'admin', 'api', 'www', 'website', 'app', 'static', 'media',
+    'public', 'test', 'dev', 'staging', 'mail', 'blog', 'support',
+    'help', 'status', 'auth', 'login', 'dashboard', 'root',
+}
+
+
+def validate_subdomain(value):
+    if not value:
+        return
+    subdomain = value.lower().strip()
+    if len(subdomain) < 3:
+        raise ValidationError("Subdomen kamida 3 ta belgidan iborat bo'lishi kerak.")
+    if len(subdomain) > 40:
+        raise ValidationError("Subdomen 40 ta belgidan oshmasligi kerak.")
+    if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', subdomain):
+        raise ValidationError("Subdomen faqat kichik lotin harflari, raqamlar va chiziqcha ('-') dan iborat bo'lishi kerak.")
+    if subdomain in RESERVED_SUBDOMAINS:
+        raise ValidationError(f"'{subdomain}' nomi tizim tomonidan band qilingan, boshqa subdomen tanlang.")
+
 
 class Restaurant(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
+    subdomain = models.SlugField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        validators=[validate_subdomain],
+        help_text="Restoran uchun unikal subdomen (masalan: 'sim-sim')",
+    )
     address = models.TextField(blank=True, null=True)
     contact_info = models.CharField(max_length=100, blank=True, null=True)
     is_active = models.BooleanField(default=True)

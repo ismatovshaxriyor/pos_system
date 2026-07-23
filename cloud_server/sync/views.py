@@ -11,9 +11,11 @@ from rest_framework import status, permissions, throttling
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from tenants.models import (
     License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount,
     ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest,
+    validate_subdomain,
 )
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token_batch, get_public_key_pem
@@ -525,4 +527,38 @@ class PublicDemoRequestView(APIView):
             "id": str(demo_req.id),
             "detail": "So'rovingiz muvaffaqiyatli qabul qilindi. Mutaxassisimiz tez orada siz bilan bog'lanadi."
         }, status=status.HTTP_201_CREATED)
+
+
+class PublicSubdomainCheckView(APIView):
+    """
+    Subdomen nomi bo'shligini va to'g'riligini tekshirish API.
+    `GET /api/sync/public/check-subdomain/?subdomain=sim-sim`
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
+
+    def get(self, request):
+        subdomain = request.query_params.get('subdomain', '').strip().lower()
+        if not subdomain:
+            return Response({'available': False, 'reason': "Subdomen parametri kiritilmadi."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_subdomain(subdomain)
+        except ValidationError as err:
+            return Response({'available': False, 'reason': err.message}, status=status.HTTP_200_OK)
+
+        if Restaurant.objects.filter(subdomain__iexact=subdomain).exists():
+            return Response({
+                'available': False,
+                'reason': f"'{subdomain}' subdomeni boshqa restoran tomonidan band qilingan.",
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'available': True,
+            'subdomain': subdomain,
+            'full_domain': f"{subdomain}.hamrohpos.uz",
+            'detail': f"'{subdomain}' subdomeni bo'sh va foydalanish uchun tayyor."
+        }, status=status.HTTP_200_OK)
+
 

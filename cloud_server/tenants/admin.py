@@ -114,12 +114,13 @@ def _enqueue_command(modeladmin, request, queryset, command_type, success_messag
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'online_badge', 'license_status_badge', 'admin_display', 'contact_info', 'is_active',
+        'name', 'subdomain', 'online_badge', 'license_status_badge', 'admin_display', 'contact_info', 'is_active',
         'app_version_display', 'desired_version', 'last_seen', 'created_at',
         'unresolved_errors_badge',
     )
     list_filter = ('is_active', 'is_online', LicenseExpiryFilter)
-    search_fields = ('name', 'address', 'contact_info')
+    search_fields = ('name', 'subdomain', 'address', 'contact_info')
+    prepopulated_fields = {'subdomain': ('name',)}
     readonly_fields = ('is_online',)
     inlines = [RestaurantAdminAccountInline, RestaurantStatusInline]
     actions = [
