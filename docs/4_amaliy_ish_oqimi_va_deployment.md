@@ -130,9 +130,23 @@ Restoranda svet o'chib yonsa yoki server kompyuteri qayta yoqilsa (reboot), **in
 3. **BIOS/UEFI Sozlamasi (Tavsiya)**:
    Server kompyuterining BIOS sozlamalarida **"Restore AC Power Loss" / "Auto Power On"** parametrini `Enable` qilib qo'yilsa, tok o'chib kelganda kompyuterning o'zi tugmasiz avtomatik yonadi va tizim 1-2 daqiqada to'liq tayyor bo'ladi.
 
+---
 
+## 2.3. Kassa Planshetida Xodimlarning 6-Xonali Kod va Smenalarni Almashtirib Kirishi (Staff PIN & Shift Swap)
+
+Kassa terminali va planshetlarda xodimlarning operativ va xavfsiz ishlashi uchun PIN autentifikatsiya quyidagicha tashkil etilgan:
+
+1. **Menejer Tarafidan Kod Yaratish**:
+   Restoran menejeri admin panelida xodim uchun bir martalik **6-xonali raqamli kod** (masalan `482915`) generatsiya qilib beradi (`generate_registration_code`).
+2. **Planshetni Biriktirish va PIN Belgilash**:
+   Xodim planshetda shu 6-xonali kodni kiritib, o'ziga qulay 6-xonali shaxsiy PIN kodi (`112233`) o'rnatadi.
+3. **Kassada Smenalarni Almashtirib Kirish (Shift Swap)**:
+   - Restoran kassa planshetida bir nechta kassirlar navbatma-navbat ishlashi mumkin.
+   - 1-kassir smenani yakunlaganda, 2-kassir xuddi shu kassa planshetida o'zining 6-xonali PIN kodini (`654321`) kiritadi.
+   - `verify_pin_login` planshetning faol seansini darhol 2-kassirga o'tkazadi va unga shaxsiy token beradi (planshetni qayta ro'yxatdan o'tkazish shart bo'lmaydi).
 
 ---
+
 
 ## 3. Favqulodda Holatlarda Tiklash (Disaster Recovery & Backup)
 

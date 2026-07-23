@@ -75,7 +75,22 @@ mDNS sozlangandan so'ng, server Wi-Fi tarmog'ida quyidagicha ko'rinadi:
 
 ---
 
-## 5. Tok O'chib-Yonganda Avtomatik Ishga Tushish (Zero-Touch Autostart)
+## 5. Xodimlarning 6-Xonali Kod va Kassa Planshetida Smenalarni Almashtirib Kirishi (Staff PIN & Shift Swap)
+
+Kassa va planshetlarda xodimlarning ishlashi quyidagicha tashkil etiladi:
+
+1. **6-Xonali Kod Generatsiya Qilish**:
+   - Restoran menejeri admin panelda kassir/afitsiant uchun bir martalik **6-xonali raqamli kod** (masalan `482915`) generatsiya qilib beradi (`POST /api/users/{id}/generate-registration-code/`).
+2. **Planshetni Biriktirish va PIN o'rnatish**:
+   - Kassir kassa planshetida shu 6-xonali kodni hamda o'zining shaxsiy 6-xonali PIN kodini (`112233`) kiritadi (`POST /api/auth/device/register/`).
+3. **Kassa Planshetida Smenalarni Almashtirib Kirish (Shift Swap)**:
+   - 1-kassir smenani yakunlagach, 2-kassir xuddi shu kassa planshetida o'zining 6-xonali PIN kodini (`654321`) kiritadi (`POST /api/auth/pin-login/`).
+   - Tizim kassa planshetining faol seansini 2-kassirga o'tkazadi va unga shaxsiy token beradi (planshetni qayta ro'yxatdan o'tkazish shart bo'lmaydi).
+
+---
+
+## 6. Tok O'chib-Yonganda Avtomatik Ishga Tushish (Zero-Touch Autostart)
+
 
 Svet o'chib yonganda yoki kompyuter qayta yoqilganda (reboot), **insonsiz (hech qanday buyruqsiz)** barcha servislar avtomatik ko'tariladi:
 

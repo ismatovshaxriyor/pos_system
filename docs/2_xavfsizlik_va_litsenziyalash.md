@@ -53,7 +53,23 @@ Litsenziya kaliti faqatgina mana shu xesh bilan mos kelgandagina lokal tizim ma'
 
 ---
 
-## 3. Masofadan Bloklash (Kill-Switch) Mexanizmi
+## 3. Xodimlar Autentifikatsiyasi va Smenalarni Almashtirish (Staff PIN & Shift Swap)
+
+Kassa va planshetlarda xodimlarning xavfsiz ishlashi uchun **6-xonali PIN va Qurilma biriktiruvi** qo'llaniladi:
+
+1. **6-Xonali Kod Generatsiya Qilish**:
+   Menejer admin panelida xodim (kassir/afitsiant) uchun 6-xonali raqamli bir martalik ro'yxatdan o'tish kodini (`generate_registration_code`) generatsiya qilib beradi.
+2. **Planshetni Biriktirish va PIN o'rnatish**:
+   Kassir planshetda shu 6-xonali kodni kiritib o'zining shaxsiy 6-xonali PIN kodini belgilanadi (`redeem_registration_code`).
+3. **Kassada Smenani Almashtirib Kirish (Shift Swapping)**:
+   - Bitta kassa planshetida bir nechta kassirlar navbatma-navbat ishlashi mumkin.
+   - 1-kassir smenani topshirgach, 2-kassir kelib xuddi shu kassa planshetida o'zining 6-xonali PIN kodini kiritadi.
+   - `verify_pin_login` kassa planshetining faol seansini darhol 2-kassirga o'tkazadi va uning barcha harakatlarini shaxsiy jurnallaydi.
+
+---
+
+## 4. Masofadan Bloklash (Kill-Switch) Mexanizmi
+
 
 Agar restoran oylik to'lovni amalga oshirmasa yoki shartnomani buzsa, tizimni masofadan to'xtatish imkoniyati bo'lishi kerak.
 
