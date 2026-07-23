@@ -163,7 +163,8 @@ def send_error_logs():
         return
 
     if response.status_code != 200:
-        logger.warning("Xato jurnalini yuborish rad etildi: %s", response.text)
+        msg_preview = response.text[:200].replace('\n', ' ')
+        logger.warning("Xato jurnalini yuborish rad etildi (HTTP %d): %s", response.status_code, msg_preview)
         return
 
     ErrorLog.objects.filter(id__in=[row.id for row in batch]).update(
@@ -276,7 +277,8 @@ def sync_completed_orders():
         return
 
     if response.status_code != 201:
-        logger.warning("Sotuvlarni sinxronlash rad etildi: %s", response.text)
+        msg_preview = response.text[:200].replace('\n', ' ')
+        logger.warning("Sotuvlarni sinxronlash rad etildi (HTTP %d): %s", response.status_code, msg_preview)
         return
         
     data = response.json()
