@@ -274,10 +274,28 @@ JAZZMIN_SETTINGS = {
     "site_header": "Cloud POS Server",
     "site_brand": "HQ POS Manager",
     "welcome_sign": "Welcome to the Mother POS Admin",
+    "copyright": "POS System Cloud HQ",
+    "search_model": ["tenants.Restaurant", "tenants.License"],
     "show_ui_builder": False,
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user-shield",
+        "auth.Group": "fas fa-users",
+        "authtoken.Token": "fas fa-key",
+        "authtoken.TokenProxy": "fas fa-key",
+        "tenants.Restaurant": "fas fa-store",
+        "tenants.RestaurantAdminAccount": "fas fa-user-tie",
+        "tenants.License": "fas fa-id-card",
+        "tenants.RemoteCommand": "fas fa-terminal",
+        "tenants.ErrorLog": "fas fa-exclamation-triangle",
+        "tenants.SyncedOrder": "fas fa-receipt",
+    },
+    "default_icon_parents": "fas fa-folder",
+    "default_icon_children": "fas fa-circle",
 }
 
 JAZZMIN_UI_TWEAKS = {
     "theme": "darkly",
     "dark_mode_theme": "darkly",
 }
+
