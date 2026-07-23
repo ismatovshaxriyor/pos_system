@@ -69,5 +69,6 @@ jobs:
               echo "Waiting for web and website containers to start ($i/20)..."
               sleep 3
             done
+            echo "Restarting cloudflared tunnel to pick up new Zero Trust wildcard ingress rules..."
             docker compose -f docker-compose.prod.yml restart cloudflared
             docker image prune -f
