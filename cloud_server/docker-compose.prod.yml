@@ -149,11 +149,6 @@ services:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      web:
-        condition: service_healthy
-      website:
-        condition: service_healthy
 
 volumes:
   cloud_postgres_data:

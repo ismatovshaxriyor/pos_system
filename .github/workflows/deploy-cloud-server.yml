@@ -61,14 +61,6 @@ jobs:
             git reset --hard origin/main
             cd cloud_server
             docker compose -f docker-compose.prod.yml up -d --build
-            for i in $(seq 1 20); do
-              if docker compose -f docker-compose.prod.yml exec -T web python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/admin/login/')" >/dev/null 2>&1 && docker compose -f docker-compose.prod.yml exec -T website wget -q --spider http://127.0.0.1:80/ >/dev/null 2>&1; then
-                echo "Web and Website containers are healthy and responding!"
-                break
-              fi
-              echo "Waiting for web and website containers to start ($i/20)..."
-              sleep 3
-            done
-            echo "Restarting cloudflared tunnel to pick up new Zero Trust wildcard ingress rules..."
+            sleep 5
             docker compose -f docker-compose.prod.yml restart cloudflared
             docker image prune -f
