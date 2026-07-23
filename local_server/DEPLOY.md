@@ -85,7 +85,30 @@ Svet o'chib yonganda yoki kompyuter qayta yoqilganda (reboot), **insonsiz (hech 
 
 ---
 
-## 6. Zaxira Usullar (Fallback Options)
+## 6. Turli Subnetdagi Termoprinterlarni Avtomatik Ulash (Multi-Subnet Printing)
+
+Restoran termoprinterlari (Xprinter va h.k.) zavoddan kelganda boshqa IP subnetda (masalan `192.168.123.100` yoki `192.168.1.87`) bo'lishi mumkin. Server Wi-Fi/LAN tarmog'i esa masalan `192.168.10.x` bo'lishi mumkin.
+
+### Dinamik Auto-Aliasing Mexanizmi:
+`local_server` kodi (`core/escpos.py::ensure_subnet_alias`) har safar printerga chek yuborayotganda yoki Admin panelda test qilganda printerning IP subnetini tekshiradi va server tarmoq kartasiga unga mos IP Alias (`192.168.123.250`) ni avtomatik biriktiradi.
+
+### O'rnatish Paytida Zaxira Avto-Biriktirish Skripti (Tavsiya etiladi):
+Serverni restoranga birinchi o'rnatayotganda standart termoprinter subnetlarini bir martada biriktirib qo'yish:
+
+- **Linux (Ubuntu)**:
+  ```bash
+  sudo ./scripts/setup_printer_subnets.sh
+  ```
+- **Windows**:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup_printer_subnets.ps1
+  ```
+*Bu skriptlar `192.168.123.x`, `192.168.1.x` va `192.168.0.x` subnet aliaslarini avtomatik tarmoq kartasiga ulab qo'yadi.*
+
+---
+
+## 7. Zaxira Usullar (Fallback Options)
+
 
 Agar restorandagi Wi-Fi router multicast (mDNS) trafigini bloklagan bo'lsa:
 1. **Routerda Static DHCP Lease**: Router sozlamalariga kirib serverning MAC manziliga doimiy IP (`192.168.1.200`) biriktirish.
