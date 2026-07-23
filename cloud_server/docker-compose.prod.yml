@@ -130,6 +130,12 @@ services:
   # SSL Cloudflare tomonida - bu instance sertifikat boshqarishi shart
   # emas. Ingress qoidasi (hamrohpos.uz -> http://web:8001) Cloudflare
   # Zero Trust dashboardida sozlanadi, token faqat autentifikatsiya qiladi.
+  website:
+    build:
+      context: ../website
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
