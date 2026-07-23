@@ -35,7 +35,6 @@ jobs:
           host: ${{ secrets.EC2_HOST || secrets.SERVER_HOST || secrets.HOST || secrets.SERVER_IP }}
           username: ${{ secrets.EC2_USER || secrets.SERVER_USER || secrets.USER || secrets.USERNAME }}
           password: ${{ secrets.EC2_PASSWORD || secrets.SERVER_PASSWORD || secrets.SSH_PASSWORD || secrets.PASSWORD }}
-          key: ${{ secrets.EC2_SSH_KEY || secrets.SSH_KEY }}
           script: |
             set -e
             cd ~/pos_system/cloud_server
