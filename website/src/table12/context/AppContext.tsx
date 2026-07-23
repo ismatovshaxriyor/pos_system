@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScreenView, Language, Dish, CartItem, WaiterRequestHistoryItem } from '../types';
 import { MENU_DISHES, TRANSLATIONS } from '../data/mockData';
+import { fetchPublicMenu, fetchTableLive, callWaiterApi } from '../services/api';
 
 interface AppContextType {
   currentScreen: ScreenView;
@@ -8,6 +9,10 @@ interface AppContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: typeof TRANSLATIONS['EN'];
+  dishes: Dish[];
+  qrCode: string;
+  tableName: string;
+  isLiveApiConnected: boolean;
   selectedDish: Dish;
   setSelectedDish: (dish: Dish) => void;
   portionSize: 'Standard' | 'Large';
@@ -73,6 +78,7 @@ const INITIAL_CART: CartItem[] = [
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('home');
   const [language, setLanguage] = useState<Language>('EN');
+  const [dishes, setDishes] = useState<Dish[]>(MENU_DISHES);
   const [selectedDish, setSelectedDish] = useState<Dish>(MENU_DISHES[0]);
   const [portionSize, setPortionSize] = useState<'Standard' | 'Large'>('Standard');
   const [cart, setCart] = useState<CartItem[]>(INITIAL_CART);
@@ -85,6 +91,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   ]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isLiveApiConnected, setIsLiveApiConnected] = useState(false);
+  const [tableName, setTableName] = useState('Table 12');
+
+  // Extract QR code from URL query parameters (e.g. ?qr=... or ?table=... or default 'demo')
+  const urlParams = new URLSearchParams(window.location.search);
+  const qrCode = urlParams.get('qr') || urlParams.get('table') || 'demo';
 
   // Modals state
   const [isCutleryModalOpen, setIsCutleryModalOpen] = useState(false);
@@ -95,6 +107,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isEmirChamberModalOpen, setIsEmirChamberModalOpen] = useState(false);
 
   const t = TRANSLATIONS[language];
+
+  // Fetch real menu and live table state from local_server API
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLiveData() {
+      // 1. Fetch live menu items and prices
+      const apiDishes = await fetchPublicMenu();
+      if (apiDishes && apiDishes.length > 0 && isMounted) {
+        setDishes(apiDishes);
+        setSelectedDish(apiDishes[0]);
+        setIsLiveApiConnected(true);
+      }
+
+      // 2. Fetch live table details
+      const tableData = await fetchTableLive(qrCode);
+      if (tableData && isMounted) {
+        if (tableData.name) {
+          setTableName(tableData.name);
+        }
+        setIsLiveApiConnected(true);
+      }
+    }
+
+    loadLiveData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [qrCode]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -150,7 +192,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   };
 
-  const callWaiter = (requestName: string = 'Call waiter') => {
+  const callWaiter = async (requestName: string = 'Call waiter') => {
     setWaiterStatus('coming');
     const now = new Date();
     const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -165,7 +207,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ...prev
     ]);
 
-    showToast(`${requestName} sent to Station 4`);
+    // Send real waiter call notification to local_server API
+    const apiResult = await callWaiterApi(qrCode, requestName);
+    if (apiResult) {
+      showToast(apiResult.message || `${requestName} sent to staff`);
+    } else {
+      showToast(`${requestName} sent to Station 4`);
+    }
   };
 
   const cancelWaiterCall = () => {
@@ -186,6 +234,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         language,
         setLanguage,
         t,
+        dishes,
+        qrCode,
+        tableName,
+        isLiveApiConnected,
         selectedDish,
         setSelectedDish,
         portionSize,

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Language } from '../types';
 
 export const Header: React.FC = () => {
-  const { currentScreen, setCurrentScreen, language, setLanguage, t, waiterStatus } = useApp();
+  const { currentScreen, setCurrentScreen, language, setLanguage, t, waiterStatus, tableName } = useApp();
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
 
   const languages: { code: Language; name: string }[] = [
@@ -33,7 +33,7 @@ export const Header: React.FC = () => {
             restaurant
           </span>
           <span className="font-serif-display font-bold text-xl sm:text-2xl text-[#E3C282] tracking-tight whitespace-nowrap">
-            {t.tableNumber}
+            {tableName}
           </span>
         </button>
       </div>

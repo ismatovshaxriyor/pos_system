@@ -6,6 +6,7 @@ import { Dish } from '../types';
 export const MenuScreen: React.FC = () => {
   const {
     t,
+    dishes,
     openDishDetail,
     addToCart,
     favorites,
@@ -14,13 +15,13 @@ export const MenuScreen: React.FC = () => {
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Plov');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
 
-  const categories = ['Plov', 'Kebabs', 'Manti', 'Soups', 'Salads', 'Desserts', 'Tea', 'Drinks'];
+  const categories = ['All', ...Array.from(new Set(dishes.map((d) => d.category)))];
 
-  const filteredDishes = MENU_DISHES.filter((dish) => {
+  const filteredDishes = dishes.filter((dish) => {
     const matchesCategory = selectedCategory === 'All' || dish.category === selectedCategory;
     const matchesSearch =
       dish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

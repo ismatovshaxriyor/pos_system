@@ -8,6 +8,7 @@ export const BillScreen: React.FC = () => {
     serviceFeeUZS,
     totalUZS,
     t,
+    tableName,
     callWaiter,
     setIsSplitBillModalOpen,
     setIsPayModalOpen,
@@ -37,7 +38,7 @@ export const BillScreen: React.FC = () => {
 
         <div className="text-center mb-6 border-b border-[#E3C282]/20 pb-5">
           <p className="font-serif-display font-bold text-2xl text-[#E3C282]">
-            Table 12
+            {tableName}
           </p>
           <p className="font-sans-body text-[10px] font-bold tracking-widest text-[#C1C8C4] mt-1">
             OCT 14, 2026 • 20:45
