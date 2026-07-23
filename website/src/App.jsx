@@ -10,7 +10,7 @@ import DemoModal from './components/DemoModal';
 import Footer from './components/Footer';
 import LoadingScreen from './components/LoadingScreen';
 import NotFound from './components/NotFound';
-import RestaurantMenu from './components/RestaurantMenu';
+import Table12App from './table12/App';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -50,9 +50,9 @@ export default function App() {
     return <LoadingScreen />;
   }
 
-  // Render Customer Digital Menu & Payment UI for restaurant subdomains
+  // Render Table-12 1:1 Template for restaurant subdomains
   if (tenantSubdomain) {
-    return <RestaurantMenu subdomain={tenantSubdomain} />;
+    return <Table12App subdomain={tenantSubdomain} />;
   }
 
   // Handle 404 for unknown paths (e.g. /404, /unknown, etc.)
