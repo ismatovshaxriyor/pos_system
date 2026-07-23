@@ -281,9 +281,10 @@ LATEST_RELEASE_VERSION = _read_latest_release_version()
 JAZZMIN_SETTINGS = {
     "site_title": "Mother Cloud Admin",
     "site_header": f"Cloud POS (v{LATEST_RELEASE_VERSION})",
-    "site_brand": f"HQ POS Manager (v{LATEST_RELEASE_VERSION})",
+    "site_brand": f"HQ POS v{LATEST_RELEASE_VERSION}",
     "welcome_sign": f"Mother POS Admin — Oxirgi versiya: v{LATEST_RELEASE_VERSION}",
     "copyright": f"POS System Cloud HQ (v{LATEST_RELEASE_VERSION})",
+
     "search_model": ["tenants.Restaurant", "tenants.License"],
     "show_ui_builder": False,
     "icons": {
