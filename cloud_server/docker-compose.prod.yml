@@ -64,6 +64,12 @@ services:
       # storage buni talab qiladi) va STATIC_ROOT=/app/staticfiles'ga yozadi -
       # read_only ildiz FS bilan bu joy yoziladigan bo'lishi shart.
       - /app/staticfiles
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/admin/login/')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     depends_on:
       db:
         condition: service_healthy
@@ -90,7 +96,7 @@ services:
       redis:
         condition: service_healthy
       web:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   celery_beat:
@@ -115,7 +121,7 @@ services:
       redis:
         condition: service_healthy
       web:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   # Ona serverni Cloudflare edge orqali ochadi - hech qanday port ochish
@@ -129,7 +135,8 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
-      - web
+      web:
+        condition: service_healthy
 
 volumes:
   cloud_postgres_data:
