@@ -59,6 +59,7 @@ services:
     tmpfs:
       - /tmp
       - /run
+      - /root
       # entrypoint.sh har start'da `collectstatic` qiladi (whitenoise manifest
       # storage buni talab qiladi) va STATIC_ROOT=/app/staticfiles'ga yozadi -
       # read_only ildiz FS bilan bu joy yoziladigan bo'lishi shart.
