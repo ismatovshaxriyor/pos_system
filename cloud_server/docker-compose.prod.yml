@@ -152,6 +152,8 @@ services:
     restart: unless-stopped
     env_file: .env
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TRANSPORT_PROTOCOL=http2
     depends_on:
       - website
 
