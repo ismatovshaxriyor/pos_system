@@ -48,7 +48,7 @@ export const PaymentModal: React.FC = () => {
               Receipt Sent
             </h2>
             <p className="font-sans-body text-xs text-[#C1C8C4] mb-6">
-              Total paid: <span className="text-[#E3C282] font-bold">{totalUZS.toLocaleString()} UZS</span>. We look forward to serving you again at Table 12.
+              Total paid: <span className="text-[#E3C282] font-bold">{totalUZS.toLocaleString()} UZS</span>. We look forward to serving you again at {tableName}.
             </p>
             <button
               onClick={handleFinish}

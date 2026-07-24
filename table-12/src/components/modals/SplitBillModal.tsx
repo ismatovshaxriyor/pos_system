@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 
 export const SplitBillModal: React.FC = () => {
-  const { isSplitBillModalOpen, setIsSplitBillModalOpen, totalUZS, showToast } = useApp();
+  const { isSplitBillModalOpen, setIsSplitBillModalOpen, totalUZS, showToast, tableName } = useApp();
   const [splitCount, setSplitCount] = useState(2);
 
   if (!isSplitBillModalOpen) return null;
@@ -31,7 +31,7 @@ export const SplitBillModal: React.FC = () => {
           Split Bill
         </h2>
         <p className="font-sans-body text-xs text-[#C1C8C4] mb-6">
-          Divide Table 12 total among your party guests.
+          Divide {tableName} total among your party guests.
         </p>
 
         {/* Counter */}
