@@ -66,10 +66,10 @@ services:
       - /app/staticfiles
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/admin/login/')\" || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -95,8 +95,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      web:
-        condition: service_healthy
+      - web
     restart: unless-stopped
 
   celery_beat:
@@ -120,8 +119,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      web:
-        condition: service_healthy
+      - web
     restart: unless-stopped
 
   # Ona serverni Cloudflare edge orqali ochadi - hech qanday port ochish
@@ -137,13 +135,12 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 5
-      start_period: 5s
+      start_period: 15s
     depends_on:
-      web:
-        condition: service_healthy
+      - web
 
   cloudflared:
     image: cloudflare/cloudflared:latest
