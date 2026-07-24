@@ -95,7 +95,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      - web
+      web:
+        condition: service_healthy
     restart: unless-stopped
 
   celery_beat:
@@ -119,7 +120,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      - web
+      web:
+        condition: service_healthy
     restart: unless-stopped
 
   # Ona serverni Cloudflare edge orqali ochadi - hech qanday port ochish
