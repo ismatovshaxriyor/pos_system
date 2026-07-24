@@ -111,56 +111,6 @@ export const BillScreen: React.FC = () => {
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#E3C282]/5 via-[#E3C282]/30 to-[#E3C282]/5" />
       </div>
 
-      {/* Action Buttons Grid */}
-      <div className="mt-6 grid grid-cols-2 gap-3.5">
-        <button
-          onClick={() => callWaiter('Call waiter')}
-          className="glass-card rounded-full py-3.5 px-4 flex flex-col items-center justify-center gap-1.5 hover:bg-[#E3C282]/10 transition-all active:scale-95 border border-[#E3C282]/30"
-        >
-          <span className="material-symbols-outlined text-[#E3C282] text-xl">
-            person_raised_hand
-          </span>
-          <span className="font-sans-body text-[10px] font-bold tracking-widest text-[#E3C282] uppercase">
-            {t.callWaiter}
-          </span>
-        </button>
-
-        <button
-          onClick={() => callWaiter('Request final bill check')}
-          className="glass-card rounded-full py-3.5 px-4 flex flex-col items-center justify-center gap-1.5 hover:bg-[#E3C282]/10 transition-all active:scale-95 border border-[#E3C282]/30"
-        >
-          <span className="material-symbols-outlined text-[#E3C282] text-xl">
-            receipt_long
-          </span>
-          <span className="font-sans-body text-[10px] font-bold tracking-widest text-[#E3C282] uppercase">
-            {t.askBill}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setIsSplitBillModalOpen(true)}
-          className="glass-card rounded-full py-3.5 px-4 flex flex-col items-center justify-center gap-1.5 hover:bg-[#E3C282]/10 transition-all active:scale-95 border border-[#E3C282]/30"
-        >
-          <span className="material-symbols-outlined text-[#E3C282] text-xl">
-            call_split
-          </span>
-          <span className="font-sans-body text-[10px] font-bold tracking-widest text-[#E3C282] uppercase">
-            {t.splitBill}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setIsPayModalOpen(true)}
-          className="bg-[#ADCDC3] text-[#18362E] rounded-full py-3.5 px-4 flex flex-col items-center justify-center gap-1.5 hover:bg-[#C9EADF] transition-all active:scale-95 shadow-lg shadow-[#ADCDC3]/20"
-        >
-          <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-            credit_card
-          </span>
-          <span className="font-sans-body text-[10px] font-bold tracking-widest uppercase">
-            {t.payCard}
-          </span>
-        </button>
-      </div>
     </div>
   );
 };
