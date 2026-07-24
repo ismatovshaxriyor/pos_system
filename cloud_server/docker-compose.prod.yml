@@ -134,8 +134,6 @@ services:
     build:
       context: ../website
       dockerfile: Dockerfile
-    ports:
-      - "127.0.0.1:80:80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
@@ -150,8 +148,9 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    network_mode: host
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - website
 
 volumes:
   cloud_postgres_data:
