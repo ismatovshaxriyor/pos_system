@@ -47,6 +47,7 @@ services:
       - RUN_MIGRATIONS=1
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
+      - DEBUG=0
     volumes:
       - ./keys:/app/keys:ro
       - media_data:/app/media
@@ -84,6 +85,7 @@ services:
     environment:
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
+      - DEBUG=0
     volumes:
       - ./keys:/app/keys:ro
     read_only: true
@@ -109,6 +111,7 @@ services:
     environment:
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379/0
+      - DEBUG=0
     volumes:
       - ./keys:/app/keys:ro
     read_only: true
