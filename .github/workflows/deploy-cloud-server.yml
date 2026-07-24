@@ -35,7 +35,8 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST || secrets.SERVER_HOST }}
           username: ${{ secrets.EC2_USER || secrets.SERVER_USER }}
-          password: ${{ secrets.EC2_PASSWORD || secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY || secrets.SERVER_SSH_KEY }}
+          password: ${{ secrets.EC2_PASSWORD || secrets.SERVER_PASSWORD }}
           script: |
             TARGET_DIR=""
             for dir in "$HOME/pos_system" "$HOME" "/root/pos_system" "/var/www/pos_system" "$(pwd)"; do
