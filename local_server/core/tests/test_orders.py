@@ -121,6 +121,7 @@ class OrderLogicTests(TestCase):
         self.assertEqual(self.order.total_amount, Decimal('50000'))
 
     def test_add_item_bulk(self):
+        """Bulk qo'shishda bir xil product merge bo'ladi, turli notelar birlashtiriladi."""
         url = reverse('order-add-item', args=[self.order.id])
         response = self.client.post(
             url,
@@ -131,8 +132,50 @@ class OrderLogicTests(TestCase):
             content_type='application/json', **_auth_header(self.manager),
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(self.order.items.count(), 2)
-        self.assertEqual(self.order.total_amount, Decimal('75000')) # (1 + 2) * 25000 = 75000
+        # Bir xil product — merge bo'ladi: 1 ta qator, quantity = 1 + 2 = 3
+        self.assertEqual(self.order.items.count(), 1)
+        item = self.order.items.first()
+        self.assertEqual(item.quantity, 3)
+        self.assertEqual(self.order.total_amount, Decimal('75000'))  # 3 * 25000
+
+    def test_add_item_merges_same_product(self):
+        """Bir xil product + note + modifiers bo'lsa, yangi qator yaratilmay, quantity oshadi."""
+        url = reverse('order-add-item', args=[self.order.id])
+
+        # Birinchi marta: 1x osh
+        self.client.post(
+            url, {"product_id": self.product.id, "quantity": 1},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(self.order.items.count(), 1)
+        self.assertEqual(self.order.items.first().quantity, 1)
+
+        # Ikkinchi marta: yana 1x osh — merge bo'lishi kerak
+        self.client.post(
+            url, {"product_id": self.product.id, "quantity": 1},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(self.order.items.count(), 1)  # Hali ham 1 ta qator
+        self.assertEqual(self.order.items.first().quantity, 2)  # 1 + 1 = 2
+        self.assertEqual(self.order.total_amount, Decimal('50000'))  # 2 * 25000
+
+    def test_add_item_merges_with_different_notes(self):
+        """Turli note bo'lsa ham merge bo'ladi, notelar birlashtiriladi."""
+        url = reverse('order-add-item', args=[self.order.id])
+
+        self.client.post(
+            url, {"product_id": self.product.id, "quantity": 1, "note": "achchiq"},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.client.post(
+            url, {"product_id": self.product.id, "quantity": 1, "note": "achchiq emas"},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(self.order.items.count(), 1)  # Merge — 1 ta qator
+        item = self.order.items.first()
+        self.assertEqual(item.quantity, 2)
+        self.assertIn("achchiq", item.note)
+        self.assertIn("achchiq emas", item.note)
 
     def test_voided_items_excluded_from_total(self):
         self.order.items.create(product=self.product, quantity=1, price=Decimal('25000'))

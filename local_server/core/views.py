@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
@@ -488,14 +488,44 @@ class OrderViewSet(viewsets.ModelViewSet):
             for item_data in items_data:
                 product = item_data['product']
                 quantity = item_data.get('quantity', 1)
-                OrderItem.objects.create(
-                    order=order,
+                note = item_data.get('note', '')
+                modifiers = item_data.get('modifiers') or {}
+
+                # Bir xil product bo'lsa, mavjud itemning quantity'sini
+                # oshiramiz — kassada "2x Osh" ko'rinadi.
+                # Note farq qilsa, mavjud note ga yangi note qo'shib qo'yiladi.
+                existing = order.items.filter(
                     product=product,
-                    quantity=quantity,
-                    price=product.price,
-                    note=item_data.get('note', ''),
-                    modifiers=item_data.get('modifiers') or {},
-                )
+                    is_voided=False,
+                ).first()
+
+                if existing:
+                    # Atomik o'sish: F() ni to'g'ridan-to'g'ri QuerySet.update()
+                    # orqali ishlatamiz — bu django-simple-history bilan conflict
+                    # bermaydi (F() + save() history INSERT da ValueError beradi).
+                    OrderItem.objects.filter(pk=existing.pk).update(
+                        quantity=F('quantity') + quantity,
+                    )
+                    existing.refresh_from_db()
+
+                    # Yangi note bo'lsa, mavjud note ga qo'shib qo'yish
+                    if note and note != existing.note:
+                        existing.note = f"{existing.note}; {note}" if existing.note else note
+                    # Modifiers merge — yangi kalitlarni qo'shish
+                    if modifiers and modifiers != existing.modifiers:
+                        merged = {**existing.modifiers, **modifiers}
+                        existing.modifiers = merged
+
+                    existing.save(update_fields=['note', 'modifiers', 'updated_at'])
+                else:
+                    OrderItem.objects.create(
+                        order=order,
+                        product=product,
+                        quantity=quantity,
+                        price=product.price,
+                        note=note,
+                        modifiers=modifiers,
+                    )
 
         if order.status == 'in_progress':
             services.send_order_to_kitchen(order)
