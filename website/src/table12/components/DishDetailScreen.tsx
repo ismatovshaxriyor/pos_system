@@ -37,7 +37,7 @@ export const DishDetailScreen: React.FC = () => {
           <div className="max-w-4xl">
             {selectedDish.isSignature && (
               <span className="font-sans-body text-[11px] font-bold tracking-widest text-[#E3C282] mb-2 block uppercase">
-                SIGNATURE DISH
+                {t.signatureDishLabel}
               </span>
             )}
             <h1 className="font-serif-display font-bold text-3xl sm:text-5xl text-[#C7EADE] mb-3">

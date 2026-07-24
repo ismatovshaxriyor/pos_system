@@ -239,7 +239,21 @@ export const TRANSLATIONS = {
     caloriesLabel: 'CALORIES',
     proteinLabel: 'PROTEIN',
     carbsLabel: 'CARBS',
-    totalPrice: 'TOTAL PRICE'
+    totalPrice: 'TOTAL PRICE',
+    all: 'All',
+    allSelection: 'All Selection',
+    portionLabel: 'PORTION',
+    timeLabel: 'TIME',
+    minLabel: 'min',
+    details: 'Details',
+    price: 'Price',
+    pairingRecommendation: 'Pairing Recommendation',
+    pairingRecommendationDesc: 'Our Sommelier recommends high-altitude Fergana silk tea or vintage drinks with our signature plov.',
+    signatureDishLabel: 'SIGNATURE DISH',
+    currentTotal: 'Current Total',
+    noActiveRequest: 'No active request. Select an option below to notify your server.',
+    cancel: 'Cancel',
+    inProgress: 'IN PROGRESS'
   },
   RU: {
     tableNumber: 'Столик 12',
@@ -300,7 +314,21 @@ export const TRANSLATIONS = {
     caloriesLabel: 'КАЛОРИИ',
     proteinLabel: 'БЕЛКИ',
     carbsLabel: 'УГЛЕВОДЫ',
-    totalPrice: 'ИТОГОВАЯ СУММА'
+    totalPrice: 'ИТОГОВАЯ СУММА',
+    all: 'Все',
+    allSelection: 'Все блюда',
+    portionLabel: 'ПОРЦИЯ',
+    timeLabel: 'ВРЕМЯ',
+    minLabel: 'мин',
+    details: 'Подробнее',
+    price: 'Цена',
+    pairingRecommendation: 'Рекомендация сомелье',
+    pairingRecommendationDesc: 'К плову и мясным блюдам идеально подходят самаркандские и ферганские чаи.',
+    signatureDishLabel: 'ФИРМЕННОЕ БЛЮДО',
+    currentTotal: 'Текущий итог',
+    noActiveRequest: 'Нет активных запросов. Выберите вариант ниже.',
+    cancel: 'Отмена',
+    inProgress: 'В ПРОЦЕССЕ'
   },
   UZ: {
     tableNumber: '12-Stol',
@@ -361,6 +389,20 @@ export const TRANSLATIONS = {
     caloriesLabel: 'KALORIYA',
     proteinLabel: 'OQSIL',
     carbsLabel: 'UGLEVOD',
-    totalPrice: 'JAMI SUMMA'
+    totalPrice: 'JAMI SUMMA',
+    all: 'Barchasi',
+    allSelection: 'Barcha Taomlar',
+    portionLabel: 'PORSIYA',
+    timeLabel: 'VAQTI',
+    minLabel: 'daq',
+    details: 'Batafsil',
+    price: 'Narxi',
+    pairingRecommendation: 'Ichimlik Uygʻunligi Tavsiyasi',
+    pairingRecommendationDesc: 'Osh va pishirilgan taomlar bilan maxsus samarqandiy va fargʻona choylari hamda sara ichimliklar ajoyib uygʻunlik beradi.',
+    signatureDishLabel: 'FIRMENNIY TAOM',
+    currentTotal: 'Joriy Hisob',
+    noActiveRequest: 'Faol soʻrov yoʻq. Serverga xabar yuborish uchun pastdagi variantlardan birini tanlang.',
+    cancel: 'Bekor qilish',
+    inProgress: 'BAJARILMOQDA'
   }
 };

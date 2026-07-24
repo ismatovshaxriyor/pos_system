@@ -98,7 +98,7 @@ export const MenuScreen: React.FC = () => {
       <section className="mt-8 sm:mt-12">
         <div className="flex items-center justify-between mb-8">
           <h2 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#ADCDC3]">
-            {selectedCategory === 'Plov' ? t.masterPlovSelection : `${selectedCategory} Selection`}
+            {selectedCategory === 'All' ? t.allSelection : (selectedCategory === 'Plov' ? t.masterPlovSelection : selectedCategory)}
           </h2>
           <div className="h-px bg-[#E3C282]/20 flex-grow ml-6 hidden sm:block" />
         </div>
@@ -176,19 +176,19 @@ export const MenuScreen: React.FC = () => {
                   <div className="grid grid-cols-3 gap-2 mb-6 text-center bg-[#00110D]/40 p-2.5 rounded-xl border border-[#E3C282]/10">
                     <div className="flex flex-col">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#E3C282]/70 uppercase">
-                        PORTION
+                        {t.portionLabel}
                       </span>
                       <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.portion}</span>
                     </div>
                     <div className="flex flex-col border-x border-[#E3C282]/10">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#E3C282]/70 uppercase">
-                        TIME
+                        {t.timeLabel}
                       </span>
-                      <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.prepTimeMinutes} min</span>
+                      <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.prepTimeMinutes} {t.minLabel}</span>
                     </div>
                     <div className="flex flex-col">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#E3C282]/70 uppercase">
-                        CALORIES
+                        {t.caloriesLabel}
                       </span>
                       <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.calories} kcal</span>
                     </div>
@@ -204,7 +204,7 @@ export const MenuScreen: React.FC = () => {
                       onClick={() => openDishDetail(dish)}
                       className="px-5 py-2 rounded-full bg-[#E3C282]/15 text-[#E3C282] border border-[#E3C282]/40 font-sans-body text-xs font-bold tracking-widest hover:bg-[#E3C282] hover:text-[#001712] transition-all active:scale-95 uppercase flex items-center gap-1.5"
                     >
-                      <span>Batafsil</span>
+                      <span>{t.details}</span>
                       <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>
                   </div>
