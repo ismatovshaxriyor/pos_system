@@ -1,5 +1,9 @@
+import base64
+import io
+import qrcode
 from django import forms
 from django.contrib import admin, messages
+from django.utils.html import format_html
 from simple_history.admin import SimpleHistoryAdmin
 
 from . import services
@@ -97,8 +101,33 @@ class TableZoneAdmin(SimpleHistoryAdmin):
 
 @admin.register(Table)
 class TableAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'zone', 'capacity', 'is_active', 'is_synced')
+    list_display = ('name', 'zone', 'capacity', 'is_active', 'qr_code', 'qr_code_display')
     list_filter = ('zone', 'is_active', 'is_synced')
+    readonly_fields = ('qr_code', 'qr_code_display', 'qr_url_display')
+
+    @admin.display(description="QR Kod Havolasi")
+    def qr_url_display(self, obj):
+        if not obj.qr_code:
+            return '-'
+        url = f"/qr/?qr={obj.qr_code}"
+        return format_html('<a href="{0}" target="_blank">{0}</a>', url)
+
+    @admin.display(description="Stol uchun QR Kod (Stiker)")
+    def qr_code_display(self, obj):
+        if not obj.qr_code:
+            return '-'
+        qr_url = f"/qr/?qr={obj.qr_code}"
+        img = qrcode.make(qr_url, box_size=5)
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        data_uri = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
+        return format_html(
+            '<div style="width:140px;text-align:center">'
+            '<img src="{0}" alt="QR" style="width:100%;border-radius:8px;border:1px solid #ddd">'
+            '<div style="margin-top:6px"><a href="{0}" download="stol-qr-{1}.png" style="display:inline-block;padding:3px 8px;background:#22883f;color:#fff;border-radius:4px;font-size:11px;text-decoration:none">QR Yuklab Olish</a></div>'
+            '</div>',
+            data_uri, obj.name.replace(' ', '_'),
+        )
 
 @admin.register(Category)
 class CategoryAdmin(SimpleHistoryAdmin):
