@@ -146,7 +146,9 @@ services:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     env_file: .env
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-$TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
     depends_on:
       - website
 
