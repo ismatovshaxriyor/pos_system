@@ -60,5 +60,10 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cd cloud_server
+            if [ -f .env ]; then
+              set -a
+              . ./.env
+              set +a
+            fi
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             docker image prune -f
