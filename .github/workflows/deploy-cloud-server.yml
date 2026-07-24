@@ -66,4 +66,8 @@ jobs:
               set +a
             fi
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            echo "=== DOCKER COMPOSE PS ==="
+            docker compose -f docker-compose.prod.yml ps
+            echo "=== CLOUDFLARED LOGS ==="
+            docker compose -f docker-compose.prod.yml logs --tail=20 cloudflared
             docker image prune -f
