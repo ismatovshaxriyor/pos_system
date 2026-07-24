@@ -134,6 +134,8 @@ services:
     build:
       context: ../website
       dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:80:80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
