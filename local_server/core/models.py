@@ -365,6 +365,12 @@ class RestaurantConfig(BaseModel):
     """
     Restoranning umumiy sozlamalari (singleton).
     """
+    public_domain = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Mijozlar stoldagi QR kodni skanerlaganda o'tishi kerak bo'lgan restoran subdomeni (masalan: filial1.hamrohpos.uz)"
+    )
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Kenglik (Latitude)")
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Uzunlik (Longitude)")
     attendance_radius = models.PositiveIntegerField(default=100, help_text="Ruxsat berilgan radius (metrlarda)")

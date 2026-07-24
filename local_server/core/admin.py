@@ -105,18 +105,53 @@ class TableAdmin(SimpleHistoryAdmin):
     list_filter = ('zone', 'is_active', 'is_synced')
     readonly_fields = ('qr_code', 'qr_code_display', 'qr_url_display')
 
+    def changelist_view(self, request, extra_context=None):
+        self._request = request
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        self._request = request
+        return super().change_view(request, object_id, form_url=form_url, extra_context=extra_context)
+
+    def _build_qr_url(self, obj):
+        domain = None
+        try:
+            from core.models import RestaurantConfig
+            config = RestaurantConfig.objects.first()
+            if config and config.public_domain and config.public_domain.strip():
+                domain = config.public_domain.strip()
+        except Exception:
+            pass
+
+        if not domain and getattr(settings, 'PUBLIC_DOMAIN', ''):
+            domain = settings.PUBLIC_DOMAIN.strip()
+
+        if domain:
+            if '://' in domain:
+                scheme_host = domain
+            else:
+                scheme = 'https' if 'hamrohpos.uz' in domain else 'http'
+                scheme_host = f"{scheme}://{domain}"
+            return f"{scheme_host.rstrip('/')}/table/{obj.qr_code}/"
+
+        path = f"/table/{obj.qr_code}/"
+        req = getattr(self, '_request', None)
+        if req:
+            return req.build_absolute_uri(path)
+        return path
+
     @admin.display(description="QR Kod Havolasi")
     def qr_url_display(self, obj):
         if not obj.qr_code:
             return '-'
-        url = f"/qr/?qr={obj.qr_code}"
+        url = self._build_qr_url(obj)
         return format_html('<a href="{0}" target="_blank">{0}</a>', url)
 
     @admin.display(description="Stol uchun QR Kod (Stiker)")
     def qr_code_display(self, obj):
         if not obj.qr_code:
             return '-'
-        qr_url = f"/qr/?qr={obj.qr_code}"
+        qr_url = self._build_qr_url(obj)
         img = qrcode.make(qr_url, box_size=5)
         buf = io.BytesIO()
         img.save(buf, format='PNG')
@@ -250,7 +285,7 @@ class StockMovementAdmin(SimpleHistoryAdmin):
 
 @admin.register(RestaurantConfig)
 class RestaurantConfigAdmin(SimpleHistoryAdmin):
-    list_display = ('id', 'latitude', 'longitude', 'attendance_radius', 'updated_at')
+    list_display = ('id', 'public_domain', 'latitude', 'longitude', 'attendance_radius', 'updated_at')
 
 
 @admin.register(Attendance)

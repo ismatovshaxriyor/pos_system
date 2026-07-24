@@ -42,6 +42,8 @@ CSRF_TRUSTED_ORIGINS = [
 if os.environ.get('SECURE_PROXY_SSL_HEADER', '0') == '1':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+PUBLIC_DOMAIN = os.environ.get('PUBLIC_DOMAIN', '').strip()
+
 
 # Application definition
 
