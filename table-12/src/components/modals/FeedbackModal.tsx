@@ -2,14 +2,18 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 
 export const FeedbackModal: React.FC = () => {
-  const { isFeedbackModalOpen, setIsFeedbackModalOpen, showToast } = useApp();
+  const { isFeedbackModalOpen, setIsFeedbackModalOpen, callWaiter, showToast, tableName, t } = useApp();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
 
   if (!isFeedbackModalOpen) return null;
 
   const handleSubmit = () => {
-    showToast('Thank you! Your feedback has been sent to management.');
+    const feedbackText = comment.trim() 
+      ? `Fikr va Baho (${rating}★): ${comment}` 
+      : `Baho: ${rating} Yulduz`;
+    callWaiter(feedbackText);
+    showToast(t.feedbackSuccess || 'Rahmat! Fikringiz yuborildi.');
     setIsFeedbackModalOpen(false);
     setComment('');
   };
@@ -25,13 +29,13 @@ export const FeedbackModal: React.FC = () => {
         </button>
 
         <span className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] uppercase block mb-1">
-          GUEST EXPERIENCE
+          {t.guestExperience}
         </span>
         <h2 className="font-serif-display font-bold text-2xl text-[#C7EADE] mb-2">
-          Leave Feedback
+          {t.feedbackTitle}
         </h2>
         <p className="font-sans-body text-xs text-[#C1C8C4] mb-6">
-          Rate your dining experience at Table 12.
+          {tableName} • {t.feedbackSub}
         </p>
 
         {/* Rating Stars */}
@@ -58,7 +62,7 @@ export const FeedbackModal: React.FC = () => {
           rows={3}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Write your comments regarding cuisine, atmosphere, or service..."
+          placeholder={t.feedbackPlaceholder}
           className="w-full bg-[#00110D] border border-[#E3C282]/20 rounded-xl p-3.5 text-xs text-[#C7EADE] focus:outline-none focus:border-[#E3C282] mb-6 font-sans-body"
         />
 
@@ -66,7 +70,7 @@ export const FeedbackModal: React.FC = () => {
           onClick={handleSubmit}
           className="w-full bg-[#E3C282] text-[#001712] font-sans-body text-xs font-bold tracking-widest py-3.5 rounded-full hover:bg-[#FFDEA0] transition-colors uppercase"
         >
-          SUBMIT FEEDBACK
+          {t.submitFeedback}
         </button>
       </div>
     </div>

@@ -8,6 +8,7 @@ export const BillScreen: React.FC = () => {
     serviceFeeUZS,
     totalUZS,
     t,
+    tableName,
     callWaiter,
     setIsSplitBillModalOpen,
     setIsPayModalOpen,
@@ -37,7 +38,7 @@ export const BillScreen: React.FC = () => {
 
         <div className="text-center mb-6 border-b border-[#E3C282]/20 pb-5">
           <p className="font-serif-display font-bold text-2xl text-[#E3C282]">
-            Table 12
+            {tableName}
           </p>
           <p className="font-sans-body text-[10px] font-bold tracking-widest text-[#C1C8C4] mt-1">
             OCT 14, 2026 • 20:45
@@ -81,30 +82,7 @@ export const BillScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quantity controls */}
-                  <div className="flex items-center gap-2 mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => updateCartQuantity(item.dish.id, -1)}
-                      className="w-5 h-5 rounded bg-[#00110D] text-[#E3C282] flex items-center justify-center text-xs hover:bg-[#E3C282]/20"
-                      aria-label="Decrease quantity"
-                    >
-                      -
-                    </button>
-                    <span className="font-sans-body text-xs text-[#C7EADE]">{item.quantity}</span>
-                    <button
-                      onClick={() => updateCartQuantity(item.dish.id, 1)}
-                      className="w-5 h-5 rounded bg-[#00110D] text-[#E3C282] flex items-center justify-center text-xs hover:bg-[#E3C282]/20"
-                      aria-label="Increase quantity"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeFromCart(item.dish.id)}
-                      className="text-[10px] text-red-400 ml-2 hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
+
                 </div>
               );
             })

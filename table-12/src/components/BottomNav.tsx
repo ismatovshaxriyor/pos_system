@@ -36,12 +36,7 @@ export const BottomNav: React.FC = () => {
               {item.label}
             </span>
 
-            {/* Badge for Bill if items exist */}
-            {item.id === 'bill' && totalCartCount > 0 && !isActive && (
-              <span className="absolute -top-1 -right-1 bg-[#E3C282] text-[#001712] font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#001712]">
-                {totalCartCount}
-              </span>
-            )}
+
 
             {/* Pulsing indicator for Waiter if status is 'coming' */}
             {item.id === 'waiter' && waiterStatus === 'coming' && !isActive && (

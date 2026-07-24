@@ -6,6 +6,7 @@ import { Dish } from '../types';
 export const MenuScreen: React.FC = () => {
   const {
     t,
+    dishes,
     openDishDetail,
     addToCart,
     favorites,
@@ -14,13 +15,13 @@ export const MenuScreen: React.FC = () => {
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Plov');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
 
-  const categories = ['Plov', 'Kebabs', 'Manti', 'Soups', 'Salads', 'Desserts', 'Tea', 'Drinks'];
+  const categories = ['All', ...Array.from(new Set(dishes.map((d) => d.category)))];
 
-  const filteredDishes = MENU_DISHES.filter((dish) => {
+  const filteredDishes = dishes.filter((dish) => {
     const matchesCategory = selectedCategory === 'All' || dish.category === selectedCategory;
     const matchesSearch =
       dish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -97,19 +98,32 @@ export const MenuScreen: React.FC = () => {
       <section className="mt-8 sm:mt-12">
         <div className="flex items-center justify-between mb-8">
           <h2 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#ADCDC3]">
-            {selectedCategory === 'Plov' ? t.masterPlovSelection : `${selectedCategory} Selection`}
+            {selectedCategory === 'All' ? t.allSelection : (selectedCategory === 'Plov' ? t.masterPlovSelection : selectedCategory)}
           </h2>
           <div className="h-px bg-[#E3C282]/20 flex-grow ml-6 hidden sm:block" />
         </div>
 
         {/* Dish Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
-          {filteredDishes.map((dish) => {
-            const isFav = favorites.includes(dish.id);
-            const qty = quantities[dish.id] || 1;
-            const isAdded = addedIds[dish.id];
+        {filteredDishes.length === 0 ? (
+          <div className="glass-card rounded-2xl p-12 text-center border border-[#E3C282]/30 max-w-md mx-auto my-12">
+            <span className="material-symbols-outlined text-[#E3C282] text-5xl mb-4">
+              restaurant_menu
+            </span>
+            <h3 className="font-serif-display font-semibold text-2xl text-[#E3C282] mb-2">
+              Hozircha taomlar mavjud emas
+            </h3>
+            <p className="font-sans-body text-xs text-[#C1C8C4] opacity-80">
+              Restoran menyusiga hali taomlar qo'shilmadi yoki tanlangan kategoriya bo'sh.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
+            {filteredDishes.map((dish) => {
+              const isFav = favorites.includes(dish.id);
+              const qty = quantities[dish.id] || 1;
+              const isAdded = addedIds[dish.id];
 
-            return (
+              return (
               <div
                 key={dish.id}
                 onClick={() => openDishDetail(dish)}
@@ -162,53 +176,36 @@ export const MenuScreen: React.FC = () => {
                   <div className="grid grid-cols-3 gap-2 mb-6 text-center bg-[#00110D]/40 p-2.5 rounded-xl border border-[#E3C282]/10">
                     <div className="flex flex-col">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#E3C282]/70 uppercase">
-                        PORTION
+                        {t.portionLabel}
                       </span>
                       <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.portion}</span>
                     </div>
                     <div className="flex flex-col border-x border-[#E3C282]/10">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#E3C282]/70 uppercase">
-                        TIME
+                        {t.timeLabel}
                       </span>
-                      <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.prepTimeMinutes} min</span>
+                      <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.prepTimeMinutes} {t.minLabel}</span>
                     </div>
                     <div className="flex flex-col">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#E3C282]/70 uppercase">
-                        CALORIES
+                        {t.caloriesLabel}
                       </span>
                       <span className="font-sans-body text-xs text-[#C7EADE] font-medium">{dish.calories} kcal</span>
                     </div>
                   </div>
 
-                  {/* Quantity & Add Action */}
+                  {/* Price & Details Action */}
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-[#E3C282]/15">
-                    <div className="flex items-center bg-[#0E2F28] rounded-full px-2.5 py-1 border border-[#E3C282]/20">
-                      <button
-                        onClick={(e) => handleQtyChange(dish.id, -1, e)}
-                        className="text-[#E3C282] p-1 hover:opacity-70"
-                      >
-                        <span className="material-symbols-outlined text-base">remove</span>
-                      </button>
-                      <span className="font-sans-body text-xs font-semibold px-3 text-[#C7EADE]">
-                        {qty}
-                      </span>
-                      <button
-                        onClick={(e) => handleQtyChange(dish.id, 1, e)}
-                        className="text-[#E3C282] p-1 hover:opacity-70"
-                      >
-                        <span className="material-symbols-outlined text-base">add</span>
-                      </button>
-                    </div>
+                    <span className="font-serif-display font-bold text-lg text-[#E3C282]">
+                      {dish.priceUZS.toLocaleString()} <span className="text-xs font-sans-body">UZS</span>
+                    </span>
 
                     <button
-                      onClick={(e) => handleAddDish(dish, e)}
-                      className={`px-7 py-2.5 rounded-full font-sans-body text-xs font-bold tracking-widest transition-all active:scale-95 uppercase ${
-                        isAdded
-                          ? 'bg-[#1A3A32] text-[#E3C282] border border-[#E3C282]'
-                          : 'bg-[#E3C282] text-[#001712] hover:bg-[#FFDEA0]'
-                      }`}
+                      onClick={() => openDishDetail(dish)}
+                      className="px-5 py-2 rounded-full bg-[#E3C282]/15 text-[#E3C282] border border-[#E3C282]/40 font-sans-body text-xs font-bold tracking-widest hover:bg-[#E3C282] hover:text-[#001712] transition-all active:scale-95 uppercase flex items-center gap-1.5"
                     >
-                      {isAdded ? t.added : t.add}
+                      <span>{t.details}</span>
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
                     </button>
                   </div>
                 </div>
@@ -216,6 +213,7 @@ export const MenuScreen: React.FC = () => {
             );
           })}
         </div>
+        )}
       </section>
 
       {/* Sommelier Pairing Feature Section */}

@@ -49,3 +49,48 @@ export interface TableOrder {
   serviceFeePercent: number;
   totalUZS: number;
 }
+
+// Backend API response types (local_server public APIs)
+export interface ApiProduct {
+  id: number;
+  name: string;
+  description: string;
+  price: string | number;
+  image?: string | null;
+  is_available: boolean;
+  preparation_time?: number;
+}
+
+export interface ApiCategory {
+  id: number;
+  name: string;
+  image?: string | null;
+  products: ApiProduct[];
+}
+
+export interface ApiOrderItem {
+  id: number;
+  product_name: string;
+  quantity: number;
+  price: string | number;
+  total: string | number;
+  note?: string;
+}
+
+export interface ApiActiveOrder {
+  id: number;
+  status: string;
+  items: ApiOrderItem[];
+  subtotal: string | number;
+  service_fee: string | number;
+  total_amount: string | number;
+  balance_due: string | number;
+}
+
+export interface ApiTableLive {
+  id: number;
+  name: string;
+  qr_code: string;
+  active_order: ApiActiveOrder | null;
+}
+

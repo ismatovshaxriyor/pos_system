@@ -9,6 +9,7 @@ export const DishDetailScreen: React.FC = () => {
     setPortionSize,
     addToCart,
     openDishDetail,
+    dishes,
     t
   } = useApp();
 
@@ -20,7 +21,7 @@ export const DishDetailScreen: React.FC = () => {
 
   const totalPrice = basePrice * quantity;
 
-  const similarDishes = MENU_DISHES.filter((d) => d.id !== selectedDish.id).slice(0, 2);
+  const similarDishes = dishes.filter((d) => d.id !== selectedDish.id).slice(0, 2);
 
   return (
     <div className="relative pb-36 animate-in fade-in duration-300">
@@ -36,7 +37,7 @@ export const DishDetailScreen: React.FC = () => {
           <div className="max-w-4xl">
             {selectedDish.isSignature && (
               <span className="font-sans-body text-[11px] font-bold tracking-widest text-[#E3C282] mb-2 block uppercase">
-                SIGNATURE DISH
+                {t.signatureDishLabel}
               </span>
             )}
             <h1 className="font-serif-display font-bold text-3xl sm:text-5xl text-[#C7EADE] mb-3">
@@ -219,46 +220,23 @@ export const DishDetailScreen: React.FC = () => {
 
       {/* Bottom Sticky Action Footer Bar */}
       <div className="fixed bottom-0 left-0 w-full z-50 p-4 sm:p-6 md:px-16 pointer-events-none">
-        <div className="max-w-5xl mx-auto glass-card rounded-full p-2 sm:p-2.5 flex items-center justify-between shadow-2xl pointer-events-auto border border-[#E3C282]/40 bg-[#001712]/90 backdrop-blur-2xl">
-          {/* Quantity Stepper */}
-          <div className="flex items-center bg-[#00110D] rounded-full px-2 py-1 ml-1">
-            <button
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-              className="w-9 h-9 flex items-center justify-center text-[#E3C282] hover:bg-[#E3C282]/10 rounded-full transition-colors"
-            >
-              <span className="material-symbols-outlined text-lg">remove</span>
-            </button>
-            <span className="w-8 text-center font-serif-display font-bold text-lg text-[#C7EADE]">
-              {quantity}
+        <div className="max-w-5xl mx-auto glass-card rounded-full p-3 sm:p-4 flex items-center justify-between shadow-2xl pointer-events-auto border border-[#E3C282]/40 bg-[#001712]/90 backdrop-blur-2xl">
+          <div className="flex items-center gap-3 ml-2">
+            <span className="font-sans-body text-xs font-bold tracking-widest text-[#C1C8C4] uppercase">
+              {t.price || "Narxi"}:
             </span>
-            <button
-              onClick={() => setQuantity((q) => q + 1)}
-              className="w-9 h-9 flex items-center justify-center text-[#E3C282] hover:bg-[#E3C282]/10 rounded-full transition-colors"
-            >
-              <span className="material-symbols-outlined text-lg">add</span>
-            </button>
+            <span className="font-serif-display font-bold text-xl sm:text-2xl text-[#E3C282]">
+              {selectedDish.priceUZS.toLocaleString()} UZS
+            </span>
           </div>
 
-          {/* Price & CTA */}
-          <div className="flex items-center gap-4 sm:gap-8 mr-1">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="font-sans-body text-[10px] font-bold tracking-widest text-[#C1C8C4] uppercase">
-                {t.totalPrice}
-              </span>
-              <span className="font-serif-display font-bold text-lg text-[#E3C282]">
-                {totalPrice.toLocaleString()} UZS
-              </span>
-            </div>
-            <button
-              onClick={() => addToCart(selectedDish, quantity, portionSize)}
-              className="bg-[#E3C282] text-[#001712] px-6 sm:px-8 py-3.5 rounded-full font-sans-body text-xs font-bold tracking-widest flex items-center gap-2 hover:bg-[#FFDEA0] transition-all active:scale-95 uppercase shadow-lg shadow-[#E3C282]/20"
-            >
-              <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
-                shopping_bag
-              </span>
-              <span>{t.addOrder}</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setCurrentScreen('menu')}
+            className="bg-[#E3C282] text-[#001712] px-6 sm:px-8 py-3 rounded-full font-sans-body text-xs font-bold tracking-widest flex items-center gap-2 hover:bg-[#FFDEA0] transition-all active:scale-95 uppercase shadow-lg shadow-[#E3C282]/20"
+          >
+            <span className="material-symbols-outlined text-lg">restaurant_menu</span>
+            <span>{t.exploreMenu || "Menyuga qaytish"}</span>
+          </button>
         </div>
       </div>
     </div>

@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 
 export const CutleryModal: React.FC = () => {
-  const { isCutleryModalOpen, setIsCutleryModalOpen, callWaiter } = useApp();
+  const { isCutleryModalOpen, setIsCutleryModalOpen, callWaiter, t } = useApp();
 
   const [selectedItems, setSelectedItems] = useState<string[]>(['Fresh Napkins']);
 
   const items = [
-    { id: 'Forks & Knives', label: 'Forks & Knives', icon: 'flatware' },
-    { id: 'Soup Spoons', label: 'Soup Spoons', icon: 'soup_kitchen' },
-    { id: 'Fresh Napkins', label: 'Textile Fresh Napkins', icon: 'dry_cleaning' },
-    { id: 'Extra Plates', label: 'Extra Sharing Plates', icon: 'dinner_dining' },
-    { id: 'Hot Towels', label: 'Warm Osh Towels (Osh Oshi)', icon: 'clean_hands' },
-    { id: 'Toothpicks', label: 'Toothpicks & Mint', icon: 'spa' },
+    { id: 'Forks & Knives', label: t.cutleryForksKnives || 'Forks & Knives', icon: 'flatware' },
+    { id: 'Soup Spoons', label: t.cutlerySpoons || 'Soup Spoons', icon: 'soup_kitchen' },
+    { id: 'Fresh Napkins', label: t.cutleryNapkins || 'Textile Fresh Napkins', icon: 'dry_cleaning' },
+    { id: 'Extra Plates', label: t.cutleryPlates || 'Extra Sharing Plates', icon: 'dinner_dining' },
+    { id: 'Hot Towels', label: t.cutleryHotTowels || 'Warm Osh Towels (Osh Oshi)', icon: 'clean_hands' },
+    { id: 'Toothpicks', label: t.cutleryToothpicks || 'Toothpicks & Mint', icon: 'spa' },
   ];
 
   if (!isCutleryModalOpen) return null;
@@ -25,7 +25,7 @@ export const CutleryModal: React.FC = () => {
 
   const handleRequest = () => {
     const list = selectedItems.length > 0 ? selectedItems.join(', ') : 'Extra cutlery';
-    callWaiter(`Request: ${list}`);
+    callWaiter(`Qoʻshimcha Idishlar Soʻrovi: ${list}`);
     setIsCutleryModalOpen(false);
   };
 
@@ -40,13 +40,13 @@ export const CutleryModal: React.FC = () => {
         </button>
 
         <span className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] uppercase block mb-1">
-          TABLE SERVICE
+          {t.tableService || 'TABLE SERVICE'}
         </span>
         <h2 className="font-serif-display font-bold text-2xl text-[#C7EADE] mb-2">
-          Request Extra Cutlery
+          {t.requestCutleryTitle || 'Request Extra Cutlery'}
         </h2>
         <p className="font-sans-body text-xs text-[#C1C8C4] mb-6">
-          Select what you require and our server will bring them to Station 4 immediately.
+          {t.requestCutlerySub || 'Select what you require and our server will bring them immediately.'}
         </p>
 
         <div className="grid grid-cols-1 gap-2.5 mb-6">
@@ -76,7 +76,7 @@ export const CutleryModal: React.FC = () => {
           onClick={handleRequest}
           className="w-full bg-[#E3C282] text-[#001712] font-sans-body text-xs font-bold tracking-widest py-3.5 rounded-full hover:bg-[#FFDEA0] transition-colors uppercase"
         >
-          SEND REQUEST
+          {t.sendRequest || 'SEND REQUEST'}
         </button>
       </div>
     </div>

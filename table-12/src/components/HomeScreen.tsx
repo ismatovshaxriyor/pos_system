@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { MENU_DISHES } from '../data/mockData';
 
 export const HomeScreen: React.FC = () => {
-  const { setCurrentScreen, t, addToCart, setIsOurStoryModalOpen, setIsEmirChamberModalOpen } = useApp();
+  const { setCurrentScreen, t, dishes, addToCart, setIsOurStoryModalOpen, setIsEmirChamberModalOpen } = useApp();
   const [activeSlide, setActiveSlide] = useState(0);
 
   const heroSlides = [
@@ -28,7 +28,7 @@ export const HomeScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [heroSlides.length]);
 
-  const saffronTeaDish = MENU_DISHES.find((d) => d.id === 'fergana-saffron-tea') || MENU_DISHES[7];
+  const saffronTeaDish = dishes.length > 0 ? (dishes.find((d) => d.isSignature) || dishes[0]) : null;
 
   return (
     <div className="relative pt-16 pb-36 min-h-screen">
@@ -149,47 +149,49 @@ export const HomeScreen: React.FC = () => {
       </section>
 
       {/* The Sommelier Selection Component */}
-      <section className="mt-16 sm:mt-24 px-6 md:px-16 max-w-[1440px] mx-auto">
-        <div className="relative glass-card p-8 sm:p-12 rounded-2xl border border-[#E3C282]/40 gold-border-glow overflow-hidden">
-          {/* Gold Leaf Corner Accent */}
-          <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none overflow-hidden">
-            <div className="absolute top-0 right-0 w-[150%] h-[150%] bg-gradient-to-br from-[#E3C282]/40 to-transparent rotate-45 transform translate-x-1/2 -translate-y-1/2 border-b border-[#E3C282]/50" />
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-8 sm:gap-12 items-center">
-            <div className="w-36 h-52 flex-shrink-0 relative rounded-xl overflow-hidden border border-[#E3C282]/30 shadow-2xl">
-              <img
-                src={saffronTeaDish.image}
-                alt={saffronTeaDish.name}
-                className="w-full h-full object-cover"
-              />
+      {saffronTeaDish && (
+        <section className="mt-16 sm:mt-24 px-6 md:px-16 max-w-[1440px] mx-auto">
+          <div className="relative glass-card p-8 sm:p-12 rounded-2xl border border-[#E3C282]/40 gold-border-glow overflow-hidden">
+            {/* Gold Leaf Corner Accent */}
+            <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none overflow-hidden">
+              <div className="absolute top-0 right-0 w-[150%] h-[150%] bg-gradient-to-br from-[#E3C282]/40 to-transparent rotate-45 transform translate-x-1/2 -translate-y-1/2 border-b border-[#E3C282]/50" />
             </div>
-            <div className="flex-1">
-              <span className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] mb-2 block uppercase">
-                {t.sommelierSelection}
-              </span>
-              <h3 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#C7EADE] mb-3">
-                {saffronTeaDish.name}
-              </h3>
-              <p className="font-sans-body text-sm text-[#C1C8C4] mb-6 leading-relaxed">
-                {saffronTeaDish.description}
-              </p>
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="font-serif-display font-bold text-2xl text-[#E3C282]">
-                  {saffronTeaDish.priceUZS.toLocaleString()} UZS
+
+            <div className="flex flex-col md:flex-row gap-8 sm:gap-12 items-center">
+              <div className="w-36 h-52 flex-shrink-0 relative rounded-xl overflow-hidden border border-[#E3C282]/30 shadow-2xl">
+                <img
+                  src={saffronTeaDish.image}
+                  alt={saffronTeaDish.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex-1">
+                <span className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] mb-2 block uppercase">
+                  {t.sommelierSelection}
                 </span>
-                <span className="h-px flex-grow bg-[#E3C282]/30 min-w-[30px]" />
-                <button
-                  onClick={() => addToCart(saffronTeaDish)}
-                  className="font-sans-body text-xs font-bold tracking-widest border border-[#E3C282]/60 px-6 py-2.5 rounded-full hover:bg-[#E3C282] text-[#C7EADE] hover:text-[#001712] transition-colors active:scale-95 uppercase"
-                >
-                  {t.addOrder}
-                </button>
+                <h3 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#C7EADE] mb-3">
+                  {saffronTeaDish.name}
+                </h3>
+                <p className="font-sans-body text-sm text-[#C1C8C4] mb-6 leading-relaxed">
+                  {saffronTeaDish.description}
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="font-serif-display font-bold text-2xl text-[#E3C282]">
+                    {saffronTeaDish.priceUZS.toLocaleString()} UZS
+                  </span>
+                  <span className="h-px flex-grow bg-[#E3C282]/30 min-w-[30px]" />
+                  <button
+                    onClick={() => setCurrentScreen('menu')}
+                    className="font-sans-body text-xs font-bold tracking-widest border border-[#E3C282]/60 px-6 py-2.5 rounded-full hover:bg-[#E3C282] text-[#C7EADE] hover:text-[#001712] transition-colors active:scale-95 uppercase"
+                  >
+                    {t.viewMenu}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 };
