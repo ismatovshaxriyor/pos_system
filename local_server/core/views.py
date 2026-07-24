@@ -1084,6 +1084,13 @@ class QRAppView(TemplateView):
     """
     template_name = 'core/qr_app.html'
 
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+
 
 
 

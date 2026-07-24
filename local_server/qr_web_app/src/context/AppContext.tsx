@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScreenView, Language, Dish, CartItem, WaiterRequestHistoryItem } from '../types';
 import { MENU_DISHES, TRANSLATIONS } from '../data/mockData';
+import { fetchTableLive } from '../api';
 
 interface AppContextType {
   currentScreen: ScreenView;
@@ -25,6 +26,7 @@ interface AppContextType {
   waiterHistory: WaiterRequestHistoryItem[];
   toastMessage: string | null;
   showToast: (msg: string) => void;
+  tableInfo: { tableName: string; zoneName: string } | null;
   
   // Modals
   isCutleryModalOpen: boolean;
@@ -49,40 +51,18 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const INITIAL_CART: CartItem[] = [
-  {
-    dish: MENU_DISHES[1], // Wedding Plov
-    quantity: 2,
-    portionSize: 'Standard',
-    priceUZS: 120000
-  },
-  {
-    dish: MENU_DISHES[4], // Lamb Kebab
-    quantity: 1,
-    portionSize: 'Standard',
-    priceUZS: 95000
-  },
-  {
-    dish: MENU_DISHES[7], // Green Tea / Saffron Tea
-    quantity: 3,
-    portionSize: 'Standard',
-    priceUZS: 15000
-  }
-];
+const INITIAL_CART: CartItem[] = [];
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('home');
-  const [language, setLanguage] = useState<Language>('EN');
+  const [language, setLanguage] = useState<Language>('UZ');
   const [selectedDish, setSelectedDish] = useState<Dish>(MENU_DISHES[0]);
   const [portionSize, setPortionSize] = useState<'Standard' | 'Large'>('Standard');
   const [cart, setCart] = useState<CartItem[]>(INITIAL_CART);
-  const [favorites, setFavorites] = useState<string[]>(['wedding-plov', 'lamb-kebab']);
+  const [favorites, setFavorites] = useState<string[]>([]);
   
-  const [waiterStatus, setWaiterStatus] = useState<'idle' | 'calling' | 'coming'>('coming');
-  const [waiterHistory, setWaiterHistory] = useState<WaiterRequestHistoryItem[]>([
-    { id: '1', title: 'Napkin request', time: 'Completed · 19:42', status: 'COMPLETED' },
-    { id: '2', title: 'Wine service', time: 'Completed · 19:15', status: 'COMPLETED' }
-  ]);
+  const [waiterStatus, setWaiterStatus] = useState<'idle' | 'calling' | 'coming'>('idle');
+  const [waiterHistory, setWaiterHistory] = useState<WaiterRequestHistoryItem[]>([]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -188,6 +168,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast(`${requestName} yuborildi`);
   };
 
+  const [tableInfo, setTableInfo] = useState<{ tableName: string; zoneName: string } | null>(null);
+  const [liveOrder, setLiveOrder] = useState<any>(null);
+
+  useEffect(() => {
+    const qrCode = getQrCodeFromUrl();
+    if (qrCode && qrCode !== 'demo') {
+      fetchTableLive(qrCode)
+        .then((data) => {
+          if (data) {
+            setTableInfo({
+              tableName: data.table_name || '',
+              zoneName: data.zone_name || ''
+            });
+            if (data.current_order && data.current_order.items && data.current_order.items.length > 0) {
+              setLiveOrder(data.current_order);
+              const mappedItems: CartItem[] = data.current_order.items.map((item: any) => ({
+                dish: {
+                  id: String(item.id),
+                  name: item.product_name,
+                  category: 'ordered',
+                  priceUZS: parseFloat(item.price),
+                  description: '',
+                  image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
+                  rating: 5,
+                  prepTime: '15 min'
+                },
+                quantity: item.quantity,
+                portionSize: 'Standard',
+                priceUZS: parseFloat(item.price)
+              }));
+              setCart(mappedItems);
+            } else {
+              setCart([]);
+            }
+          }
+        })
+        .catch((err) => console.error("Error fetching live table order:", err));
+    }
+  }, []);
+
   const cancelWaiterCall = () => {
     setWaiterStatus('idle');
     showToast('Request cancelled');
@@ -195,8 +215,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Financial calculations
   const subtotalUZS = cart.reduce((acc, item) => acc + (item.priceUZS * item.quantity), 0);
-  const serviceFeeUZS = Math.round(subtotalUZS * 0.15);
-  const totalUZS = subtotalUZS + serviceFeeUZS;
+  const serviceFeeUZS = liveOrder && liveOrder.service_charge
+    ? parseFloat(liveOrder.service_charge)
+    : Math.round(subtotalUZS * 0.10);
+  const totalUZS = liveOrder && liveOrder.final_amount
+    ? parseFloat(liveOrder.final_amount)
+    : subtotalUZS + serviceFeeUZS;
 
   return (
     <AppContext.Provider
@@ -223,6 +247,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         waiterHistory,
         toastMessage,
         showToast,
+        tableInfo,
         isCutleryModalOpen,
         setIsCutleryModalOpen,
         isFeedbackModalOpen,

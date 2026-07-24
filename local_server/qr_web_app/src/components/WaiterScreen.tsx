@@ -60,14 +60,14 @@ export const WaiterScreen: React.FC = () => {
               onClick={cancelWaiterCall}
               className="text-[10px] text-red-400/80 hover:text-red-300 underline font-sans-body tracking-wider uppercase mt-1"
             >
-              Cancel
+              {t.cancel}
             </button>
           </div>
         </div>
       ) : (
         <div className="mb-8 glass-card rounded-2xl p-4 text-center border border-[#E3C282]/20">
           <p className="font-sans-body text-xs text-[#C1C8C4]">
-            No active request. Select an option below to notify your server.
+            {t.noActiveRequest}
           </p>
         </div>
       )}
@@ -76,7 +76,7 @@ export const WaiterScreen: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 mb-10">
         {/* Call Waiter */}
         <button
-          onClick={() => callWaiter('Call waiter')}
+          onClick={() => callWaiter(t.callWaiter)}
           className="glass-card rounded-2xl p-5 flex items-center gap-5 group text-left w-full active:scale-[0.98] transition-all hover:border-[#E3C282]/50 hover:bg-[#0F2D26]/40"
         >
           <div className="w-14 h-14 rounded-full bg-[#E3C282]/10 flex items-center justify-center border border-[#E3C282]/30 group-hover:bg-[#E3C282]/20 transition-colors flex-shrink-0">
@@ -100,7 +100,7 @@ export const WaiterScreen: React.FC = () => {
         {/* Ask for Bill */}
         <button
           onClick={() => {
-            callWaiter('Ask for bill');
+            callWaiter(t.askBill);
             setCurrentScreen('bill');
           }}
           className="glass-card rounded-2xl p-5 flex items-center gap-5 group text-left w-full active:scale-[0.98] transition-all hover:border-[#E3C282]/50 hover:bg-[#0F2D26]/40"
@@ -116,29 +116,6 @@ export const WaiterScreen: React.FC = () => {
             </h3>
             <p className="font-sans-body text-xs text-[#C1C8C4]">
               {t.askBillDesc}
-            </p>
-          </div>
-          <span className="material-symbols-outlined text-[#E3C282]/50 group-hover:translate-x-1 transition-transform">
-            chevron_right
-          </span>
-        </button>
-
-        {/* Request Extra Cutlery */}
-        <button
-          onClick={() => setIsCutleryModalOpen(true)}
-          className="glass-card rounded-2xl p-5 flex items-center gap-5 group text-left w-full active:scale-[0.98] transition-all hover:border-[#E3C282]/50 hover:bg-[#0F2D26]/40"
-        >
-          <div className="w-14 h-14 rounded-full bg-[#E3C282]/10 flex items-center justify-center border border-[#E3C282]/30 group-hover:bg-[#E3C282]/20 transition-colors flex-shrink-0">
-            <span className="material-symbols-outlined text-[#E3C282] text-2xl">
-              flatware
-            </span>
-          </div>
-          <div className="flex-1">
-            <h3 className="font-serif-display font-semibold text-lg text-[#E3C282] mb-0.5">
-              {t.requestCutlery}
-            </h3>
-            <p className="font-sans-body text-xs text-[#C1C8C4]">
-              {t.requestCutleryDesc}
             </p>
           </div>
           <span className="material-symbols-outlined text-[#E3C282]/50 group-hover:translate-x-1 transition-transform">
@@ -167,30 +144,6 @@ export const WaiterScreen: React.FC = () => {
           <span className="material-symbols-outlined text-[#E3C282]/50 group-hover:translate-x-1 transition-transform">
             chevron_right
           </span>
-        </button>
-      </div>
-
-      {/* Sommelier's Note Card */}
-      <div className="relative glass-card p-6 rounded-2xl overflow-hidden mb-10 border border-[#E3C282]/30">
-        <div className="absolute top-0 right-0 w-14 h-14 bg-[#E3C282]/20 rounded-bl-3xl border-b border-l border-[#E3C282]/40 flex items-center justify-center">
-          <span className="material-symbols-outlined text-[#E3C282] text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
-            wine_bar
-          </span>
-        </div>
-        <p className="font-sans-body text-[10px] font-bold tracking-widest text-[#E3C282] mb-3 uppercase">
-          {t.sommelierNote}
-        </p>
-        <h4 className="font-serif-display font-semibold text-xl text-[#C7EADE] mb-2">
-          {t.exclusivePairing}
-        </h4>
-        <p className="font-sans-body text-xs text-[#C1C8C4] leading-relaxed italic mb-5">
-          {t.exclusivePairingText}
-        </p>
-        <button
-          onClick={() => callWaiter('Sommelier Wine Pairing requested')}
-          className="font-sans-body text-[11px] font-bold tracking-widest border border-[#E3C282] text-[#E3C282] px-5 py-2 rounded-full hover:bg-[#E3C282] hover:text-[#001712] transition-all uppercase active:scale-95"
-        >
-          {t.requestPairing}
         </button>
       </div>
 

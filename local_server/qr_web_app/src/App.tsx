@@ -11,7 +11,6 @@ import { BillScreen } from './components/BillScreen';
 
 import { OurStoryModal } from './components/modals/OurStoryModal';
 import { EmirChamberModal } from './components/modals/EmirChamberModal';
-import { CutleryModal } from './components/modals/CutleryModal';
 import { FeedbackModal } from './components/modals/FeedbackModal';
 import { SplitBillModal } from './components/modals/SplitBillModal';
 import { PaymentModal } from './components/modals/PaymentModal';
@@ -42,7 +41,6 @@ const AppContent: React.FC = () => {
       {/* Modals */}
       <OurStoryModal />
       <EmirChamberModal />
-      <CutleryModal />
       <FeedbackModal />
       <SplitBillModal />
       <PaymentModal />

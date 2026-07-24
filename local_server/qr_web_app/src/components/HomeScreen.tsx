@@ -37,13 +37,15 @@ export const HomeScreen: React.FC = () => {
 
       {/* Hero Cinematic Carousel Section */}
       <section className="relative h-[680px] md:h-[740px] w-full overflow-hidden">
-        {/* Carousel Track */}
-        <div
-          className="flex h-full w-full transition-transform duration-1000 ease-in-out"
-          style={{ transform: `translateX(-${activeSlide * 100}%)` }}
-        >
+        {/* Carousel Slides */}
+        <div className="relative h-full w-full">
           {heroSlides.map((slide, index) => (
-            <div key={index} className="min-w-full h-full relative flex-shrink-0">
+            <div
+              key={index}
+              className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
+                index === activeSlide ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+              }`}
+            >
               <div className="absolute inset-0 bg-gradient-to-t from-[#001712] via-[#001712]/40 to-[#001712]/20 z-10" />
               <img
                 src={slide.image}
@@ -63,20 +65,6 @@ export const HomeScreen: React.FC = () => {
             <p className="font-sans-body text-base sm:text-lg text-[#C1C8C4] max-w-2xl mx-auto mb-10 opacity-90 leading-relaxed">
               {t.welcomeSubtitle}
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button
-                onClick={() => setCurrentScreen('menu')}
-                className="w-full sm:w-auto bg-[#E6E2D8] text-[#18362E] font-sans-body font-bold text-xs tracking-widest px-10 py-4.5 rounded-full transition-all active:scale-95 hover:bg-white gold-border-glow shadow-xl"
-              >
-                {t.viewMenu}
-              </button>
-              <button
-                onClick={() => setIsOurStoryModalOpen(true)}
-                className="w-full sm:w-auto border border-[#E3C282]/50 text-[#E3C282] font-sans-body font-bold text-xs tracking-widest px-10 py-4.5 rounded-full backdrop-blur-md hover:bg-[#E3C282]/10 transition-all active:scale-95"
-              >
-                {t.ourStory}
-              </button>
-            </div>
           </div>
         </div>
 

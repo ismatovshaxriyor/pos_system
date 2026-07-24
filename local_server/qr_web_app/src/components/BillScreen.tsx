@@ -13,10 +13,11 @@ export const BillScreen: React.FC = () => {
     setIsPayModalOpen,
     updateCartQuantity,
     removeFromCart,
+    tableInfo,
   } = useApp();
 
   return (
-    <div className="pt-24 pb-48 px-6 max-w-lg mx-auto relative min-h-screen animate-in fade-in duration-300">
+    <div className="pt-24 pb-36 px-6 max-w-lg mx-auto relative min-h-screen animate-in fade-in duration-300">
       {/* Background Ambient Glow */}
       <div className="fixed inset-0 -z-10 opacity-20 pointer-events-none oriental-pattern-overlay" />
 
@@ -37,7 +38,7 @@ export const BillScreen: React.FC = () => {
 
         <div className="text-center mb-6 border-b border-[#E3C282]/20 pb-5">
           <p className="font-serif-display font-bold text-2xl text-[#E3C282]">
-            Table 12
+            {tableInfo ? `${tableInfo.tableName}${tableInfo.zoneName ? ` (${tableInfo.zoneName})` : ''}` : 'Table 12'}
           </p>
           <p className="font-sans-body text-[10px] font-bold tracking-widest text-[#C1C8C4] mt-1">
             OCT 14, 2026 • 20:45
@@ -76,34 +77,9 @@ export const BillScreen: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <span className="font-sans-body text-xs font-semibold text-[#C7EADE]">
-                        {itemTotal.toLocaleString()}
+                        {itemTotal.toLocaleString()} UZS
                       </span>
                     </div>
-                  </div>
-
-                  {/* Quantity controls */}
-                  <div className="flex items-center gap-2 mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => updateCartQuantity(item.dish.id, -1)}
-                      className="w-5 h-5 rounded bg-[#00110D] text-[#E3C282] flex items-center justify-center text-xs hover:bg-[#E3C282]/20"
-                      aria-label="Decrease quantity"
-                    >
-                      -
-                    </button>
-                    <span className="font-sans-body text-xs text-[#C7EADE]">{item.quantity}</span>
-                    <button
-                      onClick={() => updateCartQuantity(item.dish.id, 1)}
-                      className="w-5 h-5 rounded bg-[#00110D] text-[#E3C282] flex items-center justify-center text-xs hover:bg-[#E3C282]/20"
-                      aria-label="Increase quantity"
-                    >
-                      +
-                    </button>
-                    <button
-                      onClick={() => removeFromCart(item.dish.id)}
-                      className="text-[10px] text-red-400 ml-2 hover:underline"
-                    >
-                      Remove
-                    </button>
                   </div>
                 </div>
               );
@@ -183,24 +159,6 @@ export const BillScreen: React.FC = () => {
           <span className="font-sans-body text-[10px] font-bold tracking-widest uppercase">
             {t.payCard}
           </span>
-        </button>
-      </div>
-
-      {/* Bottom Sticky Total Tracker Bar */}
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-[#0e2f28]/90 backdrop-blur-md rounded-2xl p-4 border border-[#E3C282]/30 shadow-2xl flex justify-between items-center z-40">
-        <div>
-          <p className="font-sans-body text-[10px] font-bold tracking-widest text-[#C1C8C4] uppercase">
-            Current Total
-          </p>
-          <p className="font-serif-display font-bold text-lg text-[#E3C282]">
-            {totalUZS.toLocaleString()} UZS
-          </p>
-        </div>
-        <button
-          onClick={() => setIsPayModalOpen(true)}
-          className="bg-[#ADCDC3] text-[#18362E] font-sans-body text-xs font-bold tracking-widest px-6 py-2.5 rounded-full active:scale-95 transition-transform uppercase shadow-md"
-        >
-          {t.payNow}
         </button>
       </div>
     </div>
