@@ -1,7 +1,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+ENV NODE_ENV=development
 COPY package*.json ./
-RUN npm install
+RUN npm install --include=dev
 COPY . .
 RUN npm run build
 
