@@ -142,8 +142,7 @@ services:
       retries: 5
       start_period: 5s
     depends_on:
-      web:
-        condition: service_healthy
+      - web
 
   cloudflared:
     image: cloudflare/cloudflared:latest

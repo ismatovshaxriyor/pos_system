@@ -60,5 +60,10 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cd cloud_server
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            # Zero-downtime build: build images while existing containers continue serving traffic
+            docker compose -f docker-compose.prod.yml build
+            # Rolling updates: recreate backend web first, then website Nginx frontend
+            docker compose -f docker-compose.prod.yml up -d --no-deps web
+            docker compose -f docker-compose.prod.yml up -d --no-deps website
+            docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
