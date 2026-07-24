@@ -218,7 +218,7 @@ class DiscoveryView(APIView):
         state = LicenseState.load()
         return Response({
             "service": "pos-bola",
-            "version": getattr(settings, 'APP_VERSION', '0.3.0'),
+            "version": getattr(settings, 'APP_VERSION', '0.3.2'),
             "activated": bool(state and state.activated_at),
             "restaurant_id": str(state.restaurant_id) if state and state.restaurant_id else None,
             "restaurant_name": state.restaurant_name if state else "Faollashtirilmagan Server",

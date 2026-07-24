@@ -450,7 +450,7 @@ class PublicStatsView(APIView):
     def get(self, request):
         active_count = Restaurant.objects.filter(is_active=True).count()
         online_count = Restaurant.objects.filter(is_online=True).count()
-        release_version = getattr(settings, 'LATEST_RELEASE_VERSION', '0.3.0')
+        release_version = getattr(settings, 'LATEST_RELEASE_VERSION', '0.3.2')
 
         return Response({
             "active_restaurants": active_count,

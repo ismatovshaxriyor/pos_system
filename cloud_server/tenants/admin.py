@@ -264,7 +264,7 @@ class RestaurantAdmin(admin.ModelAdmin):
             return
         from django.conf import settings
         from django.template.response import TemplateResponse
-        latest_version = getattr(settings, 'LATEST_RELEASE_VERSION', '0.3.0')
+        latest_version = getattr(settings, 'LATEST_RELEASE_VERSION', '0.3.2')
         return TemplateResponse(request, 'admin/release_version.html', {
             'title': f"Yangi versiya yuborish (Oxirgi versiya: v{latest_version})",
             'latest_version': latest_version,

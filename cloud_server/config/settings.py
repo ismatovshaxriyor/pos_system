@@ -276,10 +276,15 @@ SPECTACULAR_SETTINGS = {
 }
 
 def _read_latest_release_version():
-    version_file = BASE_DIR.parent / 'local_server' / 'VERSION'
+    # 1. Container/cloud_server ostidagi VERSION fayli (/app/VERSION)
+    version_file = BASE_DIR / 'VERSION'
     if version_file.exists():
-        return version_file.read_text().strip()
-    return os.environ.get('LATEST_RELEASE_VERSION', '0.3.0')
+        return version_file.read_text(encoding='utf-8').strip()
+    # 2. Local dev (monorepo) holdagi local_server/VERSION fayli
+    version_file_local = BASE_DIR.parent / 'local_server' / 'VERSION'
+    if version_file_local.exists():
+        return version_file_local.read_text(encoding='utf-8').strip()
+    return os.environ.get('LATEST_RELEASE_VERSION', '0.3.2')
 
 
 LATEST_RELEASE_VERSION = _read_latest_release_version()
