@@ -69,7 +69,11 @@ class LicenseState(models.Model):
 
     @classmethod
     def load(cls):
-        return cls.objects.filter(pk=1).first()
+        from django.db.utils import OperationalError, ProgrammingError
+        try:
+            return cls.objects.filter(pk=1).first()
+        except (ProgrammingError, OperationalError):
+            return None
 
     @property
     def furthest_expiry(self):

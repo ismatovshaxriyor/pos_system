@@ -43,6 +43,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
+      - RUN_MIGRATIONS=1
       - DEBUG=1
       - DB_NAME=pos_local_db
       - DB_USER=pos_user
