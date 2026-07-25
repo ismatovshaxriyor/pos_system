@@ -1,9 +1,12 @@
+from datetime import timedelta
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from core import services
-from core.models import StaffDevice, User
+from core.models import DeviceRegistrationCode, StaffDevice, User
 
 
 def _auth_header(user):
@@ -52,6 +55,37 @@ class GenerateRegistrationCodeActionTests(TestCase):
         response = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
 
         self.assertEqual(response.status_code, 400)
+
+    def test_repeated_call_returns_same_code_instead_of_replacing_it(self):
+        # Regressiya: har chaqiruv eski (hali amal qiluvchi) kodni o'chirib
+        # yangisini yaratardi - agar bu ikkinchi marta (masalan tugma qayta
+        # bosilib) chaqirilsa, xodimga aytilgan/yozib qo'yilgan birinchi kod
+        # sababsiz ishlamay qolardi. Endi bitta amal qiluvchi kod bo'lsa,
+        # u qayta ishlatiladi - yangilanmaydi.
+        url = reverse('user-generate-registration-code', args=[self.waiter.id])
+
+        first = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
+        second = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(first.data['code'], second.data['code'])
+        self.assertEqual(
+            DeviceRegistrationCode.objects.filter(user=self.waiter, used_at__isnull=True).count(), 1,
+        )
+
+    def test_new_code_generated_once_previous_one_expired(self):
+        url = reverse('user-generate-registration-code', args=[self.waiter.id])
+        first = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
+
+        expired = DeviceRegistrationCode.objects.get(user=self.waiter)
+        expired.expires_at = timezone.now() - timedelta(minutes=1)
+        expired.save(update_fields=['expires_at'])
+
+        second = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
+
+        self.assertEqual(second.status_code, 201)
+        self.assertNotEqual(first.data['code'], second.data['code'])
 
 
 class StaffDeviceViewSetTests(TestCase):

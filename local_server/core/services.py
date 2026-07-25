@@ -35,9 +35,21 @@ def generate_registration_code(user, created_by):
     Admin generatsiya qiladi, xodim planshetida kiritadi. 6-xonali raqamli kod.
     PIN bilan kiruvchi (is_staff=False) xodim uchun - admin hisobi parol bilan
     kiradi, unga registratsiya kodi kerak emas.
+
+    Idempotent: agar shu foydalanuvchi uchun hali amal qiluvchi (ishlatilmagan
+    va muddati o'tmagan) kod mavjud bo'lsa, o'sha kod qaytariladi - yangisi
+    bilan ALMASHTIRILMAYDI. Aks holda (masalan, admin panelda tugma ikki marta
+    bosilsa yoki so'rov qayta yuborilsa) har chaqiruv eski, hali xodimga
+    yetkazilgan kodni bekor qilib, uni ishlamay qolishiga olib kelardi.
     """
     if user.is_staff:
         raise ServiceError("Admin foydalanuvchi uchun PIN kirish kerak emas.")
+
+    existing = DeviceRegistrationCode.objects.filter(
+        user=user, used_at__isnull=True, expires_at__gt=timezone.now(),
+    ).first()
+    if existing:
+        return existing
 
     DeviceRegistrationCode.objects.filter(user=user, used_at__isnull=True).delete()
     code = get_random_string(6, allowed_chars='0123456789')
@@ -77,7 +89,29 @@ def redeem_registration_code(phone, code, device_id, pin, device_label=''):
         raise ServiceError("Kod noto'g'ri yoki muddati tugagan.")
 
     registration = DeviceRegistrationCode.objects.filter(user=user, code=code).first()
-    if not registration or not registration.is_valid():
+    if not registration:
+        raise ServiceError("Kod noto'g'ri yoki muddati tugagan.")
+
+    if not registration.is_valid():
+        # Retry-idempotentlik: restoran WiFi'si uzilib klient javobni olmasa-yu
+        # so'rovni AYNAN shu (kod, device_id, pin) bilan qayta yuborsa, bu kod
+        # `used_at` tufayli endi "invalid" ko'rinadi - lekin agar birinchi
+        # urinish aslida muvaffaqiyatli bo'lgan bo'lsa (shu kod shu qurilmani
+        # shu PIN bilan allaqachon bog'lagan), xato qaytarish kassirni
+        # chalkashtiradi: u "kod noto'g'ri" deb o'ylab qoladi, holbuki
+        # qurilmasi allaqachon ishlaydi. Shu holatda xatosiz, mavjud tokenni
+        # qaytaramiz - boshqa har qanday holatda (haqiqatan eskirgan/boshqa
+        # qurilmada ishlatilgan kod) oddiy umumiy xabar saqlanadi.
+        already_registered = (
+            registration.used_at is not None
+            and check_password(pin, user.pin_hash)
+            and StaffDevice.objects.filter(
+                user=user, device_id=device_id, is_active=True, is_approved=True,
+            ).exists()
+        )
+        if already_registered:
+            token, _ = Token.objects.get_or_create(user=user)
+            return user, token
         raise ServiceError("Kod noto'g'ri yoki muddati tugagan.")
 
     with transaction.atomic():
@@ -167,10 +201,21 @@ def verify_pin_login(device_id, pin):
         raise ServiceError("Qurilma yoki PIN noto'g'ri.")
 
     _clear_failures(device_id)
-    if device.user != matched_user:
-        device.user = matched_user
-    device.last_login_at = timezone.now()
-    device.save(update_fields=['user', 'last_login_at', 'updated_at'])
+    if device.user_id != matched_user.id:
+        # Smena almashinuvi: shu kassa plansheti boshqa xodimga (matched_user)
+        # o'tmoqda. Agar matched_user allaqachon BOSHQA faol+tasdiqlangan
+        # qurilmaga ega bo'lsa (masalan bir necha kassa terminali bo'lgan
+        # restoranda), uni avval evict qilmasdan shu qatorni matched_user'ga
+        # bog'lash `uniq_active_approved_device_per_user` constraint'ini
+        # buzardi (IntegrityError -> 500 - kassir umuman kira olmay qolardi).
+        with transaction.atomic():
+            _evict_active_device(user=matched_user)
+            device.user = matched_user
+            device.last_login_at = timezone.now()
+            device.save(update_fields=['user', 'last_login_at', 'updated_at'])
+    else:
+        device.last_login_at = timezone.now()
+        device.save(update_fields=['last_login_at', 'updated_at'])
     token, _ = Token.objects.get_or_create(user=matched_user)
     return matched_user, token
 

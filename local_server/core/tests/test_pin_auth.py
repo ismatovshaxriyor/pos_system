@@ -64,6 +64,33 @@ class DeviceRegisterViewTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
+    def test_retrying_same_request_after_a_successful_but_lost_response_is_idempotent(self):
+        # Regressiya: restoran WiFi'sida javob klientga yetib bormasa (spotty
+        # WiFi - shu loyihada boshqa joylarda ham hujjatlashtirilgan muammo),
+        # klient AYNAN o'sha (kod, device_id, pin)ni qayta yuboradi. Birinchi
+        # so'rov aslida muvaffaqiyatli bo'lgan bo'lsa, ikkinchisi xato emas -
+        # xuddi shu tokenni qaytarishi kerak, aks holda kassir "kod noto'g'ri"
+        # deb chalkashib qolar edi, holbuki qurilmasi allaqachon ishlaydi.
+        first = self._post()
+        self.assertEqual(first.status_code, 201)
+
+        second = self._post()
+
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.data['token'], first.data['token'])
+        self.assertEqual(StaffDevice.objects.filter(user=self.staff, is_active=True).count(), 1)
+
+    def test_used_code_retried_with_different_pin_still_rejected(self):
+        # Yuqoridagi idempotentlik faqat AYNAN bir xil (kod, device_id, pin)
+        # qayta yuborilganda ishlashi kerak - boshqa PIN bilan urinish hali
+        # ham rad etilishi kerak (aks holda ishlatilgan kod cheksiz qayta
+        # foydalanish teshigiga aylanardi).
+        self._post()
+
+        response = self._post(pin='999999')
+
+        self.assertEqual(response.status_code, 400)
+
     def test_wrong_code_rejected(self):
         response = self._post(code='WRONGCODE')
 
@@ -195,4 +222,31 @@ class PinLoginViewTests(TestCase):
         # StaffDevice endi Kassir 2 ga o'tgan bo'lishi kerak
         self.device.refresh_from_db()
         self.assertEqual(self.device.user, cashier2)
+
+    def test_shift_switch_evicts_incoming_cashiers_other_active_device(self):
+        # Regressiya: agar kiruvchi kassir (cashier2) allaqachon BOSHQA
+        # kassa terminaliga faol+tasdiqlangan holda bog'langan bo'lsa, uni
+        # shu (device-9) terminalga bog'lash avval eski qurilmasini evict
+        # qilmasdan `uniq_active_approved_device_per_user` constraint'ini
+        # buzib IntegrityError (500) berardi - kassir umuman kira olmasdi.
+        cashier2 = User.objects.create_user(username='+998900000005', role='cashier')
+        cashier2.pin_hash = make_password('654321')
+        cashier2.save(update_fields=['pin_hash'])
+        other_device = StaffDevice.objects.create(
+            user=cashier2, device_id='device-other-terminal', is_active=True, is_approved=True,
+        )
+        Token.objects.create(user=cashier2)
+
+        response = self.client.post(
+            self.url, {"device_id": "device-9", "pin": "654321"}, content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['username'], cashier2.username)
+
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.user, cashier2)
+
+        other_device.refresh_from_db()
+        self.assertFalse(other_device.is_active)
 
