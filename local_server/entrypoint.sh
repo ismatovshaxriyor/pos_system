@@ -10,7 +10,6 @@ if [ "$RUN_MIGRATIONS" = "1" ]; then
     # django.views.static.serve orqali xizmat qilinadi - collectstatic
     # ishlamasa bu papka umuman mavjud bo'lmaydi va har bir /static/ so'rovi
     # 404 qaytaradi (jumladan admin panel CSS/JS va QR web app bundle'i).
-    python manage.py collectstatic --noinput
 fi
 
 exec "$@"
