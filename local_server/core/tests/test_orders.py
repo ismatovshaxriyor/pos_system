@@ -277,6 +277,36 @@ class OrderLogicTests(TestCase):
         self.assertEqual(print_jobs.count(), 1)
         self.assertEqual(print_jobs.first().items_snapshot[0]['note'], "Yangi taom")
 
+    def test_update_order_items_forbidden_on_completed_order(self):
+        # Generic PATCH orqali items - add_item/close bilan bir xil "yopiq
+        # buyurtma" himoyasini chetlab o'tmasligi kerak (aks holda to'langan
+        # buyurtmaning taomlarini keyinchalik qo'shib/o'chirib bo'lardi).
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='completed')
+        item = OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        url = reverse('order-detail', args=[order.id])
+        response = self.client.patch(
+            url,
+            {"items": [{"id": item.id, "product_id": self.product.id, "quantity": 99}]},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 400)
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, 1)
+
+    def test_update_order_items_forbidden_on_cancelled_order(self):
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='cancelled')
+        item = OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        url = reverse('order-detail', args=[order.id])
+        response = self.client.patch(
+            url,
+            {"items": []},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(order.items.count(), 1)
+
     def test_product_delete_is_soft_and_blocks_ordering(self):
         del_url = reverse('product-detail', args=[self.product.id])
         response = self.client.delete(del_url, **_auth_header(self.manager))

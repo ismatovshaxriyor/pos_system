@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import F, Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
@@ -993,8 +994,14 @@ class PublicMenuView(APIView):
 
 def _get_public_table(qr_code):
     """
-    qr_code bo'yicha stolni aniqlaydi. Agar qr_code == 'demo' bo'lsa
-    yoki yaroqsiz bo'lsa, bazadagi birinchi faol stolni moslab beradi.
+    qr_code bo'yicha stolni aniqlaydi. Faqat aniq qr_code == 'demo' bo'lsa
+    (demo/test rejimi uchun ataylab) bazadagi birinchi faol stolni moslab
+    beradi. Har qanday BOSHQA yaroqsiz (UUID bo'lmagan) qr_code 404 qaytaradi -
+    aks holda mijoz tomonidan mo'ljallanmagan/tasodifiy yozilgan yo'l (masalan
+    "/table/xatolik/") xuddi 'demo' kabi ishlov berilib, restorandagi ixtiyoriy
+    boshqa stolning haqiqiy jonli buyurtmasi/summasi ochiq (autentifikatsiyasiz)
+    oshkor bo'lib qolar edi, hattoki afitsiantni noto'g'ri stolga chaqirtirish
+    ham mumkin bo'lardi.
     """
     if str(qr_code).lower() == 'demo':
         table = Table.objects.filter(is_active=True).first()
@@ -1004,12 +1011,9 @@ def _get_public_table(qr_code):
 
     try:
         table_uuid = uuid.UUID(str(qr_code))
-        return get_object_or_404(Table, qr_code=table_uuid, is_active=True)
     except (ValueError, TypeError):
-        table = Table.objects.filter(is_active=True).first()
-        if not table:
-            table = Table.objects.create(name='Demo Stol', is_active=True)
-        return table
+        raise Http404("Yaroqsiz QR kod.")
+    return get_object_or_404(Table, qr_code=table_uuid, is_active=True)
 
 
 class PublicTableLiveView(APIView):

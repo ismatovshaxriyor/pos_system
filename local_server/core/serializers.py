@@ -1,3 +1,4 @@
+import ipaddress
 from decimal import Decimal
 
 from drf_spectacular.utils import extend_schema_field
@@ -165,6 +166,34 @@ class PrinterSerializer(serializers.ModelSerializer):
         model = Printer
         fields = ('id', 'name', 'ip_address', 'port', 'chars_per_line', 'is_active', 'created_at', 'updated_at')
 
+    def validate_ip_address(self, value):
+        """
+        `PrinterViewSet` istalgan autentifikatsiyalangan xodimga ochiq (oshxona
+        dashboardining o'z printer-sozlash oynasi shunga tayanadi - faqat
+        menejerga yopib bo'lmaydi). Shu sababli bu maydon avval hech qanday
+        tekshiruvsiz qabul qilinardi - `test-print`/oddiy chop etish oqimi esa
+        shu manzilga to'g'ridan-to'g'ri TCP ulanadi (`escpos.send_tcp`), demak
+        istalgan xodim serverni ixtiyoriy IP:portga (hatto Docker'ning ichki
+        xizmat nomlariga, masalan "redis") ulanishga majburlay olardi (SSRF).
+        Faqat restoran ichki tarmog'idagi (LAN) private IP qabul qilinadi -
+        domen nomlari, loopback, link-local va ochiq internet manzillari rad
+        etiladi.
+        """
+        if not value:
+            return value
+        value = value.strip()
+        try:
+            ip = ipaddress.ip_address(value)
+        except ValueError:
+            raise serializers.ValidationError(
+                "IP manzil formatida bo'lishi kerak (masalan 192.168.1.50) - domen nomi emas."
+            )
+        if ip.is_loopback or ip.is_link_local or not ip.is_private:
+            raise serializers.ValidationError(
+                "Faqat restoran ichki tarmog'idagi (LAN) IP manzil qabul qilinadi."
+            )
+        return value
+
 class CategorySerializer(serializers.ModelSerializer):
     printer = PrinterSerializer(read_only=True)
     printer_id = serializers.PrimaryKeyRelatedField(
@@ -329,8 +358,21 @@ class OrderSerializer(serializers.ModelSerializer):
         from . import services
 
         with transaction.atomic():
+            if items_data is not None:
+                # `add_item`/`close`/`cancel` hammasi buyurtma qulflab (select_for_update)
+                # holatini tekshiradi - shu yerdagi nested items yozuvi ham xuddi
+                # shu himoyani chetlab o'tmasligi kerak, aks holda generic PATCH
+                # orqali yopilgan/bekor qilingan buyurtmaning taomlarini
+                # qo'shish/o'chirish mumkin bo'lib qolardi (moliyaviy nomuvofiqlik -
+                # xuddi status/discount uchun yopilgan teshikning bir turi).
+                locked = Order.objects.select_for_update().get(pk=instance.pk)
+                if locked.status in ('completed', 'cancelled'):
+                    raise serializers.ValidationError({
+                        'items': "Yopilgan yoki bekor qilingan buyurtma taomlarini o'zgartirib bo'lmaydi.",
+                    })
+
             instance = super().update(instance, validated_data)
-            
+
             if items_data is not None:
                 existing_items = {item.id: item for item in instance.items.all()}
                 keep_item_ids = []

@@ -1,4 +1,5 @@
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseForbidden
+from django.utils.html import escape
 from tenants.models import Restaurant
 
 
@@ -48,12 +49,19 @@ class DomainRoutingMiddleware:
         return self.get_response(request)
 
     def render_tenant_home(self, restaurant):
+        # escape() - restaurant.name/subdomain operator (cloud admin panel)
+        # tomonidan kiritiladi, mijoz kiritmasi emas - lekin bu yerda xom
+        # f-string orqali to'g'ridan-to'g'ri HTML'ga qo'yilgani uchun (Django
+        # shablon autoescaping'i ishlamaydi) himoya chuqurligi sifatida
+        # baribir escape qilinadi.
+        name = escape(restaurant.name)
+        subdomain = escape(restaurant.subdomain)
         html = f"""<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{restaurant.name} — Hamroh POS</title>
+    <title>{name} — Hamroh POS</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {{ font-family: 'Inter', system-ui, sans-serif; background: #001712; color: #c7eade; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }}
@@ -68,8 +76,8 @@ class DomainRoutingMiddleware:
 <body>
     <div class="card">
         <div class="icon">🏪</div>
-        <h1>{restaurant.name}</h1>
-        <div class="subdomain">{restaurant.subdomain}.hamrohpos.uz</div>
+        <h1>{name}</h1>
+        <div class="subdomain">{subdomain}.hamrohpos.uz</div>
         <br>
         <div class="badge">● Onlayn (Hamroh POS Bulutli Tizimi)</div>
         <p>Ushbu restoran Hamroh POS bulutli boshqaruv serveriga muvaffaqiyatli ulangan.</p>

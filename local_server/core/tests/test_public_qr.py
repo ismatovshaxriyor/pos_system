@@ -76,6 +76,22 @@ class PublicQRMenuTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
+    def test_public_table_malformed_qr_code_returns_404(self):
+        """
+        UUID bo'lmagan, 'demo' ham bo'lmagan qr_code - avval xato bilan
+        bazadagi ixtiyoriy faol stolga (haqiqiy mijoz ma'lumoti!) moslab
+        qo'yilardi. Endi 404 qaytishi kerak - boshqa stolning jonli
+        buyurtmasi/summasi tasodifiy/noto'g'ri URL orqali oshkor bo'lmasin.
+        """
+        url = reverse('public-table-live', kwargs={'qr_code': 'not-a-real-uuid'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_call_waiter_malformed_qr_code_returns_404(self):
+        url = reverse('public-call-waiter', kwargs={'qr_code': 'not-a-real-uuid'})
+        response = self.client.post(url, {'reason': 'test'}, content_type='application/json')
+        self.assertEqual(response.status_code, 404)
+
     def test_call_waiter_api(self):
         """Ofitsiant chaqirish API yuborilganda Notification yaratilishi va 200 OK qaytishi kerak."""
         url = reverse('public-call-waiter', kwargs={'qr_code': self.table.qr_code})

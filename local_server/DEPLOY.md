@@ -100,15 +100,15 @@ Svet o'chib yonganda yoki kompyuter qayta yoqilganda (reboot), **insonsiz (hech 
 
 ---
 
-## 6. Turli Subnetdagi Termoprinterlarni Avtomatik Ulash (Multi-Subnet Printing)
+## 7. Turli Subnetdagi Termoprinterlarni Ulash (Multi-Subnet Printing)
 
-Restoran termoprinterlari (Xprinter va h.k.) zavoddan kelganda boshqa IP subnetda (masalan `192.168.123.100` yoki `192.168.1.87`) bo'lishi mumkin. Server Wi-Fi/LAN tarmog'i esa masalan `192.168.10.x` bo'lishi mumkin.
+Restoran termoprinterlari (Xprinter va h.k.) zavoddan kelganda boshqa IP subnetda (masalan `192.168.123.100` yoki `192.168.1.87`) bo'lishi mumkin, server Wi-Fi/LAN tarmog'i esa masalan `192.168.10.x` bo'lishi mumkin. Bunday holda ular bir-birini standart TCP (port 9100) orqali ko'ra olmaydi.
 
-### Dinamik Auto-Aliasing Mexanizmi:
-`local_server` kodi (`core/escpos.py::ensure_subnet_alias`) har safar printerga chek yuborayotganda yoki Admin panelda test qilganda printerning IP subnetini tekshiradi va server tarmoq kartasiga unga mos IP Alias (`192.168.123.250`) ni avtomatik biriktiradi.
+### Birinchi tanlov - printerning o'z IP'sini to'g'irlash
+Eng ishonchli va tavsiya etiladigan yo'l: printerning o'zini (self-test sahifa/tarmoq sozlash menyusi orqali) restoran routerining haqiqiy LAN subnetiga mos statik IP'ga (yoki DHCP'ga) o'tkazish. Shunda hech qanday qo'shimcha sozlash shart emas.
 
-### O'rnatish Paytida Zaxira Avto-Biriktirish Skripti (Tavsiya etiladi):
-Serverni restoranga birinchi o'rnatayotganda standart termoprinter subnetlarini bir martada biriktirib qo'yish:
+### Agar printer IP'sini o'zgartirib bo'lmasa - HOST darajasida bir martalik alias skripti
+**Muhim: bu muammo faqat serverning o'zi (host OS) darajasida hal qilinishi mumkin, `local_server` konteyneri ichidan EMAS.** `web`/`celery_worker` konteynerlarida na `sudo`, na `ip` buyrug'i, na `NET_ADMIN` tarmoq huquqi yo'q (Docker standart bridge tarmog'ida ishlaydi) - shu sababli konteyner ichidan hostning haqiqiy tarmoq kartasiga IP-alias qo'sha olmaydi. Buning o'rniga, serverni restoranga birinchi o'rnatayotganda quyidagi skriptni **host operatsion tizimida, bir marta** ishga tushiring - u eng ko'p tarqalgan zavod-standart termoprinter subnetlarini (`192.168.123.x`, `192.168.1.x`, `192.168.0.x`) serverning tarmoq kartasiga doimiy alias sifatida biriktiradi:
 
 - **Linux (Ubuntu)**:
   ```bash
@@ -118,11 +118,12 @@ Serverni restoranga birinchi o'rnatayotganda standart termoprinter subnetlarini 
   ```powershell
   powershell -ExecutionPolicy Bypass -File .\scripts\setup_printer_subnets.ps1
   ```
-*Bu skriptlar `192.168.123.x`, `192.168.1.x` va `192.168.0.x` subnet aliaslarini avtomatik tarmoq kartasiga ulab qo'yadi.*
+
+Ishlaganini tekshirish: `ip addr show` (Linux) buyrug'ida `192.168.123.250`, `192.168.1.250`, `192.168.0.250` manzillari ko'rinishi kerak. Alias qayta yuklanishda (reboot) saqlanib qolishi uchun buni tizim yuklanishida (masalan `systemd` unit yoki `rc.local`) avtomatik ishga tushiradigan qilib qo'yish tavsiya etiladi - skriptning o'zi bir martalik, doimiy emas.
 
 ---
 
-## 7. Zaxira Usullar (Fallback Options)
+## 8. Zaxira Usullar (Fallback Options)
 
 
 Agar restorandagi Wi-Fi router multicast (mDNS) trafigini bloklagan bo'lsa:
@@ -131,7 +132,7 @@ Agar restorandagi Wi-Fi router multicast (mDNS) trafigini bloklagan bo'lsa:
 
 ---
 
-## 7. Nosozliklarni Aniqlash (Troubleshooting)
+## 9. Nosozliklarni Aniqlash (Troubleshooting)
 
 - **mDNS e'lon qilinayotganini tekshirish (Linux/macOS)**:
   ```bash
@@ -148,3 +149,4 @@ Agar restorandagi Wi-Fi router multicast (mDNS) trafigini bloklagan bo'lsa:
   docker compose ps
   docker compose logs -f web
   ```
+- **Printerga ulanmayapti (`test-print` 502 qaytaryapti)**: avval printer bilan server bir subnetdami tekshiring - `ping <printer_ip>` konteynerdan emas, **host'ning o'zidan** ishlashi kerak (`docker compose exec web ping <printer_ip>` ishlamaydi, chunki konteyner Docker bridge tarmog'ida). Agar ping o'tmasa - 7-bo'limdagi alias skriptini ishga tushiring yoki printerning o'z IP'sini to'g'irlang.

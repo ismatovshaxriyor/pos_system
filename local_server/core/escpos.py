@@ -14,10 +14,7 @@ O'zbek lotin matni apostrof-transliteratsiyadan keyin sof ASCII bo'lib qoladi,
 ruscha/kirill nomlar CP866'da chiqadi; CP866'da yo'q o'zbek kirill harflari
 (қ, ғ, ҳ, ў) vizual yaqin muqobiliga almashtiriladi - chek uchun yetarli.
 """
-import ipaddress
-import platform
 import socket
-import subprocess
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -163,57 +160,24 @@ def render_test_ticket(*, printer_name, endpoint='', width=DEFAULT_WIDTH):
     return b''.join(out)
 
 
-def ensure_subnet_alias(target_ip):
-    """
-    Printer IP manzili (masalan 192.168.123.100) server mavjud Wi-Fi/LAN
-    subnetiga to'g'ri kelmasa, OS network interface'iga avtomatik IP Alias
-    (masalan 192.168.123.250/24) qo'shishga urinadi.
-    """
-    try:
-        ip = ipaddress.ip_address(str(target_ip).strip())
-        if ip.is_loopback or ip.is_link_local:
-            return
-
-        octets = str(ip).split('.')
-        if len(octets) != 4:
-            return
-
-        subnet_prefix = '.'.join(octets[:3])
-        alias_ip = f"{subnet_prefix}.250"
-        if alias_ip == str(ip):
-            alias_ip = f"{subnet_prefix}.251"
-
-        system = platform.system().lower()
-        if 'linux' in system:
-            res = subprocess.run(['ip', '-4', 'addr', 'show'], capture_output=True, text=True, timeout=2)
-            if res.returncode == 0 and subnet_prefix not in res.stdout:
-                route_res = subprocess.run(['ip', 'route', 'show', 'default'], capture_output=True, text=True, timeout=2)
-                iface = 'eth0'
-                if route_res.returncode == 0 and 'dev' in route_res.stdout:
-                    parts = route_res.stdout.split()
-                    if 'dev' in parts:
-                        iface = parts[parts.index('dev') + 1]
-                subprocess.run(['sudo', 'ip', 'addr', 'add', f'{alias_ip}/24', 'dev', iface], capture_output=True, timeout=3)
-        elif 'windows' in system:
-            res = subprocess.run(['netsh', 'interface', 'ipv4', 'show', 'addresses'], capture_output=True, text=True, timeout=2)
-            if res.returncode == 0 and subnet_prefix not in res.stdout:
-                subprocess.run(['netsh', 'interface', 'ipv4', 'add', 'address', 'Wi-Fi', alias_ip, '255.255.255.0'], capture_output=True, timeout=3)
-                subprocess.run(['netsh', 'interface', 'ipv4', 'add', 'address', 'Ethernet', alias_ip, '255.255.255.0'], capture_output=True, timeout=3)
-        elif 'darwin' in system:
-            res = subprocess.run(['ifconfig'], capture_output=True, text=True, timeout=2)
-            if res.returncode == 0 and subnet_prefix not in res.stdout:
-                subprocess.run(['sudo', 'ifconfig', 'en0', 'alias', alias_ip, 'netmask', '255.255.255.0'], capture_output=True, timeout=3)
-    except Exception:
-        pass
-
-
 def send_tcp(host, port, payload, timeout=5.0):
     """
     ESC/POS baytlarini printerning raw TCP portiga (odatda 9100) yuboradi.
     Muvaffaqiyatsizlikda OSError (socket.timeout ham OSError avlodi) ko'taradi -
     chaqiruvchi (Celery task / view) retry/xabar siyosatini o'zi hal qiladi.
+
+    Eslatma: printer server bilan boshqa IP subnetda bo'lsa (masalan printer
+    zavod holida 192.168.123.x, server esa 192.168.1.x'da), bu funksiya buni
+    o'zi "tuzatmaydi" - avval shu modul ichida shunday urinish bor edi
+    (`ensure_subnet_alias`, `sudo ip addr add` orqali), lekin u web/
+    celery_worker KONTEYNERI ichidan chaqirilardi: konteynerda na `sudo`, na
+    `ip` buyrug'i, na NET_ADMIN huquqi yo'q (tekshirib ko'rilgan - har doim
+    jimgina hech narsa qilmay o'tib ketardi) - ustiga, konteyner o'z Docker
+    bridge tarmog'ida bo'lgani uchun hostning haqiqiy tarmoq kartasiga alias
+    qo'sholmaydi ham edi. Haqiqiy yechim - `scripts/setup_printer_subnets.sh`
+    (yoki `.ps1`) ni HOST darajasida, o'rnatish paytida bir marta ishga
+    tushirish (qarang DEPLOY.md, 6-bo'lim).
     """
-    ensure_subnet_alias(host)
     with socket.create_connection((str(host), int(port)), timeout=timeout) as sock:
         sock.settimeout(timeout)
         sock.sendall(payload)

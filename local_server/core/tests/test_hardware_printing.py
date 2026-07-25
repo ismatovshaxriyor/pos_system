@@ -43,6 +43,49 @@ class HardwarePrintingBase(TestCase):
         )
 
 
+class PrinterIPValidationTests(HardwarePrintingBase):
+    """
+    `ip_address` cheklanmagan bo'lsa, `test-print`/oddiy chop etish oqimi
+    (`escpos.send_tcp`) istalgan xodim ko'rsatgan manzilga TCP ulanadi -
+    Docker'ning ichki xizmat nomlari (masalan "redis") yoki ochiq internet
+    manzillariga SSRF vektori. Faqat LAN private IP qabul qilinishi kerak.
+    """
+    def _create(self, ip_address):
+        url = reverse('printer-list')
+        return self.client.post(
+            url, {"name": "Yangi printer", "ip_address": ip_address},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+
+    def test_docker_service_hostname_rejected(self):
+        response = self._create("redis")
+        self.assertEqual(response.status_code, 400)
+
+    def test_public_ip_rejected(self):
+        response = self._create("8.8.8.8")
+        self.assertEqual(response.status_code, 400)
+
+    def test_loopback_rejected(self):
+        response = self._create("127.0.0.1")
+        self.assertEqual(response.status_code, 400)
+
+    def test_link_local_rejected(self):
+        response = self._create("169.254.1.5")
+        self.assertEqual(response.status_code, 400)
+
+    def test_private_lan_ip_accepted(self):
+        response = self._create("192.168.1.50")
+        self.assertEqual(response.status_code, 201, response.content)
+
+    def test_blank_ip_accepted_virtual_printer(self):
+        url = reverse('printer-list')
+        response = self.client.post(
+            url, {"name": "Virtual printer", "ip_address": ""},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+
+
 class DispatchTests(HardwarePrintingBase):
     def test_start_dispatches_network_job_after_commit(self):
         order = Order.objects.create(table=self.table, waiter=self.manager)
