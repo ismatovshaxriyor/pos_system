@@ -63,6 +63,11 @@ services:
     tmpfs:
       - /tmp
       - /run
+      # entrypoint.sh har `RUN_MIGRATIONS=1` start'da `collectstatic`
+      # qiladi va STATIC_ROOT=/app/staticfiles'ga yozadi - read_only ildiz
+      # FS ostida bu joy yoziladigan bo'lishi shart (cloud_server'dagi bir
+      # xil sabab bilan bir xil yechim).
+      - /app/staticfiles
     depends_on:
       db:
         condition: service_healthy
