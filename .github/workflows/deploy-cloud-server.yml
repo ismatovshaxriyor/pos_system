@@ -102,24 +102,4 @@ jobs:
               exit 1
             fi
 
-            echo "=== DIAGNOSTIKA: Docker ichki tarmoq orqali origin ==="
-            docker network ls
-            NET=$(docker inspect cloud_server-cloudflared-1 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')
-            echo "cloudflared tarmog'i: $NET"
-            docker network inspect "$NET" --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}
-            {{end}}'
-            echo "--- website container'idan web:8001 ga ---"
-            docker compose -f docker-compose.prod.yml exec -T website sh -c "wget -qO- --timeout=5 -S http://web:8001/admin/login/ 2>&1 | head -20" || echo "website->web MUVAFFAQIYATSIZ"
-            echo "--- birlashgan tarmoqdagi vaqtinchalik konteynerdan website:80 va web:8001 ga ---"
-            docker run --rm --network "$NET" busybox sh -c "
-              echo '[nslookup website]'; nslookup website 2>&1;
-              echo '[nslookup web]'; nslookup web 2>&1;
-              echo '[wget website:80]'; wget -qO- --timeout=5 http://website:80/ 2>&1 | head -5;
-              echo '[wget web:8001]'; wget -qO- --timeout=5 http://web:8001/admin/login/ 2>&1 | head -5;
-            " || echo "vaqtinchalik konteyner MUVAFFAQIYATSIZ"
-            echo "=== tashqi domenga so'rov + keyingi cloudflared loglari ==="
-            curl -s -o /dev/null -w "hamrohpos.uz -> %{http_code}\n" --max-time 10 https://hamrohpos.uz/ || true
-            sleep 3
-            docker compose -f docker-compose.prod.yml logs --tail=30 cloudflared
-
             docker image prune -f
