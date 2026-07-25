@@ -133,6 +133,11 @@ services:
   # SSL Cloudflare tomonida - bu instance sertifikat boshqarishi shart
   # emas. Ingress qoidasi (hamrohpos.uz -> http://website:80) Cloudflare
   # Zero Trust dashboardida sozlanadi, Nginx frontend va backend (web:8001) ni bog'laydi.
+  #
+  # DIQQAT - Django tomonga ketadigan HAR QANDAY ingress qoidasi `web:8001`
+  # bo'lishi shart. `web:8000` - bu local_server (Bola) porti; Ona'da u yerda
+  # hech kim tinglamaydi va "connection refused" beradi (2026-07-24'da
+  # `*.hamrohpos.uz` aynan shu sabab 502 qaytargan).
   website:
     build:
       context: ../website
@@ -145,7 +150,8 @@ services:
       retries: 5
       start_period: 15s
     depends_on:
-      - web
+      web:
+        condition: service_healthy
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -154,8 +160,19 @@ services:
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     environment:
       - TUNNEL_TRANSPORT_PROTOCOL=http2
+    # DIQQAT: `docker compose up -d --build` faqat o'zgargan servislarni
+    # (web/website) qayta yaratadi va ularga YANGI Docker network IP beradi;
+    # cloudflared konteyneri esa tegilmay qoladi va eski IP'ga ulanishda
+    # davom etadi -> tashqarida hamma domen 502 ("dial tcp 172.18.0.4:8001:
+    # connect: connection refused"). Shuning uchun deploy skripti (.github/
+    # workflows/deploy-cloud-server.yml) har deploydan keyin cloudflared'ni
+    # majburan restart qiladi. depends_on healthcheck'ga bog'langan: tunnel
+    # origin'lar tayyor bo'lgunicha ulanmasin.
     depends_on:
-      - website
+      web:
+        condition: service_healthy
+      website:
+        condition: service_healthy
 
 volumes:
   cloud_postgres_data:

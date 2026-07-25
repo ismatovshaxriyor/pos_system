@@ -64,8 +64,42 @@ jobs:
               export $(grep -v '^#' .env | xargs 2>/dev/null)
             fi
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
+            # cloudflared'ni MAJBURAN qayta ishga tushiramiz. `up -d --build`
+            # faqat o'zgargan servislarni (web/website) qayta yaratadi va
+            # ularga yangi Docker network IP beradi; cloudflared konteyneri
+            # esa tegilmay qoladi va eski IP'ga ulanishda davom etadi ->
+            # tashqarida hamma domen 502 ("Unable to reach the origin
+            # service ... dial tcp 172.18.0.x: connection refused"). Restart
+            # tunnel'ning DNS keshini va ochiq ulanishlarini tozalaydi.
+            docker compose -f docker-compose.prod.yml restart cloudflared
+
             echo "=== DOCKER COMPOSE PS ==="
             docker compose -f docker-compose.prod.yml ps
+
+            # Origin'ni tunnel'dan MUSTAQIL tekshiramiz: shu qadam 502'ning
+            # Django tomonda emas, tunnel/proxy tomonda ekanini ajratadi.
+            # Muvaffaqiyatsiz bo'lsa deploy qizil bo'ladi (ilgari `up`
+            # sukut bilan o'tib ketardi va faqat cloudflared logi ko'rinardi).
+            echo "=== ORIGIN HEALTHCHECK (web:8001) ==="
+            ok=0
+            for i in $(seq 1 12); do
+              if curl -fsS -o /dev/null --max-time 10 http://127.0.0.1:8001/admin/login/; then
+                echo "web:8001 javob berdi - OK"
+                ok=1
+                break
+              fi
+              echo "urinish $i/12 ..."
+              sleep 5
+            done
+
             echo "=== CLOUDFLARED LOGS ==="
             docker compose -f docker-compose.prod.yml logs --tail=20 cloudflared
+
+            if [ "$ok" != "1" ]; then
+              echo "XATO: web:8001 origin javob bermadi. Web loglari:"
+              docker compose -f docker-compose.prod.yml logs --tail=80 web
+              exit 1
+            fi
+
             docker image prune -f
