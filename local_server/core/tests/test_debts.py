@@ -153,3 +153,16 @@ class QarzDaftarTests(TestCase):
         # Kassir qarz to'lovini qabul qilishi uchun mijozni topa olishi kerak.
         resp = self.client.get(reverse('customer-list'), **_auth_header(self.cashier))
         self.assertEqual(resp.status_code, 200)
+
+    def test_customer_destroy_allowed_for_cashier(self):
+        # Kassir menejer bilan teng huquqli - o'chirish ham mumkin.
+        resp = self.client.delete(
+            reverse('customer-detail', args=[self.customer.id]), **_auth_header(self.cashier),
+        )
+        self.assertEqual(resp.status_code, 204)
+
+    def test_customer_destroy_forbidden_for_waiter(self):
+        resp = self.client.delete(
+            reverse('customer-detail', args=[self.customer.id]), **_auth_header(self.waiter),
+        )
+        self.assertEqual(resp.status_code, 403)

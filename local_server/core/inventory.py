@@ -1,7 +1,7 @@
 """
 Ombor (inventory) API: ta'minotchi, ingredient (zaxira), retsept, kirim (xarid),
-ombor harakati ledger. Yozish amallari menejer-gated (IsManagerOrAdmin) - o'qish
-har autentifikatsiyalangan xodimga ochiq.
+ombor harakati ledger. Yozish amallari kassir/menejer-gated
+(IsCashierOrManagerOrReadOnly) - o'qish har autentifikatsiyalangan xodimga ochiq.
 
 Sotuvda zaxira kamayishi bu yerda EMAS - u `services.send_order_to_kitchen`
 ichida avtomatik bo'ladi (taom oshxonaga yuborilganda). Bu yerda faqat qo'lda
@@ -16,7 +16,7 @@ from rest_framework.response import Response
 
 from . import services
 from .models import Supplier, Ingredient, ProductIngredient, Purchase, StockMovement
-from .permissions import IsManagerOrAdmin
+from .permissions import IsManagerOrAdmin, IsCashierOrManagerOrReadOnly
 from .serializers import (
     SupplierSerializer, IngredientSerializer, RecipeItemSerializer,
     PurchaseSerializer, StockMovementSerializer, StockAdjustSerializer,
@@ -26,13 +26,13 @@ from .serializers import (
 class SupplierViewSet(viewsets.ModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
-    permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrManagerOrReadOnly]
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
-    permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrManagerOrReadOnly]
 
     @extend_schema(parameters=[
         OpenApiParameter('low_stock', bool, description="true - faqat past-zaxira (current_stock < min_stock)"),
@@ -52,7 +52,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
         """
         Inventarizatsiya/qo'lda tuzatish: `new_quantity` (absolyut) yoki `delta`
         (nisbiy) bilan zaxirani o'zgartiradi, `StockMovement(adjustment)` yozadi.
-        Menejer-gated (zaxira o'zgarishi nozik amal).
+        Kassir/menejer-gated (zaxira o'zgarishi nozik amal, afitsiantga yopiq).
         """
         ingredient = self.get_object()
         serializer = StockAdjustSerializer(data=request.data)
@@ -74,7 +74,7 @@ class RecipeItemViewSet(viewsets.ModelViewSet):
     """
     queryset = ProductIngredient.objects.all()
     serializer_class = RecipeItemSerializer
-    permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrManagerOrReadOnly]
 
     @extend_schema(parameters=[
         OpenApiParameter('product', int, description="Mahsulot id'si bo'yicha filter"),
@@ -93,7 +93,7 @@ class RecipeItemViewSet(viewsets.ModelViewSet):
 class PurchaseViewSet(viewsets.ModelViewSet):
     queryset = Purchase.objects.all()
     serializer_class = PurchaseSerializer
-    permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsCashierOrManagerOrReadOnly]
 
     def get_queryset(self):
         return Purchase.objects.select_related('supplier').prefetch_related('items__ingredient').order_by('-created_at')

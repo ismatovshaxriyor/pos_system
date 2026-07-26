@@ -8,28 +8,23 @@ to'lovlari boshqariladi.
 from django.db.models import Q
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from . import services
 from .models import Customer
-from .permissions import IsCashierOrManager, IsManagerOrAdmin
+from .permissions import IsCashierOrManager
 from .serializers import CustomerSerializer, DebtTransactionSerializer, RepaymentSerializer
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
+    # Qarz daftar: afitsiant mijoz balansi/PII/qarz tarixini ko'rmasligi kerak
+    # (o'qish ham). Kassir va menejer barcha amalni - yaratish, o'qish,
+    # tahrirlash, o'chirish, qarzini yopish (repay) - teng huquqda bajaradi.
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [IsCashierOrManager]
-
-    def get_permissions(self):
-        # Qarz daftar: afitsiant mijoz balansi/PII/qarz tarixini ko'rmasligi kerak.
-        # Kassir va menejer mijoz yaratishi, o'qishi, tahrirlashi va qarzini yopishi (repay) mumkin.
-        # Faqat o'chirish (destroy) - menejer/admin uchun.
-        if self.action == 'destroy':
-            return [permissions.IsAuthenticated(), IsManagerOrAdmin()]
-        return [IsCashierOrManager()]
 
     def get_queryset(self):
         qs = Customer.objects.all()

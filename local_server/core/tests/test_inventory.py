@@ -40,11 +40,19 @@ class InventoryTests(TestCase):
         self.assertTrue(StockMovement.objects.filter(
             ingredient=self.ingredient, movement_type='purchase', quantity=Decimal('5')).exists())
 
-    def test_purchase_is_manager_gated(self):
+    def test_purchase_allowed_for_cashier(self):
         url = reverse('purchase-list')
         resp = self.client.post(url, {
             'items': [{'ingredient_id': self.ingredient.id, 'quantity': '5'}],
         }, content_type='application/json', **_auth_header(self.cashier))
+        self.assertEqual(resp.status_code, 201)
+
+    def test_purchase_forbidden_for_waiter(self):
+        self.waiter = User.objects.create_user(username='+998900000023', role='waiter')
+        url = reverse('purchase-list')
+        resp = self.client.post(url, {
+            'items': [{'ingredient_id': self.ingredient.id, 'quantity': '5'}],
+        }, content_type='application/json', **_auth_header(self.waiter))
         self.assertEqual(resp.status_code, 403)
 
     # ---- Tuzatish (adjust) ----
@@ -65,6 +73,19 @@ class InventoryTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.ingredient.refresh_from_db()
         self.assertEqual(self.ingredient.current_stock, Decimal('12.5'))
+
+    def test_adjust_allowed_for_cashier(self):
+        url = reverse('ingredient-adjust', args=[self.ingredient.id])
+        resp = self.client.post(url, {'new_quantity': '3', 'note': 'inventarizatsiya'},
+                                content_type='application/json', **_auth_header(self.cashier))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_adjust_forbidden_for_waiter(self):
+        self.waiter = User.objects.create_user(username='+998900000025', role='waiter')
+        url = reverse('ingredient-adjust', args=[self.ingredient.id])
+        resp = self.client.post(url, {'new_quantity': '3'},
+                                content_type='application/json', **_auth_header(self.waiter))
+        self.assertEqual(resp.status_code, 403)
 
     def test_adjust_requires_exactly_one_of_new_or_delta(self):
         url = reverse('ingredient-adjust', args=[self.ingredient.id])
@@ -138,9 +159,17 @@ class InventoryTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(Decimal(results[0]['quantity']), Decimal('1.5'))
 
-    def test_recipe_item_create_is_manager_gated(self):
+    def test_recipe_item_create_allowed_for_cashier(self):
         url = reverse('recipeitem-list')
         resp = self.client.post(url, {
             'product_id': self.product.id, 'ingredient_id': self.ingredient.id, 'quantity': '1',
         }, content_type='application/json', **_auth_header(self.cashier))
+        self.assertEqual(resp.status_code, 201)
+
+    def test_recipe_item_create_forbidden_for_waiter(self):
+        self.waiter = User.objects.create_user(username='+998900000024', role='waiter')
+        url = reverse('recipeitem-list')
+        resp = self.client.post(url, {
+            'product_id': self.product.id, 'ingredient_id': self.ingredient.id, 'quantity': '1',
+        }, content_type='application/json', **_auth_header(self.waiter))
         self.assertEqual(resp.status_code, 403)

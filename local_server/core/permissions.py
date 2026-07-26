@@ -35,3 +35,19 @@ class IsCashierOrManager(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
         return bool(user and user.is_authenticated and (user.is_staff or user.role in ('cashier', 'manager')))
+
+
+class IsCashierOrManagerOrReadOnly(permissions.BasePermission):
+    """
+    Ombor uchun: o'qish - har qanday autentifikatsiyalangan xodim (afitsiant
+    ham, o'zgarishsiz qoladi); yozish - kassir yoki menejer. `IsManagerOrAdmin`
+    dan farqi: yozish huquqi endi kassirga ham beriladi (kirim/inventarizatsiya
+    kassa oynasidan ham amalga oshirilishi kerak).
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return bool(user.is_staff or user.role in ('cashier', 'manager'))
