@@ -731,7 +731,15 @@ class BootstrapView(APIView):
         })
 
 
-class RestaurantConfigViewSet(viewsets.ModelViewSet):
+class RestaurantConfigViewSet(
+    mixins.RetrieveModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet,
+):
+    # Singleton (RestaurantConfig.save() pk'ni 1ga majburlaydi) - list/create/
+    # destroy ataylab yo'q: POST orqali ikkinchi qator yaratishga urinish
+    # `save()`ning majburlangan pk=1'i tufayli IntegrityError (500) berardi,
+    # destroy esa keyingi o'qishda avtomatik qayta yaratiladigan (get_object()
+    # get_or_create) qatorni behuda o'chirardi. Faqat `/1/` orqali
+    # retrieve/update - api-docs (08-attendance.md) ham shu shartnoma bilan.
     queryset = RestaurantConfig.objects.all()
     serializer_class = RestaurantConfigSerializer
     permission_classes = [permissions.IsAuthenticated]

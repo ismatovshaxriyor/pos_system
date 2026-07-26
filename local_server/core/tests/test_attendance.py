@@ -131,3 +131,18 @@ class AttendanceTestCase(APITestCase):
         
         self.config.refresh_from_db()
         self.assertEqual(self.config.attendance_radius, 150)
+
+    def test_restaurant_config_create_and_destroy_disabled(self):
+        # Regressiya: singleton (save() pk=1ga majburlaydi) - POST orqali
+        # ikkinchi qator yaratishga urinish IntegrityError (500) berardi. Endi
+        # create/list mavjud emas (route'ning o'zi yo'q -> 404), destroy esa
+        # route bor-u lekin metod ruxsat etilmagan (405) - faqat retrieve/
+        # update qoladi.
+        self.client.force_authenticate(user=self.manager)
+        response = self.client.post('/api/restaurant-config/', {
+            'latitude': '41.300000', 'longitude': '69.200000', 'attendance_radius': 150,
+        })
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        response2 = self.client.delete('/api/restaurant-config/1/')
+        self.assertEqual(response2.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
