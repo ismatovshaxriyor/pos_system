@@ -74,13 +74,39 @@ class GenerateRegistrationCodeActionTests(TestCase):
             DeviceRegistrationCode.objects.filter(user=self.waiter, used_at__isnull=True).count(), 1,
         )
 
-    def test_new_code_generated_once_previous_one_expired(self):
+    def test_same_code_reused_and_expiry_refreshed_after_previous_one_expired(self):
+        # Kod xodimga bir marta beriladi (masalan Telegram orqali) - muddati
+        # tugagan bo'lsa ham, hali ISHLATILMAGAN bo'lsa qayta chaqirilganda
+        # boshqa qiymat bilan almashtirilmaydi, faqat expires_at yangilanadi -
+        # aks holda xodimga aytilgan kod sababsiz ishlamay qolib qolardi.
         url = reverse('user-generate-registration-code', args=[self.waiter.id])
         first = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
 
         expired = DeviceRegistrationCode.objects.get(user=self.waiter)
-        expired.expires_at = timezone.now() - timedelta(minutes=1)
+        old_expiry = timezone.now() - timedelta(minutes=1)
+        expired.expires_at = old_expiry
         expired.save(update_fields=['expires_at'])
+
+        second = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
+
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(first.data['code'], second.data['code'])
+        expired.refresh_from_db()
+        self.assertGreater(expired.expires_at, old_expiry)
+        self.assertEqual(
+            DeviceRegistrationCode.objects.filter(user=self.waiter, used_at__isnull=True).count(), 1,
+        )
+
+    def test_new_code_generated_after_previous_one_was_used(self):
+        # Kod ISHLATILGANDAN keyin (masalan qurilma almashtirilib qayta
+        # ro'yxatdan o'tkazilganda) navbatdagi chaqiruv haqiqiy yangi kod
+        # yaratishi kerak - eski (ishlatilgan) kod endi qayta berilmaydi.
+        url = reverse('user-generate-registration-code', args=[self.waiter.id])
+        first = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
+
+        used = DeviceRegistrationCode.objects.get(user=self.waiter)
+        used.used_at = timezone.now()
+        used.save(update_fields=['used_at'])
 
         second = self.client.post(url, content_type='application/json', **_auth_header(self.admin))
 

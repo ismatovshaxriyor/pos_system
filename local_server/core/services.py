@@ -36,22 +36,27 @@ def generate_registration_code(user, created_by):
     PIN bilan kiruvchi (is_staff=False) xodim uchun - admin hisobi parol bilan
     kiradi, unga registratsiya kodi kerak emas.
 
-    Idempotent: agar shu foydalanuvchi uchun hali amal qiluvchi (ishlatilmagan
-    va muddati o'tmagan) kod mavjud bo'lsa, o'sha kod qaytariladi - yangisi
-    bilan ALMASHTIRILMAYDI. Aks holda (masalan, admin panelda tugma ikki marta
-    bosilsa yoki so'rov qayta yuborilsa) har chaqiruv eski, hali xodimga
-    yetkazilgan kodni bekor qilib, uni ishlamay qolishiga olib kelardi.
+    Har bir xodim uchun kod FAQAT BIR MARTA - ishlatilmagan bo'lsa, keyingi
+    har qanday chaqiruv (tugma qayta bosilsa, muddati tugagan bo'lsa, yoki
+    xodimning boshqa maydonlari - ism/telefon - tahrirlangan bo'lsa ham) xuddi
+    o'sha kod qiymatini qaytaradi, faqat `expires_at`ni yangilaydi - yangi
+    tasodifiy qiymat bilan ALMASHTIRILMAYDI. Aks holda menejer xodimga
+    Telegram/og'zaki aytib qo'ygan kod muddat tugashi bilan sababsiz
+    ishlamay qolib, xodim endi boshqa (o'ziga aytilmagan) kod bilan
+    duch kelardi. Kod faqat haqiqatan `redeem_registration_code` orqali
+    ISHLATILGANDA (`used_at` to'ldirilganda) navbatdagi chaqiruv haqiqiy
+    yangi kod yaratadi (masalan qurilma almashtirilib qayta ro'yxatdan
+    o'tkazilganda).
     """
     if user.is_staff:
         raise ServiceError("Admin foydalanuvchi uchun PIN kirish kerak emas.")
 
-    existing = DeviceRegistrationCode.objects.filter(
-        user=user, used_at__isnull=True, expires_at__gt=timezone.now(),
-    ).first()
+    existing = DeviceRegistrationCode.objects.filter(user=user, used_at__isnull=True).first()
     if existing:
+        existing.expires_at = timezone.now() + CODE_TTL
+        existing.save(update_fields=['expires_at'])
         return existing
 
-    DeviceRegistrationCode.objects.filter(user=user, used_at__isnull=True).delete()
     code = get_random_string(6, allowed_chars='0123456789')
     return DeviceRegistrationCode.objects.create(
         user=user, code=code, created_by=created_by,
