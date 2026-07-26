@@ -21,10 +21,10 @@ GET    /api/customers/                → ro'yxat (sahifalangan: results ichida)
 POST   /api/customers/                → yaratish (kassir yoki menejer)
 GET    /api/customers/{id}/           → bitta mijoz
 PATCH  /api/customers/{id}/           → tahrirlash (kassir yoki menejer)
-DELETE /api/customers/{id}/           → o'chirish (faqat menejer)
+DELETE /api/customers/{id}/           → o'chirish (kassir yoki menejer)
 ```
 
-**Ruxsat:** o'qish (ro'yxat/bitta mijoz) — `cashier` yoki `manager`; yozish (yaratish/tahrirlash/o'chirish) — faqat `manager`. **Ofitsiant (`waiter`) qarz daftariga umuman kira olmaydi** (ro'yxat/o'qish ham `403`) — mijoz balansi/PII/qarz tarixi afitsiantdan yopiq (buyurtma ichida ham `customer` faqat ism/telefon ko'rsatiladi, balanssiz).
+**Ruxsat:** o'qish va yozish (yaratish/tahrirlash/o'chirish) — `cashier` yoki `manager`, ikkalasi teng huquqli, to'liq CRUD. **Ofitsiant (`waiter`) qarz daftariga umuman kira olmaydi** (ro'yxat/o'qish ham `403`) — mijoz balansi/PII/qarz tarixi afitsiantdan yopiq (buyurtma ichida ham `customer` faqat ism/telefon ko'rsatiladi, balanssiz).
 
 **Qidiruv / filtr:**
 - `?search=<matn>` — ism/familya/telefon bo'yicha qidiruv.
@@ -39,7 +39,7 @@ POST /api/orders/{id}/close-on-credit/
 
 Buyurtmaning **qolgan qarzini** (`balance_due`) mijoz balansiga yozadi va buyurtmani `completed` qiladi. Agar avval qisman naqd/karta to'lov qilingan bo'lsa — faqat qolgan qism yoziladi.
 
-**Ruxsat:** faqat `manager`/admin (chegirma/bekor qilish bilan bir xil darajadagi moliyaviy amal). Kassir/ofitsiant `403` oladi.
+**Ruxsat:** `cashier` yoki `manager` (qarz to'lovi/kreditga yopish kassa oynasida qabul qilinadi). Ofitsiant `403` oladi.
 
 **Javob (200):** yangilangan to'liq `Order` obyekti (`customer` maydoni endi to'ldirilgan — [`03-orders.md`](03-orders.md)).
 
@@ -48,7 +48,7 @@ Buyurtmaning **qolgan qarzini** (`balance_due`) mijoz balansiga yozadi va buyurt
 |---|---|
 | `400` | Buyurtma allaqachon `completed`/`cancelled` |
 | `400` | Buyurtmada qarz yo'q (`balance_due == 0`) — bu holda oddiy `close` ishlatilsin |
-| `403` | Menejer emas |
+| `403` | Kassir/menejer emas (masalan afitsiant) |
 | `404` | `customer_id` topilmadi yoki faol emas |
 
 **Muhim:** kreditga yopilgan buyurtma `completed` bo'ladi, lekin uning qarzi `Payment` sifatida EMAS, mijoz `balance`ida saqlanadi. Ya'ni buyurtmaning o'zida `balance_due` hali ham musbat bo'lishi mumkin — pul mijoz qarziga o'tgan.

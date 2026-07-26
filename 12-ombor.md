@@ -2,7 +2,7 @@
 
 Xomashyo zaxirasini yuritish, taomlarga retsept biriktirish (taom sotilganda ingredient avtomatik kamayadi), kirim (ta'minotchidan xarid), inventarizatsiya va past-zaxira ogohlantirishlari.
 
-**Umumiy ruxsat:** barcha ombor endpointlarida o'qish — istalgan autentifikatsiyalangan xodim; **yozish — faqat `manager`/admin**. Barcha ro'yxatlar sahifalangan (`results` ichida), aks holda alohida ko'rsatilgan.
+**Umumiy ruxsat:** barcha ombor endpointlarida o'qish — istalgan autentifikatsiyalangan xodim (afitsiant ham); **yozish — `cashier` yoki `manager`** (afitsiant yoza olmaydi). Barcha ro'yxatlar sahifalangan (`results` ichida), aks holda alohida ko'rsatilgan.
 
 ## Asosiy g'oya
 
@@ -31,7 +31,7 @@ Standart CRUD. Maydonlar: `id`, `name` (majburiy), `phone`, `note`, `is_active`.
 ```
 GET  /api/ingredients/                 → ro'yxat
 GET  /api/ingredients/?low_stock=true  → faqat past-zaxira
-POST /api/ingredients/                 → yaratish (faqat menejer; boshlang'ich qoldiq 0 — keyin adjust/kirim bilan qo'shiladi)
+POST /api/ingredients/                 → yaratish (kassir yoki menejer; boshlang'ich qoldiq 0 — keyin adjust/kirim bilan qo'shiladi)
 ```
 
 ### Zaxirani tuzatish (inventarizatsiya) — `adjust`
@@ -43,7 +43,7 @@ POST /api/ingredients/{id}/adjust/
 {"delta": "-2", "note": "buzilgan"}                       # nisbiy o'zgartirish
 ```
 
-`new_quantity` **yoki** `delta` — aynan bittasi berilishi shart (ikkalasi yoki hech biri → `400`). `StockMovement(adjustment)` yoziladi. **Faqat menejer.**
+`new_quantity` **yoki** `delta` — aynan bittasi berilishi shart (ikkalasi yoki hech biri → `400`). `StockMovement(adjustment)` yoziladi. **Kassir yoki menejer** (afitsiantga yopiq).
 
 **Javob (200):** yangilangan `Ingredient` obyekti.
 
@@ -60,8 +60,8 @@ Retsept qatorlari (`ProductIngredient`). Har qator alohida yaratiladi/o'chirilad
 
 ```
 GET    /api/recipe-items/?product={id}   → bitta taom retsepti
-POST   /api/recipe-items/                → qator qo'shish (faqat menejer)
-DELETE /api/recipe-items/{id}/           → qator o'chirish (faqat menejer)
+POST   /api/recipe-items/                → qator qo'shish (kassir yoki menejer)
+DELETE /api/recipe-items/{id}/           → qator o'chirish (kassir yoki menejer)
 ```
 Bitta taom + ingredient juftligi takrorlanmaydi (unique).
 
@@ -81,7 +81,7 @@ POST /api/purchases/
 }
 ```
 
-**Ruxsat:** faqat `manager`. `items` bo'sh bo'lsa `400`.
+**Ruxsat:** `cashier` yoki `manager`. `items` bo'sh bo'lsa `400`.
 
 **Javob (201):** yaratilgan `Purchase` (`total_cost` hisoblangan holda, `items` nested).
 
