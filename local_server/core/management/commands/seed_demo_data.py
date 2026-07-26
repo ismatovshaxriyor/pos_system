@@ -2,8 +2,9 @@ import random
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -35,8 +36,24 @@ class Command(BaseCommand):
             '--days', type=int, default=7,
             help="Nechta kunlik buyurtma tarixi generatsiya qilinsin (standart: 7).",
         )
+        parser.add_argument(
+            '--force', action='store_true',
+            help="DEBUG=False bo'lsa ham majburan ishga tushirish - odatda kerak emas.",
+        )
 
     def handle(self, *args, **options):
+        # Faqat dev/demo muhiti uchun - DEBUG=False (prod compose) bo'lganda
+        # bu buyruq tasodifan chaqirilib, real restoran bazasiga demo xodim/
+        # buyurtma/mahsulot aralashtirib qo'yishi mumkin edi. --force faqat
+        # ataylab, bilib turib qilinadigan istisno holatlar uchun.
+        if not settings.DEBUG and not options['force']:
+            raise CommandError(
+                "Bu buyruq faqat DEBUG=True (dev) muhitida ishlaydi - demo "
+                "ma'lumot real restoran prod bazasiga tasodifan qo'shilib "
+                "qolmasligi uchun. Chindan ham kerak bo'lsa --force bilan "
+                "ishga tushiring."
+            )
+
         with transaction.atomic():
             zones, tables = self._create_zones_and_tables()
             printers = self._create_printers()
