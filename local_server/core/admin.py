@@ -6,7 +6,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 from simple_history.admin import SimpleHistoryAdmin
 
-from . import services
+from . import escpos, services
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
@@ -299,6 +299,43 @@ class AttendanceAdmin(SimpleHistoryAdmin):
 class PrinterAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'ip_address', 'port', 'chars_per_line', 'is_active')
     list_filter = ('is_active',)
+    actions = ['send_test_print']
+
+    @admin.action(description="Test chek chiqarish (ulanishni tekshirish)")
+    def send_test_print(self, request, queryset):
+        """
+        Ro'yxatdan printer(lar)ni belgilab shu action'ni tanlash - haqiqiy
+        ESC/POS test chekni sinxron yuboradi, xuddi
+        `POST /api/printers/<id>/test-print/` kabi (core/views.py::PrinterViewSet.test_print),
+        lekin admin ichidan API chaqirmasdan to'g'ridan-to'g'ri.
+        """
+        for printer in queryset:
+            if not printer.is_network:
+                self.message_user(
+                    request,
+                    f"{printer.name}: IP manzil kiritilmagan - virtual printer, test chek yuborilmadi.",
+                    level=messages.WARNING,
+                )
+                continue
+            payload = escpos.render_test_ticket(
+                printer_name=printer.name,
+                endpoint=f"{printer.ip_address}:{printer.port}",
+                width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
+            )
+            try:
+                escpos.send_tcp(printer.ip_address.strip(), printer.port, payload, timeout=5.0)
+            except OSError as exc:
+                self.message_user(
+                    request,
+                    f"{printer.name}: printerga ulanib bo'lmadi ({printer.ip_address}:{printer.port}) - {exc}",
+                    level=messages.ERROR,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"{printer.name}: test chek yuborildi.",
+                    level=messages.SUCCESS,
+                )
 
 
 @admin.register(PrintJob)
