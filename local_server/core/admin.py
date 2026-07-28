@@ -2,6 +2,7 @@ import base64
 import io
 import qrcode
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.utils.html import format_html
 from simple_history.admin import SimpleHistoryAdmin
