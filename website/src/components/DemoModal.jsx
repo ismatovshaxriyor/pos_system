@@ -28,13 +28,13 @@ export default function DemoModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#001712]/80 backdrop-blur-md animate-fadeIn">
-      <div className="glass-card rounded-3xl max-w-lg w-full p-6 sm:p-8 gold-border-glow relative border-[#e3c282]/50 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A1F44]/80 backdrop-blur-md animate-fadeIn">
+      <div className="glass-card rounded-3xl max-w-lg w-full p-6 sm:p-8 gold-border-glow relative border-[#0077CC]/50 shadow-2xl">
         
         {/* Close Button */}
         <button
           onClick={handleResetAndClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-[#adcdc3] hover:text-[#e3c282] hover:bg-[#1a3a32]/50 transition-colors"
+          className="absolute top-5 right-5 p-2 rounded-xl text-[#5C9FD6] hover:text-[#0077CC] hover:bg-[#14356F]/50 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -42,69 +42,69 @@ export default function DemoModal({ isOpen, onClose }) {
         {!isSubmitted ? (
           <div className="space-y-6">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e3c282]/10 border border-[#e3c282]/30 text-xs font-mono text-[#e3c282]">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0077CC]/10 border border-[#0077CC]/30 text-xs font-mono text-[#0077CC]">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>Hamroh POS Demoga Bepul So'rov</span>
               </div>
               <h3 className="font-serif-display text-2xl font-bold text-gradient-gold">
                 Tizimni Restoraningizda Sinab Ko'ring
               </h3>
-              <p className="text-xs text-[#adcdc3]">
+              <p className="text-xs text-[#5C9FD6]">
                 Ma'lumotlaringizni qoldiring va biz restoraningizga mos offlayn kassa paketini ko'rsatib beramiz.
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs font-mono">
               <div className="space-y-1">
-                <label className="text-[#e3c282]">Restoran / Qahvaxona Nomi:</label>
+                <label className="text-[#0077CC]">Restoran / Qahvaxona Nomi:</label>
                 <div className="relative">
-                  <Building className="w-4 h-4 text-[#adcdc3] absolute left-3 top-3" />
+                  <Building className="w-4 h-4 text-[#5C9FD6] absolute left-3 top-3" />
                   <input
                     type="text"
                     required
                     placeholder="Masalan: Rayhon National Food"
                     value={formData.restaurantName}
                     onChange={(e) => setFormData({ ...formData, restaurantName: e.target.value })}
-                    className="w-full bg-[#001712] border border-[#adcdc3]/30 rounded-xl pl-9 pr-4 py-2.5 text-white placeholder-[#adcdc3]/40 focus:outline-none focus:border-[#e3c282]"
+                    className="w-full bg-[#0A1F44] border border-[#5C9FD6]/30 rounded-xl pl-9 pr-4 py-2.5 text-white placeholder-[#5C9FD6]/40 focus:outline-none focus:border-[#0077CC]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[#e3c282]">Mas'ul Shaxs Ismi:</label>
+                <label className="text-[#0077CC]">Mas'ul Shaxs Ismi:</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-[#adcdc3] absolute left-3 top-3" />
+                  <User className="w-4 h-4 text-[#5C9FD6] absolute left-3 top-3" />
                   <input
                     type="text"
                     required
                     placeholder="Masalan: Jasur Rahimov"
                     value={formData.contactName}
                     onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                    className="w-full bg-[#001712] border border-[#adcdc3]/30 rounded-xl pl-9 pr-4 py-2.5 text-white placeholder-[#adcdc3]/40 focus:outline-none focus:border-[#e3c282]"
+                    className="w-full bg-[#0A1F44] border border-[#5C9FD6]/30 rounded-xl pl-9 pr-4 py-2.5 text-white placeholder-[#5C9FD6]/40 focus:outline-none focus:border-[#0077CC]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[#e3c282]">Telefon Raqamingiz:</label>
+                <label className="text-[#0077CC]">Telefon Raqamingiz:</label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-[#adcdc3] absolute left-3 top-3" />
+                  <Phone className="w-4 h-4 text-[#5C9FD6] absolute left-3 top-3" />
                   <input
                     type="tel"
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full bg-[#001712] border border-[#adcdc3]/30 rounded-xl pl-9 pr-4 py-2.5 text-white focus:outline-none focus:border-[#e3c282]"
+                    className="w-full bg-[#0A1F44] border border-[#5C9FD6]/30 rounded-xl pl-9 pr-4 py-2.5 text-white focus:outline-none focus:border-[#0077CC]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[#e3c282]">Kassa va Filiallar Soni:</label>
+                <label className="text-[#0077CC]">Kassa va Filiallar Soni:</label>
                 <select
                   value={formData.branchCount}
                   onChange={(e) => setFormData({ ...formData, branchCount: e.target.value })}
-                  className="w-full bg-[#001712] border border-[#adcdc3]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#e3c282]"
+                  className="w-full bg-[#0A1F44] border border-[#5C9FD6]/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#0077CC]"
                 >
                   <option value="1 ta kassa">1 ta kassa (Kichik kafe/oshxona)</option>
                   <option value="2-5 ta kassa">2-5 ta kassa (O'rta restoran)</option>
@@ -132,7 +132,7 @@ export default function DemoModal({ isOpen, onClose }) {
               Rahmat! So'rovingiz Qabul Qilindi
             </h3>
 
-            <p className="text-xs text-[#adcdc3] max-w-sm mx-auto leading-relaxed">
+            <p className="text-xs text-[#5C9FD6] max-w-sm mx-auto leading-relaxed">
               Mutaxassisimiz <strong className="text-white">15 daqiqa ichida</strong> ko'rsatilgan telefon raqamingiz bo'yicha bog'lanadi va sizga hamrohpos.uz demosini ko'rsatib beradi.
             </p>
 

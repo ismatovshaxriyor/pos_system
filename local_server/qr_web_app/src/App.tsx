@@ -19,7 +19,7 @@ const AppContent: React.FC = () => {
   const { currentScreen } = useApp();
 
   return (
-    <div className="min-h-screen bg-[#001712] text-[#C7EADE] font-sans-body relative overflow-x-hidden selection:bg-[#E3C282] selection:text-[#001712]">
+    <div className="min-h-screen bg-[#0A1F44] text-[#FFFFFF] font-sans-body relative overflow-x-hidden selection:bg-[#0077CC] selection:text-white">
       {/* Header Bar */}
       <Header />
 

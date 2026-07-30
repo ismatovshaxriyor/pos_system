@@ -63,7 +63,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#001712] text-[#c7eade] font-sans">
+    <div className="min-h-screen bg-[#0A1F44] text-[#FFFFFF] font-sans">
       <Navbar onOpenDemo={() => setIsDemoModalOpen(true)} />
       <main>
         <Hero onOpenDemo={() => setIsDemoModalOpen(true)} />

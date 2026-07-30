@@ -8,8 +8,8 @@
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    background-color: #001712;
-    color: #c7eade;
+    background-color: #0A1F44;
+    color: #FFFFFF;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
   }
@@ -25,7 +25,7 @@
 
 /* Oriental / Luxury Pattern Overlay */
 .oriental-pattern-overlay {
-  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 0l10 30h30L55 50l10 30-25-20-25 20 10-30L0 30h30z' fill='%23e3c282' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 0l10 30h30L55 50l10 30-25-20-25 20 10-30L0 30h30z' fill='%230077cc' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
   background-repeat: repeat;
 }
 
@@ -33,8 +33,8 @@
 .glass-card {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  background: rgba(26, 58, 50, 0.22);
-  border: 1px solid rgba(227, 194, 130, 0.22);
+  background: rgba(10, 31, 68, 0.22);
+  border: 1px solid rgba(0, 119, 204, 0.22);
   will-change: transform, border-color, box-shadow;
 }
 
@@ -45,27 +45,27 @@
 }
 
 .glass-card-hover:hover {
-  border-color: rgba(227, 194, 130, 0.6);
-  box-shadow: 0 0 35px rgba(227, 194, 130, 0.2);
+  border-color: rgba(0, 119, 204, 0.6);
+  box-shadow: 0 0 35px rgba(0, 119, 204, 0.2);
   transform: translateY(-4px) scale(1.008);
 }
 
 .gold-border-glow {
-  box-shadow: 0 0 25px rgba(227, 194, 130, 0.22);
+  box-shadow: 0 0 25px rgba(0, 119, 204, 0.22);
 }
 
 .emerald-glow {
-  box-shadow: 0 0 35px rgba(173, 205, 195, 0.18);
+  box-shadow: 0 0 35px rgba(92, 159, 214, 0.18);
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, #fff7d6 0%, #e3c282 50%, #b89146 100%);
+  background: linear-gradient(135deg, #FFFFFF 0%, #0077CC 50%, #005A96 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-emerald {
-  background: linear-gradient(135deg, #ffffff 0%, #adcdc3 50%, #68988b 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #5C9FD6 50%, #2E6DA4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -84,7 +84,7 @@
   left: -2px;
   right: -2px;
   bottom: -2px;
-  background: linear-gradient(90deg, #e3c282, #adcdc3, #b89146, #e3c282);
+  background: linear-gradient(90deg, #0077CC, #5C9FD6, #005A96, #0077CC);
   background-size: 300% 300%;
   border-radius: inherit;
   z-index: -1;
@@ -100,13 +100,13 @@
 /* Buttons with Shimmer & Glow */
 .btn-gold {
   position: relative;
-  background: linear-gradient(135deg, #e3c282 0%, #c49f57 100%);
-  color: #001712;
+  background: linear-gradient(135deg, #0077CC 0%, #0068AD 100%);
+  color: #FFFFFF;
   font-weight: 600;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 0.2s ease,
               background 0.2s ease;
-  box-shadow: 0 4px 20px rgba(227, 194, 130, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 119, 204, 0.3);
   overflow: hidden;
 }
 
@@ -132,8 +132,8 @@
 }
 
 .btn-gold:hover {
-  background: linear-gradient(135deg, #f0d59e 0%, #d4ae66 100%);
-  box-shadow: 0 6px 30px rgba(227, 194, 130, 0.55);
+  background: linear-gradient(135deg, #8AC4EE 0%, #1483D1 100%);
+  box-shadow: 0 6px 30px rgba(0, 119, 204, 0.55);
   transform: translateY(-2px);
 }
 
@@ -142,16 +142,16 @@
 }
 
 .btn-emerald {
-  background: rgba(173, 205, 195, 0.12);
-  border: 1px solid rgba(173, 205, 195, 0.3);
-  color: #adcdc3;
+  background: rgba(92, 159, 214, 0.12);
+  border: 1px solid rgba(92, 159, 214, 0.3);
+  color: #5C9FD6;
   font-weight: 600;
   transition: all 0.25s ease;
 }
 
 .btn-emerald:hover {
-  background: rgba(173, 205, 195, 0.22);
-  border-color: rgba(173, 205, 195, 0.6);
+  background: rgba(92, 159, 214, 0.22);
+  border-color: rgba(92, 159, 214, 0.6);
   color: #ffffff;
   transform: translateY(-1px);
 }

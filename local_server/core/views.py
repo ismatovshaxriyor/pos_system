@@ -146,9 +146,11 @@ class TableViewSet(viewsets.ModelViewSet):
         Domain request headers (Host) yoki `domain` query parametri orqali aniqlanadi.
         """
         table = self.get_object()
-        domain = request.query_params.get('domain', request.get_host())
-        scheme = 'https' if request.is_secure() or 'hamrohpos.uz' in domain else 'http'
-        qr_url = f"{scheme}://{domain}/table/{table.qr_code}/"
+        qr_url = services.build_table_qr_url(
+            table,
+            request=request,
+            domain_override=request.query_params.get('domain'),
+        )
 
         import io
         import qrcode

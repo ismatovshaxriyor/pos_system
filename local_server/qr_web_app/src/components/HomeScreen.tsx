@@ -46,7 +46,7 @@ export const HomeScreen: React.FC = () => {
                 index === activeSlide ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-[#001712] via-[#001712]/40 to-[#001712]/20 z-10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A1F44] via-[#0A1F44]/40 to-[#0A1F44]/20 z-10" />
               <img
                 src={slide.image}
                 alt={slide.title}
@@ -59,10 +59,10 @@ export const HomeScreen: React.FC = () => {
         {/* Hero Text Overlay */}
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto">
           <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-            <h1 className="font-serif-display font-bold text-3xl sm:text-5xl md:text-6xl text-[#E3C282] mb-6 leading-tight tracking-tight drop-shadow-md">
+            <h1 className="font-serif-display font-bold text-3xl sm:text-5xl md:text-6xl text-[#0077CC] mb-6 leading-tight tracking-tight drop-shadow-md">
               {t.welcomeTitle}
             </h1>
-            <p className="font-sans-body text-base sm:text-lg text-[#C1C8C4] max-w-2xl mx-auto mb-10 opacity-90 leading-relaxed">
+            <p className="font-sans-body text-base sm:text-lg text-[#9FB0C4] max-w-2xl mx-auto mb-10 opacity-90 leading-relaxed">
               {t.welcomeSubtitle}
             </p>
           </div>
@@ -75,7 +75,7 @@ export const HomeScreen: React.FC = () => {
               key={i}
               onClick={() => setActiveSlide(i)}
               className={`h-1.5 rounded-full transition-all duration-500 ${
-                activeSlide === i ? 'w-10 bg-[#E3C282]' : 'w-3 bg-[#E3C282]/30'
+                activeSlide === i ? 'w-10 bg-[#0077CC]' : 'w-3 bg-[#0077CC]/30'
               }`}
               aria-label={`Go to slide ${i + 1}`}
             />
@@ -89,7 +89,7 @@ export const HomeScreen: React.FC = () => {
           {/* Private Dining Card - Emir's Chamber */}
           <div
             onClick={() => setIsEmirChamberModalOpen(true)}
-            className="md:col-span-8 group relative overflow-hidden rounded-2xl h-[380px] border border-[#E3C282]/30 glass-card glass-card-hover cursor-pointer"
+            className="md:col-span-8 group relative overflow-hidden rounded-2xl h-[380px] border border-[#0077CC]/30 glass-card glass-card-hover cursor-pointer"
           >
             <div className="absolute inset-0 opacity-50 group-hover:opacity-65 transition-opacity duration-500">
               <img
@@ -98,36 +98,36 @@ export const HomeScreen: React.FC = () => {
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-[#001712] via-[#001712]/40 to-transparent z-10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A1F44] via-[#0A1F44]/40 to-transparent z-10" />
             <div className="absolute bottom-0 left-0 p-8 z-20">
-              <span className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] block mb-2 uppercase">
+              <span className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] block mb-2 uppercase">
                 {t.privateDiningTitle}
               </span>
-              <h2 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#C7EADE] mb-2">
+              <h2 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#FFFFFF] mb-2">
                 {t.emirChamberName}
               </h2>
-              <p className="font-sans-body text-sm text-[#C1C8C4] max-w-md">
+              <p className="font-sans-body text-sm text-[#9FB0C4] max-w-md">
                 {t.emirChamberDesc}
               </p>
             </div>
           </div>
 
           {/* Chef's Signature Card */}
-          <div className="md:col-span-4 glass-card p-8 rounded-2xl flex flex-col justify-between border border-[#E3C282]/30 h-[380px] glass-card-hover">
+          <div className="md:col-span-4 glass-card p-8 rounded-2xl flex flex-col justify-between border border-[#0077CC]/30 h-[380px] glass-card-hover">
             <div>
-              <span className="material-symbols-outlined text-[#E3C282] text-4xl mb-4" style={{ fontVariationSettings: "'FILL' 1" }}>
+              <span className="material-symbols-outlined text-[#0077CC] text-4xl mb-4" style={{ fontVariationSettings: "'FILL' 1" }}>
                 restaurant_menu
               </span>
-              <h3 className="font-serif-display font-semibold text-2xl text-[#E3C282] mb-3">
+              <h3 className="font-serif-display font-semibold text-2xl text-[#0077CC] mb-3">
                 {t.chefsSignature}
               </h3>
-              <p className="font-sans-body text-sm text-[#C1C8C4] leading-relaxed">
+              <p className="font-sans-body text-sm text-[#9FB0C4] leading-relaxed">
                 {t.chefsSignatureDesc}
               </p>
             </div>
             <button
               onClick={() => setCurrentScreen('menu')}
-              className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] flex items-center gap-2 hover:translate-x-2 transition-transform text-left group uppercase pt-4"
+              className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] flex items-center gap-2 hover:translate-x-2 transition-transform text-left group uppercase pt-4"
             >
               <span>{t.exploreMenu}</span>
               <span className="material-symbols-outlined text-lg group-hover:text-white">arrow_forward</span>
@@ -138,14 +138,14 @@ export const HomeScreen: React.FC = () => {
 
       {/* The Sommelier Selection Component */}
       <section className="mt-16 sm:mt-24 px-6 md:px-16 max-w-[1440px] mx-auto">
-        <div className="relative glass-card p-8 sm:p-12 rounded-2xl border border-[#E3C282]/40 gold-border-glow overflow-hidden">
+        <div className="relative glass-card p-8 sm:p-12 rounded-2xl border border-[#0077CC]/40 gold-border-glow overflow-hidden">
           {/* Gold Leaf Corner Accent */}
           <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none overflow-hidden">
-            <div className="absolute top-0 right-0 w-[150%] h-[150%] bg-gradient-to-br from-[#E3C282]/40 to-transparent rotate-45 transform translate-x-1/2 -translate-y-1/2 border-b border-[#E3C282]/50" />
+            <div className="absolute top-0 right-0 w-[150%] h-[150%] bg-gradient-to-br from-[#0077CC]/40 to-transparent rotate-45 transform translate-x-1/2 -translate-y-1/2 border-b border-[#0077CC]/50" />
           </div>
 
           <div className="flex flex-col md:flex-row gap-8 sm:gap-12 items-center">
-            <div className="w-36 h-52 flex-shrink-0 relative rounded-xl overflow-hidden border border-[#E3C282]/30 shadow-2xl">
+            <div className="w-36 h-52 flex-shrink-0 relative rounded-xl overflow-hidden border border-[#0077CC]/30 shadow-2xl">
               <img
                 src={saffronTeaDish.image}
                 alt={saffronTeaDish.name}
@@ -153,23 +153,23 @@ export const HomeScreen: React.FC = () => {
               />
             </div>
             <div className="flex-1">
-              <span className="font-sans-body text-xs font-bold tracking-widest text-[#E3C282] mb-2 block uppercase">
+              <span className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] mb-2 block uppercase">
                 {t.sommelierSelection}
               </span>
-              <h3 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#C7EADE] mb-3">
+              <h3 className="font-serif-display font-semibold text-2xl sm:text-3xl text-[#FFFFFF] mb-3">
                 {saffronTeaDish.name}
               </h3>
-              <p className="font-sans-body text-sm text-[#C1C8C4] mb-6 leading-relaxed">
+              <p className="font-sans-body text-sm text-[#9FB0C4] mb-6 leading-relaxed">
                 {saffronTeaDish.description}
               </p>
               <div className="flex flex-wrap items-center gap-4">
-                <span className="font-serif-display font-bold text-2xl text-[#E3C282]">
+                <span className="font-serif-display font-bold text-2xl text-[#0077CC]">
                   {saffronTeaDish.priceUZS.toLocaleString()} UZS
                 </span>
-                <span className="h-px flex-grow bg-[#E3C282]/30 min-w-[30px]" />
+                <span className="h-px flex-grow bg-[#0077CC]/30 min-w-[30px]" />
                 <button
                   onClick={() => addToCart(saffronTeaDish)}
-                  className="font-sans-body text-xs font-bold tracking-widest border border-[#E3C282]/60 px-6 py-2.5 rounded-full hover:bg-[#E3C282] text-[#C7EADE] hover:text-[#001712] transition-colors active:scale-95 uppercase"
+                  className="font-sans-body text-xs font-bold tracking-widest border border-[#0077CC]/60 px-6 py-2.5 rounded-full hover:bg-[#0077CC] text-[#FFFFFF] hover:text-white transition-colors active:scale-95 uppercase"
                 >
                   {t.addOrder}
                 </button>

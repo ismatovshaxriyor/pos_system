@@ -12,32 +12,32 @@
 }
 
 .oriental-pattern-overlay {
-  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 0l10 30h30L55 50l10 30-25-20-25 20 10-30L0 30h30z' fill='%23e3c282' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 0l10 30h30L55 50l10 30-25-20-25 20 10-30L0 30h30z' fill='%230077cc' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
   background-repeat: repeat;
 }
 
 .glass-card {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  background: rgba(26, 58, 50, 0.18);
-  border: 1px solid rgba(227, 194, 130, 0.25);
+  background: rgba(10, 31, 68, 0.18);
+  border: 1px solid rgba(0, 119, 204, 0.25);
 }
 
 .glass-card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-card-hover:hover {
-  border-color: rgba(227, 194, 130, 0.5);
-  box-shadow: 0 0 25px rgba(227, 194, 130, 0.12);
+  border-color: rgba(0, 119, 204, 0.5);
+  box-shadow: 0 0 25px rgba(0, 119, 204, 0.12);
 }
 
 .gold-border-glow {
-  box-shadow: 0 0 15px rgba(227, 194, 130, 0.15);
+  box-shadow: 0 0 15px rgba(0, 119, 204, 0.15);
 }
 
 .dotted-leader {
   flex-grow: 1;
-  border-bottom: 1px dotted rgba(227, 194, 130, 0.35);
+  border-bottom: 1px dotted rgba(0, 119, 204, 0.35);
   margin: 0 8px;
   position: relative;
   top: -4px;

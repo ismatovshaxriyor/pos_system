@@ -86,18 +86,18 @@ export default function Features() {
   ];
 
   return (
-    <section id="imkoniyatlar" className="py-24 relative overflow-hidden bg-[#001712]">
+    <section id="imkoniyatlar" className="py-24 relative overflow-hidden bg-[#0A1F44]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
-          <span className="text-xs font-mono text-[#e3c282] uppercase tracking-widest px-3 py-1 rounded-full border border-[#e3c282]/30 bg-[#e3c282]/10">
+          <span className="text-xs font-mono text-[#0077CC] uppercase tracking-widest px-3 py-1 rounded-full border border-[#0077CC]/30 bg-[#0077CC]/10">
             Nega Aynan Hamroh POS?
           </span>
           <h2 className="font-serif-display text-3xl sm:text-5xl font-bold text-gradient-gold">
             Restoraningiz Silliq va Uzluksiz Ishlashi Uchun Barcha Imkoniyatlar
           </h2>
-          <p className="text-[#adcdc3] text-base leading-relaxed">
+          <p className="text-[#5C9FD6] text-base leading-relaxed">
             Biz oddiy kassa dasturi emas, internet bo'lmasa ham to'xtamaydigan ishonchli kassa va masofaviy nazorat tizimini taqdim etamiz.
           </p>
         </div>
@@ -110,28 +110,28 @@ export default function Features() {
               <div
                 key={f.id}
                 onClick={() => setSelectedFeature(f)}
-                className="glass-card glass-card-hover p-8 rounded-2xl flex flex-col justify-between space-y-4 border-[#e3c282]/20 cursor-pointer group"
+                className="glass-card glass-card-hover p-8 rounded-2xl flex flex-col justify-between space-y-4 border-[#0077CC]/20 cursor-pointer group"
               >
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#e3c282]/20 to-[#adcdc3]/10 flex items-center justify-center border border-[#e3c282]/40 transition-transform group-hover:scale-110">
-                      <Icon className="w-6 h-6 text-[#e3c282]" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0077CC]/20 to-[#5C9FD6]/10 flex items-center justify-center border border-[#0077CC]/40 transition-transform group-hover:scale-110">
+                      <Icon className="w-6 h-6 text-[#0077CC]" />
                     </div>
-                    <span className="text-[10px] font-mono text-[#e3c282] bg-[#e3c282]/10 px-2.5 py-1 rounded-md border border-[#e3c282]/20">
+                    <span className="text-[10px] font-mono text-[#0077CC] bg-[#0077CC]/10 px-2.5 py-1 rounded-md border border-[#0077CC]/20">
                       {f.tag}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-white font-serif-display group-hover:text-[#e3c282] transition-colors">
+                  <h3 className="text-lg font-bold text-white font-serif-display group-hover:text-[#0077CC] transition-colors">
                     {f.title}
                   </h3>
 
-                  <p className="text-xs text-[#adcdc3]/80 leading-relaxed">
+                  <p className="text-xs text-[#5C9FD6]/80 leading-relaxed">
                     {f.desc}
                   </p>
                 </div>
 
-                <div className="pt-4 border-t border-[#adcdc3]/10 flex items-center justify-between text-xs font-mono text-[#e3c282] group-hover:translate-x-1 transition-transform">
+                <div className="pt-4 border-t border-[#5C9FD6]/10 flex items-center justify-between text-xs font-mono text-[#0077CC] group-hover:translate-x-1 transition-transform">
                   <span>Batafsil ko'rish</span>
                   <span>→</span>
                 </div>
@@ -144,24 +144,24 @@ export default function Features() {
 
       {/* Feature Detail Modal */}
       {selectedFeature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#001712]/80 backdrop-blur-md animate-fadeIn">
-          <div className="glass-card rounded-3xl max-w-lg w-full p-6 sm:p-8 gold-border-glow relative border-[#e3c282]/50 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A1F44]/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-card rounded-3xl max-w-lg w-full p-6 sm:p-8 gold-border-glow relative border-[#0077CC]/50 shadow-2xl space-y-6">
             
             {/* Close Button */}
             <button
               onClick={() => setSelectedFeature(null)}
-              className="absolute top-5 right-5 p-2 rounded-xl text-[#adcdc3] hover:text-[#e3c282] hover:bg-[#1a3a32]/50 transition-colors"
+              className="absolute top-5 right-5 p-2 rounded-xl text-[#5C9FD6] hover:text-[#0077CC] hover:bg-[#14356F]/50 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Header */}
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#e3c282]/20 flex items-center justify-center border border-[#e3c282] shrink-0">
-                {React.createElement(selectedFeature.icon, { className: "w-7 h-7 text-[#e3c282]" })}
+              <div className="w-14 h-14 rounded-2xl bg-[#0077CC]/20 flex items-center justify-center border border-[#0077CC] shrink-0">
+                {React.createElement(selectedFeature.icon, { className: "w-7 h-7 text-[#0077CC]" })}
               </div>
               <div>
-                <span className="text-[10px] font-mono text-[#e3c282] bg-[#e3c282]/10 px-2.5 py-0.5 rounded-md border border-[#e3c282]/20">
+                <span className="text-[10px] font-mono text-[#0077CC] bg-[#0077CC]/10 px-2.5 py-0.5 rounded-md border border-[#0077CC]/20">
                   {selectedFeature.tag}
                 </span>
                 <h3 className="font-serif-display text-xl font-bold text-white mt-1">
@@ -170,16 +170,16 @@ export default function Features() {
               </div>
             </div>
 
-            <p className="text-xs text-[#adcdc3] leading-relaxed border-b border-[#adcdc3]/10 pb-4 font-sans-body">
+            <p className="text-xs text-[#5C9FD6] leading-relaxed border-b border-[#5C9FD6]/10 pb-4 font-sans-body">
               {selectedFeature.desc}
             </p>
 
             {/* Bullet Points */}
-            <div className="space-y-3 font-mono text-xs text-[#c7eade]">
-              <h4 className="text-[#e3c282] font-bold uppercase text-[11px]">Asosiy Afzalliklari:</h4>
+            <div className="space-y-3 font-mono text-xs text-[#FFFFFF]">
+              <h4 className="text-[#0077CC] font-bold uppercase text-[11px]">Asosiy Afzalliklari:</h4>
               {selectedFeature.details.map((detail, i) => (
                 <div key={i} className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#e3c282] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-[#0077CC] shrink-0 mt-0.5" />
                   <span className="leading-normal">{detail}</span>
                 </div>
               ))}

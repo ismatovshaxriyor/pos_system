@@ -88,9 +88,13 @@ export interface ApiActiveOrder {
 }
 
 export interface ApiTableLive {
-  id: number;
-  name: string;
-  qr_code: string;
-  active_order: ApiActiveOrder | null;
+  table_id?: number;
+  table_name?: string;
+  zone_name?: string;
+  qr_code?: string;
+  current_order?: ApiActiveOrder | null;
+  // Fallbacks for backwards compatibility
+  name?: string;
+  active_order?: ApiActiveOrder | null;
 }
 

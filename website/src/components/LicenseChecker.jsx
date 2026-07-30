@@ -26,21 +26,21 @@ export default function LicenseChecker() {
   };
 
   return (
-    <section id="litsenziya" className="py-24 relative overflow-hidden bg-[#001712] oriental-pattern-overlay">
+    <section id="litsenziya" className="py-24 relative overflow-hidden bg-[#0A1F44] oriental-pattern-overlay">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Card Container */}
-        <div className="glass-card p-8 sm:p-12 rounded-3xl gold-border-glow border-[#e3c282]/40 space-y-8">
+        <div className="glass-card p-8 sm:p-12 rounded-3xl gold-border-glow border-[#0077CC]/40 space-y-8">
           
           <div className="text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#e3c282]/20 flex items-center justify-center mx-auto border border-[#e3c282]">
-              <Key className="w-6 h-6 text-[#e3c282]" />
+            <div className="w-12 h-12 rounded-2xl bg-[#0077CC]/20 flex items-center justify-center mx-auto border border-[#0077CC]">
+              <Key className="w-6 h-6 text-[#0077CC]" />
             </div>
             <h2 className="font-serif-display text-2xl sm:text-4xl font-bold text-gradient-gold">
               Litsenziya Holatini Tekshirish
             </h2>
-            <p className="text-xs sm:text-sm text-[#adcdc3]">
-              Litsenziya kalitingizni (masalan: <code className="text-[#e3c282] font-mono font-bold">DEMO-7777-OKAY</code>) kiriting va uning amal qilish muddatini tekshiring.
+            <p className="text-xs sm:text-sm text-[#5C9FD6]">
+              Litsenziya kalitingizni (masalan: <code className="text-[#0077CC] font-mono font-bold">DEMO-7777-OKAY</code>) kiriting va uning amal qilish muddatini tekshiring.
             </p>
           </div>
 
@@ -52,7 +52,7 @@ export default function LicenseChecker() {
                 value={licenseKey}
                 onChange={(e) => setLicenseKey(e.target.value)}
                 placeholder="XXXX-XXXX-XXXX formatidagi kalit..."
-                className="w-full bg-[#001712]/80 border border-[#e3c282]/40 rounded-xl px-4 py-3.5 text-sm text-white font-mono placeholder-[#adcdc3]/50 focus:outline-none focus:border-[#e3c282]"
+                className="w-full bg-[#0A1F44]/80 border border-[#0077CC]/40 rounded-xl px-4 py-3.5 text-sm text-white font-mono placeholder-[#5C9FD6]/50 focus:outline-none focus:border-[#0077CC]"
               />
             </div>
             <button
@@ -66,12 +66,12 @@ export default function LicenseChecker() {
           </form>
 
           {/* Quick Demo Shortcuts */}
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-mono text-[#adcdc3]">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-mono text-[#5C9FD6]">
             <span>Namuna kalitlar:</span>
             <button
               type="button"
               onClick={() => setLicenseKey('DEMO-7777-OKAY')}
-              className="px-2.5 py-1 rounded bg-[#e3c282]/10 border border-[#e3c282]/30 text-[#e3c282] hover:bg-[#e3c282]/20"
+              className="px-2.5 py-1 rounded bg-[#0077CC]/10 border border-[#0077CC]/30 text-[#0077CC] hover:bg-[#0077CC]/20"
             >
               DEMO-7777-OKAY
             </button>
@@ -105,11 +105,11 @@ export default function LicenseChecker() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#e3c282]" />
+                  <Calendar className="w-4 h-4 text-[#0077CC]" />
                   <span>Amal qilish: <strong className="text-white">{result.expiresAt}</strong></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#e3c282]" />
+                  <ShieldCheck className="w-4 h-4 text-[#0077CC]" />
                   <span>Kassa Qurilmasi: <strong className="text-white">{result.deviceStatus}</strong></span>
                 </div>
               </div>

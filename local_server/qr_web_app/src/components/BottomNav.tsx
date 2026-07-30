@@ -14,7 +14,7 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-around px-2 sm:px-3 py-2 w-[94%] max-w-md bg-[#001712]/80 dark:bg-[#002019]/80 backdrop-blur-2xl border border-[#E3C282]/35 shadow-2xl rounded-full transition-all">
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-around px-2 sm:px-3 py-2 w-[94%] max-w-md bg-[#0A1F44]/80 dark:bg-[#0F2A5C]/80 backdrop-blur-2xl border border-[#0077CC]/35 shadow-2xl rounded-full transition-all">
       {navItems.map((item) => {
         const isActive = currentScreen === item.id;
         return (
@@ -23,8 +23,8 @@ export const BottomNav: React.FC = () => {
             onClick={() => setCurrentScreen(item.id)}
             className={`relative flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-full transition-all duration-300 active:scale-95 whitespace-nowrap ${
               isActive
-                ? 'bg-[#ADCDC3] text-[#18362E] font-bold shadow-lg shadow-[#ADCDC3]/20 scale-100'
-                : 'text-[#C1C8C4] hover:text-[#E3C282] hover:bg-[#1A3A32]/40'
+                ? 'bg-[#5C9FD6] text-[#0A1F44] font-bold shadow-lg shadow-[#5C9FD6]/20 scale-100'
+                : 'text-[#9FB0C4] hover:text-[#0077CC] hover:bg-[#14356F]/40'
             }`}
           >
             <span
@@ -38,7 +38,7 @@ export const BottomNav: React.FC = () => {
 
             {/* Badge for Bill if items exist */}
             {item.id === 'bill' && totalCartCount > 0 && !isActive && (
-              <span className="absolute -top-1 -right-1 bg-[#E3C282] text-[#001712] font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#001712]">
+              <span className="absolute -top-1 -right-1 bg-[#0077CC] text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#0A1F44]">
                 {totalCartCount}
               </span>
             )}
@@ -46,8 +46,8 @@ export const BottomNav: React.FC = () => {
             {/* Pulsing indicator for Waiter if status is 'coming' */}
             {item.id === 'waiter' && waiterStatus === 'coming' && !isActive && (
               <span className="absolute top-1.5 right-2 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E3C282] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#E3C282]"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0077CC] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#0077CC]"></span>
               </span>
             )}
           </button>

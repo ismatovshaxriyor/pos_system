@@ -61,26 +61,26 @@ export default function InteractiveDemo() {
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
-          <span className="text-xs font-mono text-[#e3c282] uppercase tracking-widest px-3 py-1 rounded-full border border-[#e3c282]/30 bg-[#e3c282]/10">
+          <span className="text-xs font-mono text-[#0077CC] uppercase tracking-widest px-3 py-1 rounded-full border border-[#0077CC]/30 bg-[#0077CC]/10">
             Jonli Tizim Ekranlari
           </span>
           <h2 className="font-serif-display text-3xl sm:text-5xl font-bold text-gradient-gold">
             Hamroh POS'ni Ekranda Sinab Ko'ring
           </h2>
-          <p className="text-[#adcdc3] text-base">
+          <p className="text-[#5C9FD6] text-base">
             Quyidagi tablarni bosing va Kassa, Oshxona hamda Cloud Admin paneli interfeyslari bilan tanishing.
           </p>
         </div>
 
         {/* Mobile-Friendly Touch-Scrollable Tab Buttons */}
         <div className="flex justify-start sm:justify-center mb-8 overflow-x-auto hide-scrollbar pb-2 px-2">
-          <div className="inline-flex p-1.5 rounded-xl glass-card border border-[#e3c282]/30 gap-1.5 shrink-0">
+          <div className="inline-flex p-1.5 rounded-xl glass-card border border-[#0077CC]/30 gap-1.5 shrink-0">
             <button
               onClick={() => setActiveTab('kassa')}
               className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs font-semibold font-mono whitespace-nowrap transition-all duration-200 ${
                 activeTab === 'kassa'
                   ? 'btn-gold shadow-md scale-[1.02]'
-                  : 'text-[#adcdc3] hover:text-white hover:bg-[#e3c282]/10'
+                  : 'text-[#5C9FD6] hover:text-white hover:bg-[#0077CC]/10'
               }`}
             >
               <ShoppingCart className="w-4 h-4" />
@@ -92,7 +92,7 @@ export default function InteractiveDemo() {
               className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs font-semibold font-mono whitespace-nowrap transition-all duration-200 ${
                 activeTab === 'oshxona'
                   ? 'btn-gold shadow-md scale-[1.02]'
-                  : 'text-[#adcdc3] hover:text-white hover:bg-[#e3c282]/10'
+                  : 'text-[#5C9FD6] hover:text-white hover:bg-[#0077CC]/10'
               }`}
             >
               <UtensilsCrossed className="w-4 h-4" />
@@ -104,7 +104,7 @@ export default function InteractiveDemo() {
               className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs font-semibold font-mono whitespace-nowrap transition-all duration-200 ${
                 activeTab === 'cloud'
                   ? 'btn-gold shadow-md scale-[1.02]'
-                  : 'text-[#adcdc3] hover:text-white hover:bg-[#e3c282]/10'
+                  : 'text-[#5C9FD6] hover:text-white hover:bg-[#0077CC]/10'
               }`}
             >
               <Monitor className="w-4 h-4" />
@@ -125,7 +125,7 @@ export default function InteractiveDemo() {
                 
                 {/* Tables bar */}
                 <div>
-                  <h4 className="text-xs font-mono text-[#e3c282] uppercase mb-2">Stol Tanlash:</h4>
+                  <h4 className="text-xs font-mono text-[#0077CC] uppercase mb-2">Stol Tanlash:</h4>
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {['Zal Stol #01', 'Zal Stol #04', 'VIP Xona #02', 'Ko\'cha Shoshle #07'].map((t) => (
                       <button
@@ -133,8 +133,8 @@ export default function InteractiveDemo() {
                         onClick={() => setSelectedTable(t)}
                         className={`px-3 py-2 rounded-lg text-xs font-mono border transition-all ${
                           selectedTable === t
-                            ? 'bg-[#e3c282]/20 border-[#e3c282] text-white font-bold'
-                            : 'glass-card border-[#adcdc3]/20 text-[#adcdc3] hover:border-[#e3c282]/40'
+                            ? 'bg-[#0077CC]/20 border-[#0077CC] text-white font-bold'
+                            : 'glass-card border-[#5C9FD6]/20 text-[#5C9FD6] hover:border-[#0077CC]/40'
                         }`}
                       >
                         {t}
@@ -145,7 +145,7 @@ export default function InteractiveDemo() {
 
                 {/* Product Catalog */}
                 <div>
-                  <h4 className="text-xs font-mono text-[#e3c282] uppercase mb-2">Taomlar Katalogi:</h4>
+                  <h4 className="text-xs font-mono text-[#0077CC] uppercase mb-2">Taomlar Katalogi:</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
                       { id: 1, name: 'Osh Palov (Lazer)', price: 45000 },
@@ -158,12 +158,12 @@ export default function InteractiveDemo() {
                       <div
                         key={p.id}
                         onClick={() => handleAddItem(p)}
-                        className="glass-card p-3.5 rounded-xl hover:border-[#e3c282] cursor-pointer transition-all flex flex-col justify-between"
+                        className="glass-card p-3.5 rounded-xl hover:border-[#0077CC] cursor-pointer transition-all flex flex-col justify-between"
                       >
                         <span className="text-xs font-bold text-white">{p.name}</span>
                         <div className="flex justify-between items-center mt-3">
-                          <span className="text-xs font-mono text-[#e3c282]">{p.price.toLocaleString()} so'm</span>
-                          <span className="w-5 h-5 rounded bg-[#e3c282]/20 flex items-center justify-center text-[#e3c282] text-xs font-bold">+</span>
+                          <span className="text-xs font-mono text-[#0077CC]">{p.price.toLocaleString()} so'm</span>
+                          <span className="w-5 h-5 rounded bg-[#0077CC]/20 flex items-center justify-center text-[#0077CC] text-xs font-bold">+</span>
                         </div>
                       </div>
                     ))}
@@ -173,9 +173,9 @@ export default function InteractiveDemo() {
               </div>
 
               {/* Right Column: Order Checkout */}
-              <div className="lg:col-span-4 glass-card p-5 rounded-xl flex flex-col justify-between border-[#e3c282]/40 space-y-4">
+              <div className="lg:col-span-4 glass-card p-5 rounded-xl flex flex-col justify-between border-[#0077CC]/40 space-y-4">
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center border-b border-[#adcdc3]/10 pb-3">
+                  <div className="flex justify-between items-center border-b border-[#5C9FD6]/10 pb-3">
                     <span className="text-xs font-bold text-white font-mono">{selectedTable}</span>
                     <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/40">
                       Faol Buyurtma
@@ -187,24 +187,24 @@ export default function InteractiveDemo() {
                       <div key={i.id} className="flex items-center justify-between text-xs glass-card p-2 rounded-lg">
                         <span className="text-white font-medium truncate max-w-[120px]">{i.name}</span>
                         <div className="flex items-center gap-2">
-                          <button onClick={() => handleUpdateQty(i.id, -1)} className="p-1 rounded bg-[#001712] text-[#e3c282]">
+                          <button onClick={() => handleUpdateQty(i.id, -1)} className="p-1 rounded bg-[#0A1F44] text-[#0077CC]">
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="font-mono text-white font-bold">{i.qty}</span>
-                          <button onClick={() => handleAddItem(i)} className="p-1 rounded bg-[#001712] text-[#e3c282]">
+                          <button onClick={() => handleAddItem(i)} className="p-1 rounded bg-[#0A1F44] text-[#0077CC]">
                             <Plus className="w-3 h-3" />
                           </button>
-                          <span className="font-mono text-[#e3c282] ml-2">{(i.price * i.qty).toLocaleString()}</span>
+                          <span className="font-mono text-[#0077CC] ml-2">{(i.price * i.qty).toLocaleString()}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-3 border-t border-[#e3c282]/20">
+                <div className="space-y-3 pt-3 border-t border-[#0077CC]/20">
                   <div className="flex justify-between text-sm font-bold">
                     <span className="text-white">Jami Summa:</span>
-                    <span className="text-[#e3c282] font-mono">{totalSum.toLocaleString()} so'm</span>
+                    <span className="text-[#0077CC] font-mono">{totalSum.toLocaleString()} so'm</span>
                   </div>
 
                   {/* Payment Type Selection */}
@@ -212,7 +212,7 @@ export default function InteractiveDemo() {
                     <button
                       onClick={() => setPaymentMethod('cash')}
                       className={`py-1.5 text-xs font-mono rounded border ${
-                        paymentMethod === 'cash' ? 'bg-[#e3c282]/20 border-[#e3c282] text-white' : 'glass-card border-transparent text-[#adcdc3]'
+                        paymentMethod === 'cash' ? 'bg-[#0077CC]/20 border-[#0077CC] text-white' : 'glass-card border-transparent text-[#5C9FD6]'
                       }`}
                     >
                       Naqd Pul
@@ -220,7 +220,7 @@ export default function InteractiveDemo() {
                     <button
                       onClick={() => setPaymentMethod('card')}
                       className={`py-1.5 text-xs font-mono rounded border ${
-                        paymentMethod === 'card' ? 'bg-[#e3c282]/20 border-[#e3c282] text-white' : 'glass-card border-transparent text-[#adcdc3]'
+                        paymentMethod === 'card' ? 'bg-[#0077CC]/20 border-[#0077CC] text-white' : 'glass-card border-transparent text-[#5C9FD6]'
                       }`}
                     >
                       Plastik Karta
@@ -250,21 +250,21 @@ export default function InteractiveDemo() {
           {/* TAB 2: OSHXONA MONITORINGI */}
           {activeTab === 'oshxona' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center pb-4 border-b border-[#adcdc3]/10">
+              <div className="flex justify-between items-center pb-4 border-b border-[#5C9FD6]/10">
                 <div>
                   <h3 className="text-lg font-bold text-white font-serif-display">Kitchen Display System (KDS)</h3>
-                  <p className="text-xs text-[#adcdc3]">Oshpaz va barmanlar uchun tayyorlanayotgan taomlar biletlari navbati</p>
+                  <p className="text-xs text-[#5C9FD6]">Oshpaz va barmanlar uchun tayyorlanayotgan taomlar biletlari navbati</p>
                 </div>
-                <span className="text-xs font-mono text-[#e3c282] bg-[#e3c282]/10 px-3 py-1.5 rounded-lg border border-[#e3c282]/30">
+                <span className="text-xs font-mono text-[#0077CC] bg-[#0077CC]/10 px-3 py-1.5 rounded-lg border border-[#0077CC]/30">
                   Printer: TCP 9100 Xprinter Active
                 </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {kitchenJobs.map((job) => (
-                  <div key={job.id} className="glass-card p-5 rounded-xl border-[#e3c282]/30 space-y-4">
+                  <div key={job.id} className="glass-card p-5 rounded-xl border-[#0077CC]/30 space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="font-mono text-xs text-[#e3c282] font-bold">{job.id} — {job.table}</span>
+                      <span className="font-mono text-xs text-[#0077CC] font-bold">{job.id} — {job.table}</span>
                       <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${
                         job.status === 'Chop etildi' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-amber-950 text-amber-300 border border-amber-500/40'
                       }`}>
@@ -272,17 +272,17 @@ export default function InteractiveDemo() {
                       </span>
                     </div>
 
-                    <div className="space-y-1.5 bg-[#001712]/60 p-3 rounded-lg border border-[#adcdc3]/10 text-xs font-mono text-[#c7eade]">
+                    <div className="space-y-1.5 bg-[#0A1F44]/60 p-3 rounded-lg border border-[#5C9FD6]/10 text-xs font-mono text-[#FFFFFF]">
                       {job.items.map((item, idx) => (
                         <div key={idx} className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#e3c282]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#0077CC]" />
                           <span>{item}</span>
                         </div>
                       ))}
                     </div>
 
                     <div className="flex justify-between items-center pt-2">
-                      <span className="text-[11px] font-mono text-[#adcdc3]">{job.printer}</span>
+                      <span className="text-[11px] font-mono text-[#5C9FD6]">{job.printer}</span>
                       <button
                         onClick={() => handleKitchenStatus(job.id)}
                         className="btn-emerald px-4 py-1.5 rounded-lg text-xs font-mono"
@@ -299,10 +299,10 @@ export default function InteractiveDemo() {
           {/* TAB 3: MASOFAVIY BOSHQARUV */}
           {activeTab === 'cloud' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center pb-4 border-b border-[#adcdc3]/10">
+              <div className="flex justify-between items-center pb-4 border-b border-[#5C9FD6]/10">
                 <div>
                   <h3 className="text-lg font-bold text-white font-serif-display">Markaziy Boshqaruv Paneli (hamrohpos.uz)</h3>
-                  <p className="text-xs text-[#adcdc3]">Barcha restoran va filiallar sotuvi hamda kunlik tushumlar nazorati</p>
+                  <p className="text-xs text-[#5C9FD6]">Barcha restoran va filiallar sotuvi hamda kunlik tushumlar nazorati</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Server className="w-4 h-4 text-emerald-400" />
@@ -313,38 +313,38 @@ export default function InteractiveDemo() {
               {/* Stats row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="glass-card p-4 rounded-xl space-y-1">
-                  <span className="text-[11px] font-mono text-[#adcdc3]">Ulangan Restoranlar:</span>
+                  <span className="text-[11px] font-mono text-[#5C9FD6]">Ulangan Restoranlar:</span>
                   <div className="text-2xl font-bold text-white font-mono">14 ta Restoran</div>
                 </div>
                 <div className="glass-card p-4 rounded-xl space-y-1">
-                  <span className="text-[11px] font-mono text-[#adcdc3]">Litsenziya Himoyasi:</span>
-                  <div className="text-2xl font-bold text-[#e3c282] font-mono">100% Himoyalangan</div>
+                  <span className="text-[11px] font-mono text-[#5C9FD6]">Litsenziya Himoyasi:</span>
+                  <div className="text-2xl font-bold text-[#0077CC] font-mono">100% Himoyalangan</div>
                 </div>
                 <div className="glass-card p-4 rounded-xl space-y-1">
-                  <span className="text-[11px] font-mono text-[#adcdc3]">Tizim Holati:</span>
+                  <span className="text-[11px] font-mono text-[#5C9FD6]">Tizim Holati:</span>
                   <div className="text-2xl font-bold text-emerald-400 font-mono">Xatosiz Ishlamoqda</div>
                 </div>
               </div>
 
               {/* Sample Fleet list */}
               <div className="glass-card p-4 rounded-xl space-y-3">
-                <h4 className="text-xs font-mono text-[#e3c282] uppercase">Ulangan Restoranlar Ro'yxati:</h4>
+                <h4 className="text-xs font-mono text-[#0077CC] uppercase">Ulangan Restoranlar Ro'yxati:</h4>
                 <div className="space-y-2 text-xs font-mono">
                   {[
                     { name: 'Afsona Restaurant (Toshkent)', ver: 'Hamroh POS', status: 'ULANGAN', expire: '2026-08-31' },
                     { name: 'Rayhon National Food (Samarqand)', ver: 'Hamroh POS', status: 'ULANGAN', expire: '2026-09-15' },
                     { name: 'Choyxona #1 (Farg\'ona)', ver: 'Hamroh POS', status: 'OFFLAYN REJIMDA', expire: '2026-08-10' },
                   ].map((r, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2.5 rounded-lg bg-[#001712]/50 border border-[#adcdc3]/10">
+                    <div key={idx} className="flex justify-between items-center p-2.5 rounded-lg bg-[#0A1F44]/50 border border-[#5C9FD6]/10">
                       <span className="text-white font-semibold">{r.name}</span>
                       <div className="flex items-center gap-4">
-                        <span className="text-[#adcdc3]">{r.ver}</span>
+                        <span className="text-[#5C9FD6]">{r.ver}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] ${
                           r.status.includes('ULANGAN') ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-950 text-amber-300'
                         }`}>
                           {r.status}
                         </span>
-                        <span className="text-[#e3c282]">{r.expire}</span>
+                        <span className="text-[#0077CC]">{r.expire}</span>
                       </div>
                     </div>
                   ))}

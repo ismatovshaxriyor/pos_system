@@ -30,6 +30,47 @@ class ServiceError(Exception):
         super().__init__(message)
 
 
+def build_table_qr_url(table, request=None, domain_override=None):
+    """
+    Stol uchun ommaviy QR menu havolasini shakllantiradi.
+    Ustuvorlik tartibi:
+    1. domain_override (query parameter bo'yicha)
+    2. RestaurantConfig.public_domain (lokal bazadagi sozlama)
+    3. settings.PUBLIC_DOMAIN (.env faylidagi sozlama)
+    4. request.get_host() (agar so'rov mavjud bo'lsa)
+    5. '/table/<qr_code>/' (fallback)
+    """
+    from django.conf import settings
+
+    domain = (domain_override and domain_override.strip()) or None
+
+    if not domain:
+        try:
+            from core.models import RestaurantConfig
+            config = RestaurantConfig.objects.first()
+            if config and config.public_domain and config.public_domain.strip():
+                domain = config.public_domain.strip()
+        except Exception:
+            pass
+
+    if not domain and getattr(settings, 'PUBLIC_DOMAIN', ''):
+        domain = settings.PUBLIC_DOMAIN.strip()
+
+    if domain:
+        if '://' in domain:
+            scheme_host = domain
+        else:
+            scheme = 'https' if 'hamrohpos.uz' in domain else 'http'
+            scheme_host = f"{scheme}://{domain}"
+        return f"{scheme_host.rstrip('/')}/table/{table.qr_code}/"
+
+    path = f"/table/{table.qr_code}/"
+    if request:
+        return request.build_absolute_uri(path)
+    return path
+
+
+
 def generate_registration_code(user, created_by):
     """
     Admin generatsiya qiladi, xodim planshetida kiritadi. 6-xonali raqamli kod.

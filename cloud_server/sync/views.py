@@ -90,12 +90,20 @@ class ActivationView(APIView):
         restaurant.last_seen = timezone.now()
         restaurant.save(update_fields=['last_seen'])
 
+        subdomain = getattr(restaurant, 'subdomain', None)
+        public_domain = f"{subdomain}.hamrohpos.uz" if subdomain else None
+
         response_data = {
             "tokens": [
                 {"token": token, "expires_at": expires_at.isoformat()}
                 for token, expires_at in tokens
             ],
-            "restaurant": {"id": str(restaurant.id), "name": restaurant.name},
+            "restaurant": {
+                "id": str(restaurant.id),
+                "name": restaurant.name,
+                "subdomain": subdomain,
+                "public_domain": public_domain,
+            },
             # Kanonik (bazadagi) registr - Bola shu qiymatni saqlashi kerak,
             # foydalanuvchi kiritgan matnni emas (yuqoridagi izohga qarang).
             "license_key": license_obj.key,

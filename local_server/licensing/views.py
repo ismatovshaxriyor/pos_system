@@ -115,6 +115,17 @@ class ActivateView(APIView):
         state.blocked_reason = ''
         state.save()
 
+        public_domain = data.get('restaurant', {}).get('public_domain')
+        if public_domain:
+            try:
+                from core.models import RestaurantConfig
+                config, _ = RestaurantConfig.objects.get_or_create(pk=1)
+                if not config.public_domain:
+                    config.public_domain = public_domain
+                    config.save()
+            except Exception as exc:
+                logger.warning("RestaurantConfig.public_domain o'rnatishda xatolik: %s", exc)
+
         admin_data = data.get('admin')
         response_data = {k: v for k, v in data.items() if k != 'admin'}
         if admin_data:

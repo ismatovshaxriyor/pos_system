@@ -115,31 +115,7 @@ class TableAdmin(SimpleHistoryAdmin):
         return super().change_view(request, object_id, form_url=form_url, extra_context=extra_context)
 
     def _build_qr_url(self, obj):
-        domain = None
-        try:
-            from core.models import RestaurantConfig
-            config = RestaurantConfig.objects.first()
-            if config and config.public_domain and config.public_domain.strip():
-                domain = config.public_domain.strip()
-        except Exception:
-            pass
-
-        if not domain and getattr(settings, 'PUBLIC_DOMAIN', ''):
-            domain = settings.PUBLIC_DOMAIN.strip()
-
-        if domain:
-            if '://' in domain:
-                scheme_host = domain
-            else:
-                scheme = 'https' if 'hamrohpos.uz' in domain else 'http'
-                scheme_host = f"{scheme}://{domain}"
-            return f"{scheme_host.rstrip('/')}/table/{obj.qr_code}/"
-
-        path = f"/table/{obj.qr_code}/"
-        req = getattr(self, '_request', None)
-        if req:
-            return req.build_absolute_uri(path)
-        return path
+        return services.build_table_qr_url(obj, request=getattr(self, '_request', None))
 
     @admin.display(description="QR Kod Havolasi")
     def qr_url_display(self, obj):

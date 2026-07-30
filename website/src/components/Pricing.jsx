@@ -57,39 +57,39 @@ export default function Pricing({ onOpenDemo }) {
   ];
 
   return (
-    <section id="tariflar" className="py-24 relative overflow-hidden bg-[#001712]">
+    <section id="tariflar" className="py-24 relative overflow-hidden bg-[#0A1F44]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
-          <span className="text-xs font-mono text-[#e3c282] uppercase tracking-widest px-3 py-1 rounded-full border border-[#e3c282]/30 bg-[#e3c282]/10">
+          <span className="text-xs font-mono text-[#0077CC] uppercase tracking-widest px-3 py-1 rounded-full border border-[#0077CC]/30 bg-[#0077CC]/10">
             Shaffof va Qulay Narxlar
           </span>
           <h2 className="font-serif-display text-3xl sm:text-5xl font-bold text-gradient-gold">
             Restoraningiz Hajmiga Mos Tarifni Tanlang
           </h2>
-          <p className="text-[#adcdc3] text-base">
+          <p className="text-[#5C9FD6] text-base">
             Yillik to'lovda <strong className="text-white">20% chegirma</strong> va bepul o'rnatib berish xizmati taqdim etiladi.
           </p>
 
           {/* Monthly / Annual Toggle */}
           <div className="pt-6 flex justify-center items-center gap-4">
-            <span className={`text-xs font-mono font-semibold ${!isAnnual ? 'text-[#e3c282]' : 'text-[#adcdc3]'}`}>
+            <span className={`text-xs font-mono font-semibold ${!isAnnual ? 'text-[#0077CC]' : 'text-[#5C9FD6]'}`}>
               Oylik To'lov
             </span>
 
             <button
               onClick={() => setIsAnnual(!isAnnual)}
-              className="w-14 h-8 rounded-full glass-card border border-[#e3c282] p-1 transition-all flex items-center"
+              className="w-14 h-8 rounded-full glass-card border border-[#0077CC] p-1 transition-all flex items-center"
             >
               <div
-                className={`w-6 h-6 rounded-full bg-gradient-to-r from-[#e3c282] to-[#b89146] transition-transform ${
+                className={`w-6 h-6 rounded-full bg-gradient-to-r from-[#0077CC] to-[#005A96] transition-transform ${
                   isAnnual ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>
 
-            <span className={`text-xs font-mono font-semibold flex items-center gap-1.5 ${isAnnual ? 'text-[#e3c282]' : 'text-[#adcdc3]'}`}>
+            <span className={`text-xs font-mono font-semibold flex items-center gap-1.5 ${isAnnual ? 'text-[#0077CC]' : 'text-[#5C9FD6]'}`}>
               <span>Yillik To'lov</span>
               <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
                 20% Chegirma
@@ -105,13 +105,13 @@ export default function Pricing({ onOpenDemo }) {
               key={idx}
               className={`glass-card glass-card-hover p-8 rounded-2xl flex flex-col justify-between space-y-6 relative transition-all ${
                 p.isPopular
-                  ? 'gradient-border-gold gold-border-glow bg-gradient-to-b from-[#1a3a32]/80 to-[#001712]/95 transform md:-translate-y-2'
-                  : 'border-[#e3c282]/20 hover:border-[#e3c282]/60'
+                  ? 'gradient-border-gold gold-border-glow bg-gradient-to-b from-[#14356F]/80 to-[#0A1F44]/95 transform md:-translate-y-2'
+                  : 'border-[#0077CC]/20 hover:border-[#0077CC]/60'
               }`}
             >
               {p.isPopular && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full btn-gold text-[11px] font-bold font-mono tracking-wider flex items-center gap-1 shadow-lg">
-                  <Sparkles className="w-3.5 h-3.5 text-[#001712] animate-pulse" />
+                  <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
                   <span>ENG OMMABOP TARIF</span>
                 </div>
               )}
@@ -121,18 +121,18 @@ export default function Pricing({ onOpenDemo }) {
                   {p.name}
                 </h3>
 
-                <p className="text-xs text-[#adcdc3]/80 leading-relaxed min-h-[36px]">
+                <p className="text-xs text-[#5C9FD6]/80 leading-relaxed min-h-[36px]">
                   {p.desc}
                 </p>
 
                 {/* Price Display */}
-                <div className="pt-2 pb-4 border-b border-[#adcdc3]/10">
+                <div className="pt-2 pb-4 border-b border-[#5C9FD6]/10">
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl sm:text-4xl font-bold text-gradient-gold font-mono">
                       {isAnnual ? p.priceAnnual : p.priceMonthly}
                     </span>
                     {p.priceMonthly !== 'Kelishilgan' && (
-                      <span className="text-xs font-mono text-[#adcdc3]">so'm / oyiga</span>
+                      <span className="text-xs font-mono text-[#5C9FD6]">so'm / oyiga</span>
                     )}
                   </div>
                 </div>
@@ -140,8 +140,8 @@ export default function Pricing({ onOpenDemo }) {
                 {/* Feature List */}
                 <div className="space-y-2.5 pt-2">
                   {p.features.map((feat, fIdx) => (
-                    <div key={fIdx} className="flex items-start gap-2.5 text-xs text-[#c7eade]">
-                      <Check className="w-4 h-4 text-[#e3c282] shrink-0 mt-0.5" />
+                    <div key={fIdx} className="flex items-start gap-2.5 text-xs text-[#FFFFFF]">
+                      <Check className="w-4 h-4 text-[#0077CC] shrink-0 mt-0.5" />
                       <span>{feat}</span>
                     </div>
                   ))}

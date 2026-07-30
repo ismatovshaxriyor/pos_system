@@ -8,22 +8,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        "background": "#001712",
-        "surface": "#001712",
-        "surface-container": "#02251d",
-        "surface-container-low": "#002019",
-        "surface-container-high": "#0e2f28",
-        "surface-container-highest": "#1a3a32",
-        "primary": "#adcdc3",
-        "primary-container": "#0f2d26",
-        "secondary": "#e3c282",
-        "secondary-container": "#5c4611",
-        "on-background": "#c7eade",
-        "on-surface": "#c7eade",
-        "on-primary": "#18362e",
-        "on-secondary": "#402d00",
-        "outline": "#8b928f",
-        "outline-variant": "#414846"
+        "background": "#0A1F44",
+        "surface": "#0A1F44",
+        "surface-container": "#0F2A5C",
+        "surface-container-low": "#0F2A5C",
+        "surface-container-high": "#14356F",
+        "surface-container-highest": "#14356F",
+        "primary": "#5C9FD6",
+        "primary-container": "#0F2A5C",
+        "secondary": "#0077CC",
+        "secondary-container": "#002F52",
+        "on-background": "#FFFFFF",
+        "on-surface": "#FFFFFF",
+        "on-primary": "#0A1F44",
+        "on-secondary": "#001B33",
+        "outline": "#8697AC",
+        "outline-variant": "#5C6B85"
       },
       fontFamily: {
         serif: ["Playfair Display", "serif"],

@@ -54,49 +54,32 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const INITIAL_CART: CartItem[] = [
-  {
-    dish: MENU_DISHES[1], // Wedding Plov
-    quantity: 2,
-    portionSize: 'Standard',
-    priceUZS: 120000
-  },
-  {
-    dish: MENU_DISHES[4], // Lamb Kebab
-    quantity: 1,
-    portionSize: 'Standard',
-    priceUZS: 95000
-  },
-  {
-    dish: MENU_DISHES[7], // Green Tea / Saffron Tea
-    quantity: 3,
-    portionSize: 'Standard',
-    priceUZS: 15000
-  }
-];
+const INITIAL_CART: CartItem[] = [];
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('home');
-  const [language, setLanguage] = useState<Language>('EN');
+  const [language, setLanguage] = useState<Language>('UZ');
   const [dishes, setDishes] = useState<Dish[]>(MENU_DISHES);
   const [selectedDish, setSelectedDish] = useState<Dish>(MENU_DISHES[0]);
   const [portionSize, setPortionSize] = useState<'Standard' | 'Large'>('Standard');
   const [cart, setCart] = useState<CartItem[]>(INITIAL_CART);
-  const [favorites, setFavorites] = useState<string[]>(['wedding-plov', 'lamb-kebab']);
+  const [favorites, setFavorites] = useState<string[]>([]);
   
-  const [waiterStatus, setWaiterStatus] = useState<'idle' | 'calling' | 'coming'>('coming');
-  const [waiterHistory, setWaiterHistory] = useState<WaiterRequestHistoryItem[]>([
-    { id: '1', title: 'Napkin request', time: 'Completed · 19:42', status: 'COMPLETED' },
-    { id: '2', title: 'Wine service', time: 'Completed · 19:15', status: 'COMPLETED' }
-  ]);
+  const [waiterStatus, setWaiterStatus] = useState<'idle' | 'calling' | 'coming'>('idle');
+  const [waiterHistory, setWaiterHistory] = useState<WaiterRequestHistoryItem[]>([]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLiveApiConnected, setIsLiveApiConnected] = useState(false);
-  const [tableName, setTableName] = useState('Table 12');
+  const [tableName, setTableName] = useState('Stol');
 
-  // Extract QR code from URL query parameters (e.g. ?qr=... or ?table=... or default 'demo')
+  // Extract QR code from URL path (e.g. /table/<qr_code>/) or query parameters (?qr=... or ?table=... or default 'demo')
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  let pathQrCode = null;
+  if (pathParts.length >= 2 && pathParts[0] === 'table') {
+    pathQrCode = pathParts[1];
+  }
   const urlParams = new URLSearchParams(window.location.search);
-  const qrCode = urlParams.get('qr') || urlParams.get('table') || 'demo';
+  const qrCode = pathQrCode || urlParams.get('qr') || urlParams.get('table') || 'demo';
 
   // Modals state
   const [isCutleryModalOpen, setIsCutleryModalOpen] = useState(false);
@@ -121,13 +104,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsLiveApiConnected(true);
       }
 
-      // 2. Fetch live table details
+      // 2. Fetch live table details and current order
       const tableData = await fetchTableLive(qrCode);
       if (tableData && isMounted) {
-        if (tableData.name) {
-          setTableName(tableData.name);
-        }
+        const name = tableData.table_name || tableData.name || 'Stol';
+        setTableName(name);
         setIsLiveApiConnected(true);
+
+        const order = tableData.current_order || tableData.active_order;
+        if (order && order.items && order.items.length > 0) {
+          const liveItems: CartItem[] = order.items.map((item: any) => {
+            const priceNum = typeof item.price === 'number' ? item.price : parseFloat(item.price || '0');
+            return {
+              dish: {
+                id: `order-item-${item.id}`,
+                name: item.product_name || item.name || 'Taom',
+                category: 'Dine-In',
+                priceUZS: priceNum,
+                description: '',
+                portion: '1 ulush',
+                prepTimeMinutes: 15,
+                calories: 450,
+                proteinGrams: 20,
+                carbsGrams: 40,
+                image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80',
+                ingredients: [],
+                allergens: [],
+              },
+              quantity: item.quantity || 1,
+              portionSize: 'Standard',
+              priceUZS: priceNum,
+            };
+          });
+          setCart(liveItems);
+        } else {
+          setCart([]);
+        }
       }
     }
 

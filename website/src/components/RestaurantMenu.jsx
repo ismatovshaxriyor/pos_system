@@ -91,12 +91,12 @@ export default function RestaurantMenu({ subdomain }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#001712] text-[#c7eade] font-sans pb-28">
+    <div className="min-h-screen bg-[#0A1F44] text-[#FFFFFF] font-sans pb-28">
       {/* Header Banner */}
-      <header className="relative bg-gradient-to-b from-[#002b22] to-[#001712] border-b border-[#144e3f] pt-8 pb-6 px-4">
+      <header className="relative bg-gradient-to-b from-[#0F2A5C] to-[#0A1F44] border-b border-[#1C4785] pt-8 pb-6 px-4">
         <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4 text-center md:text-left">
-            <div className="w-16 h-16 rounded-2xl bg-[#e3c282]/10 border border-[#e3c282]/30 flex items-center justify-center text-3xl shadow-lg">
+            <div className="w-16 h-16 rounded-2xl bg-[#0077CC]/10 border border-[#0077CC]/30 flex items-center justify-center text-3xl shadow-lg">
               🏪
             </div>
             <div>
@@ -106,21 +106,21 @@ export default function RestaurantMenu({ subdomain }) {
                   ● Onlayn
                 </span>
               </div>
-              <p className="text-xs text-[#8ab8a8] mt-1 flex items-center justify-center md:justify-start gap-2">
+              <p className="text-xs text-[#4C8FC7] mt-1 flex items-center justify-center md:justify-start gap-2">
                 <span>Raqamli Menyusi va Onlayn To'lov</span>
                 <span>•</span>
-                <span className="text-[#e3c282] font-mono">{subdomain}.hamrohpos.uz</span>
+                <span className="text-[#0077CC] font-mono">{subdomain}.hamrohpos.uz</span>
               </p>
             </div>
           </div>
 
           {/* Table / Location Selector */}
-          <div className="bg-[#002b22] border border-[#144e3f] p-2 rounded-xl flex items-center gap-2">
-            <span className="text-xs text-[#8ab8a8] pl-2 font-medium">Joylashuv:</span>
+          <div className="bg-[#0F2A5C] border border-[#1C4785] p-2 rounded-xl flex items-center gap-2">
+            <span className="text-xs text-[#4C8FC7] pl-2 font-medium">Joylashuv:</span>
             <select
               value={selectedTable}
               onChange={(e) => setSelectedTable(e.target.value)}
-              className="bg-[#001712] border border-[#144e3f] text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#e3c282]"
+              className="bg-[#0A1F44] border border-[#1C4785] text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#0077CC]"
             >
               <option value="1">🪑 Stol #1</option>
               <option value="2">🪑 Stol #2</option>
@@ -133,7 +133,7 @@ export default function RestaurantMenu({ subdomain }) {
       </header>
 
       {/* Category Tabs */}
-      <nav className="sticky top-0 z-30 bg-[#001712]/90 backdrop-blur-md border-b border-[#144e3f]/60 py-3 px-4 shadow-md">
+      <nav className="sticky top-0 z-30 bg-[#0A1F44]/90 backdrop-blur-md border-b border-[#1C4785]/60 py-3 px-4 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
           {categories.map(cat => (
             <button
@@ -141,8 +141,8 @@ export default function RestaurantMenu({ subdomain }) {
               onClick={() => setActiveCategory(cat.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-medium whitespace-nowrap transition-all ${
                 activeCategory === cat.id
-                  ? 'bg-gradient-to-r from-[#e3c282] to-[#cba460] text-[#001712] font-semibold shadow-lg shadow-[#e3c282]/20'
-                  : 'bg-[#002b22] text-[#c7eade] hover:bg-[#003b2f] border border-[#144e3f]'
+                  ? 'bg-gradient-to-r from-[#0077CC] to-[#1483D1] text-white font-semibold shadow-lg shadow-[#0077CC]/20'
+                  : 'bg-[#0F2A5C] text-[#FFFFFF] hover:bg-[#14356F] border border-[#1C4785]'
               }`}
             >
               <span>{cat.icon}</span>
@@ -160,22 +160,22 @@ export default function RestaurantMenu({ subdomain }) {
             return (
               <div
                 key={item.id}
-                className="bg-[#002b22] border border-[#144e3f] hover:border-[#10b981]/50 p-4 rounded-2xl flex items-start gap-4 transition-all hover:shadow-xl relative overflow-hidden group"
+                className="bg-[#0F2A5C] border border-[#1C4785] hover:border-[#10b981]/50 p-4 rounded-2xl flex items-start gap-4 transition-all hover:shadow-xl relative overflow-hidden group"
               >
                 {item.popular && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-l from-[#e3c282] to-[#cba460] text-[#001712] text-[10px] font-bold px-3 py-0.5 rounded-bl-xl shadow-sm">
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-[#0077CC] to-[#1483D1] text-white text-[10px] font-bold px-3 py-0.5 rounded-bl-xl shadow-sm">
                     TOP TAOM
                   </div>
                 )}
-                <div className="w-20 h-20 rounded-xl bg-[#001712] border border-[#144e3f] flex items-center justify-center text-4xl flex-shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-20 h-20 rounded-xl bg-[#0A1F44] border border-[#1C4785] flex items-center justify-center text-4xl flex-shrink-0 group-hover:scale-105 transition-transform">
                   {item.icon}
                 </div>
                 <div className="flex-1 flex flex-col justify-between h-full min-h-[80px]">
                   <div>
-                    <h3 className="text-base font-semibold text-white group-hover:text-[#e3c282] transition-colors">{item.name}</h3>
-                    <p className="text-xs text-[#8ab8a8] mt-1 line-clamp-2">{item.desc}</p>
+                    <h3 className="text-base font-semibold text-white group-hover:text-[#0077CC] transition-colors">{item.name}</h3>
+                    <p className="text-xs text-[#4C8FC7] mt-1 line-clamp-2">{item.desc}</p>
                   </div>
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#144e3f]/40">
+                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#1C4785]/40">
                     <span className="text-sm font-bold text-white font-mono">{item.price.toLocaleString()} so'm</span>
                     
                     {qty === 0 ? (
@@ -186,10 +186,10 @@ export default function RestaurantMenu({ subdomain }) {
                         <span>+</span> Qo'shish
                       </button>
                     ) : (
-                      <div className="flex items-center gap-2 bg-[#001712] border border-[#10b981]/40 rounded-xl p-1">
+                      <div className="flex items-center gap-2 bg-[#0A1F44] border border-[#10b981]/40 rounded-xl p-1">
                         <button
                           onClick={() => removeFromCart(item.id)}
-                          className="w-6 h-6 rounded-lg bg-[#002b22] text-emerald-400 font-bold hover:bg-emerald-600 hover:text-white transition-colors text-xs"
+                          className="w-6 h-6 rounded-lg bg-[#0F2A5C] text-emerald-400 font-bold hover:bg-emerald-600 hover:text-white transition-colors text-xs"
                         >
                           -
                         </button>
@@ -233,15 +233,15 @@ export default function RestaurantMenu({ subdomain }) {
       {/* Cart Drawer / Modal */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#002b22] border border-[#144e3f] w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between pb-4 border-b border-[#144e3f]">
+          <div className="bg-[#0F2A5C] border border-[#1C4785] w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-[#1C4785]">
               <div>
                 <h2 className="text-xl font-bold text-white">Savat & Buyurtma</h2>
-                <p className="text-xs text-[#8ab8a8] mt-0.5">{selectedTable === 'takeaway' ? 'Olib ketish' : `Stol #${selectedTable}`}</p>
+                <p className="text-xs text-[#4C8FC7] mt-0.5">{selectedTable === 'takeaway' ? 'Olib ketish' : `Stol #${selectedTable}`}</p>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="w-8 h-8 rounded-full bg-[#001712] text-[#8ab8a8] hover:text-white flex items-center justify-center text-sm"
+                className="w-8 h-8 rounded-full bg-[#0A1F44] text-[#4C8FC7] hover:text-white flex items-center justify-center text-sm"
               >
                 ✕
               </button>
@@ -250,18 +250,18 @@ export default function RestaurantMenu({ subdomain }) {
             {/* Cart Items List */}
             <div className="max-h-60 overflow-y-auto my-4 space-y-3 pr-1">
               {cart.map(item => (
-                <div key={item.id} className="flex items-center justify-between bg-[#001712] p-3 rounded-xl border border-[#144e3f]/60">
+                <div key={item.id} className="flex items-center justify-between bg-[#0A1F44] p-3 rounded-xl border border-[#1C4785]/60">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{item.icon}</span>
                     <div>
                       <h4 className="text-sm font-semibold text-white">{item.name}</h4>
-                      <p className="text-xs text-[#8ab8a8] font-mono">{item.price.toLocaleString()} so'm</p>
+                      <p className="text-xs text-[#4C8FC7] font-mono">{item.price.toLocaleString()} so'm</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => removeFromCart(item.id)}
-                      className="w-6 h-6 rounded-lg bg-[#002b22] text-emerald-400 font-bold hover:bg-emerald-600 hover:text-white transition-colors text-xs"
+                      className="w-6 h-6 rounded-lg bg-[#0F2A5C] text-emerald-400 font-bold hover:bg-emerald-600 hover:text-white transition-colors text-xs"
                     >
                       -
                     </button>
@@ -278,15 +278,15 @@ export default function RestaurantMenu({ subdomain }) {
             </div>
 
             {/* Payment Method Selector */}
-            <div className="my-4 pt-4 border-t border-[#144e3f]">
-              <label className="text-xs font-semibold text-[#8ab8a8] uppercase tracking-wider block mb-2">To'lov Usuli</label>
+            <div className="my-4 pt-4 border-t border-[#1C4785]">
+              <label className="text-xs font-semibold text-[#4C8FC7] uppercase tracking-wider block mb-2">To'lov Usuli</label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setPaymentMethod('click')}
                   className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'click'
                       ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                      : 'bg-[#001712] border-[#144e3f] text-[#8ab8a8]'
+                      : 'bg-[#0A1F44] border-[#1C4785] text-[#4C8FC7]'
                   }`}
                 >
                   <span className="text-base">💳</span> Click
@@ -296,7 +296,7 @@ export default function RestaurantMenu({ subdomain }) {
                   className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'payme'
                       ? 'bg-teal-600/20 border-teal-500 text-teal-400'
-                      : 'bg-[#001712] border-[#144e3f] text-[#8ab8a8]'
+                      : 'bg-[#0A1F44] border-[#1C4785] text-[#4C8FC7]'
                   }`}
                 >
                   <span className="text-base">🟢</span> Payme
@@ -305,8 +305,8 @@ export default function RestaurantMenu({ subdomain }) {
                   onClick={() => setPaymentMethod('cash')}
                   className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'cash'
-                      ? 'bg-[#e3c282]/20 border-[#e3c282] text-[#e3c282]'
-                      : 'bg-[#001712] border-[#144e3f] text-[#8ab8a8]'
+                      ? 'bg-[#0077CC]/20 border-[#0077CC] text-[#0077CC]'
+                      : 'bg-[#0A1F44] border-[#1C4785] text-[#4C8FC7]'
                   }`}
                 >
                   <span className="text-base">💵</span> Kassada
@@ -315,14 +315,14 @@ export default function RestaurantMenu({ subdomain }) {
             </div>
 
             {/* Summary & Order Action */}
-            <div className="pt-3 border-t border-[#144e3f]">
+            <div className="pt-3 border-t border-[#1C4785]">
               <div className="flex items-center justify-between text-sm mb-4">
-                <span className="text-[#8ab8a8]">Jami Summa:</span>
+                <span className="text-[#4C8FC7]">Jami Summa:</span>
                 <span className="text-xl font-bold text-white font-mono">{totalAmount.toLocaleString()} so'm</span>
               </div>
               <button
                 onClick={handleCheckout}
-                className="w-full bg-gradient-to-r from-[#e3c282] to-[#cba460] hover:from-[#f0d398] hover:to-[#dbb570] text-[#001712] font-bold py-3.5 rounded-xl shadow-lg transition-all"
+                className="w-full bg-gradient-to-r from-[#0077CC] to-[#1483D1] hover:from-[#8AC4EE] hover:to-[#1483D1] text-white font-bold py-3.5 rounded-xl shadow-lg transition-all"
               >
                 Buyurtma Berish & To'lash
               </button>
@@ -334,15 +334,15 @@ export default function RestaurantMenu({ subdomain }) {
       {/* Success Confirmation Modal */}
       {isSuccessModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#002b22] border border-emerald-500/40 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-[#0F2A5C] border border-emerald-500/40 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center text-3xl mx-auto mb-4">
               ✓
             </div>
             <h3 className="text-xl font-bold text-white">Buyurtma Yuborildi!</h3>
-            <p className="text-xs text-[#8ab8a8] mt-2 leading-relaxed">
+            <p className="text-xs text-[#4C8FC7] mt-2 leading-relaxed">
               Buyurtmangiz restoranning oshxona va kassa POS tizimiga muvaffaqiyatli uzatildi. Rahmat!
             </p>
-            <div className="mt-6 pt-4 border-t border-[#144e3f]">
+            <div className="mt-6 pt-4 border-t border-[#1C4785]">
               <button
                 onClick={() => setIsSuccessModalOpen(false)}
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
