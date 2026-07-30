@@ -664,9 +664,8 @@ def calculate_order_financials(order, context=None):
 
 def record_credit_sale(*, order, customer, amount, created_by):
     """
-    Buyurtma kreditga yopilganda: `DebtTransaction(credit_sale, +amount)` yaratadi
-    va `Customer.balance` ni F() bilan atomik oshiradi. Chaqiruvchi (view) buyurtma
-    qatorini `select_for_update` bilan qulflagan bo'lishi kutiladi.
+    Buyurtma kreditga (nasiyaga) yopilganda: `DebtTransaction(credit_sale, +amount)` yaratadi,
+    `Customer.balance` ni oshiradi va Telegram orqali adminga xabar yuboradi.
     """
     from django.db.models import F
     from .models import Customer, DebtTransaction
@@ -676,13 +675,32 @@ def record_credit_sale(*, order, customer, amount, created_by):
         order=order, created_by=created_by,
     )
     Customer.objects.filter(pk=customer.pk).update(balance=F('balance') + amount)
+    customer.refresh_from_db(fields=['balance'])
+
+    cashier_name = created_by.first_name if (created_by and created_by.first_name) else (created_by.username if created_by else "Kassir")
+    cust_name = f"{customer.first_name} {customer.last_name}".strip()
+    phone_str = f" ({customer.phone})" if customer.phone else ""
+    amt_str = f"{int(amount):,} so'm".replace(',', ' ')
+    bal_str = f"{int(customer.balance):,} so'm".replace(',', ' ')
+
+    msg = (
+        f"🔴 <b>YANGI QARZ YOZILDI (NASIYA)</b>\n\n"
+        f"👤 <b>Mijoz:</b> {cust_name}{phone_str}\n"
+        f"💰 <b>Qarz summasi:</b> {amt_str}\n"
+        f"📊 <b>Mijozning jami qarzi:</b> {bal_str}\n"
+        f"📋 <b>Buyurtma #:</b> #{order.id}\n"
+        f"👨‍💼 <b>Kassir:</b> {cashier_name}"
+    )
+    try:
+        send_telegram_notification(msg)
+    except Exception:
+        pass
 
 
 def record_repayment(*, customer, amount, method, created_by, note=''):
     """
-    Mijoz qarzni to'laganda: `DebtTransaction(repayment, -amount)` yaratadi va
-    `Customer.balance` ni F() bilan atomik kamaytiradi. Chaqiruvchi (view)
-    mijoz qatorini qulflab, `amount <= balance` ekanini tekshirgan bo'lishi kutiladi.
+    Mijoz qarzni to'laganda: `DebtTransaction(repayment, -amount)` yaratadi,
+    `Customer.balance` ni kamaytiradi va Telegram orqali adminga xabar yuboradi.
     """
     from django.db.models import F
     from .models import Customer, DebtTransaction
@@ -692,6 +710,27 @@ def record_repayment(*, customer, amount, method, created_by, note=''):
         method=method, created_by=created_by, note=note,
     )
     Customer.objects.filter(pk=customer.pk).update(balance=F('balance') - amount)
+    customer.refresh_from_db(fields=['balance'])
+
+    cashier_name = created_by.first_name if (created_by and created_by.first_name) else (created_by.username if created_by else "Kassir")
+    cust_name = f"{customer.first_name} {customer.last_name}".strip()
+    phone_str = f" ({customer.phone})" if customer.phone else ""
+    amt_str = f"{int(amount):,} so'm".replace(',', ' ')
+    bal_str = f"{int(customer.balance):,} so'm".replace(',', ' ')
+
+    msg = (
+        f"🟢 <b>QARZ TO'LANDI (QAYTARILDI)</b>\n\n"
+        f"👤 <b>Mijoz:</b> {cust_name}{phone_str}\n"
+        f"💵 <b>To'langan summa:</b> {amt_str} ({method})\n"
+        f"📊 <b>Mijozning qolgan qarzi:</b> {bal_str}\n"
+        f"👨‍💼 <b>Qabul qildi:</b> {cashier_name}"
+    )
+    if note:
+        msg += f"\n📝 <b>Izoh:</b> {note}"
+    try:
+        send_telegram_notification(msg)
+    except Exception:
+        pass
 
 
 # ==============================================================================

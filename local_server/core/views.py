@@ -1146,11 +1146,6 @@ class PublicCallWaiterView(APIView):
             }
         )
 
-        try:
-            services.send_telegram_notification(f"🔔 <b>Stol {table.name}:</b> Ofitsiant chaqirildi! ({reason})")
-        except Exception:
-            pass
-
         return Response({'status': 'ok', 'message': 'Ofitsiantga xabar yuborildi.'}, status=status.HTTP_200_OK)
 
 
