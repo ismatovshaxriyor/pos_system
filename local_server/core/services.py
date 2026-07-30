@@ -826,6 +826,43 @@ def get_restaurant_info():
     return name, logo_path
 
 
+def send_telegram_notification(text, parse_mode='HTML'):
+    """
+    RestaurantConfig dagi telegram_bot_token va telegram_chat_id orqali Telegram xabar yuboradi.
+    Token yoki chat_id kiritilmagan bo'lsa LicenseState dagi zaxira ma'lumotlaridan foydalanadi.
+    """
+    import requests
+    from .models import RestaurantConfig
+
+    config = RestaurantConfig.objects.first()
+    bot_token = config.telegram_bot_token if (config and config.telegram_bot_token) else ''
+    chat_id = config.telegram_chat_id if (config and config.telegram_chat_id) else ''
+
+    if not bot_token or not chat_id:
+        from licensing.models import LicenseState
+        state = LicenseState.objects.first()
+        if state:
+            bot_token = bot_token or state.telegram_bot_token
+            chat_id = chat_id or state.telegram_chat_id
+
+    if not bot_token or not chat_id:
+        return False
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': parse_mode,
+        'disable_web_page_preview': True,
+    }
+    try:
+        res = requests.post(url, json=payload, timeout=5)
+        return res.status_code == 200
+    except Exception as e:
+        logger.error(f"Telegram bildirishnomasi yuborishda xatolik: {e}")
+        return False
+
+
 def generate_table_qr_code(qr_url, logo_path=None, fill_color="#001712", back_color="#e3c282", box_size=10):
     """
     Stol uchun QR kodni o'rtasida restoran logotipi bilan birga PNG formatda yaratadi.

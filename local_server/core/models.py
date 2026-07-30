@@ -393,6 +393,16 @@ class RestaurantConfig(BaseModel):
         verbose_name="Xizmat haqi foizi",
         help_text="Restoran xizmat haqi foizi (masalan 10.00 = 10%). Faqat admin/menejer o'zgartira oladi."
     )
+    telegram_bot_token = models.CharField(
+        max_length=200, blank=True, default='',
+        verbose_name="Telegram Bot Token",
+        help_text="Bildirishnomalar uchun Telegram Bot Token (BotFather'dan olinadi)"
+    )
+    telegram_chat_id = models.CharField(
+        max_length=100, blank=True, default='',
+        verbose_name="Telegram Chat ID",
+        help_text="Bildirishnomalar yuboriladigan Telegram guruh yoki admin chat_id"
+    )
 
     class Meta:
         verbose_name = "Restoran Sozlamasi"

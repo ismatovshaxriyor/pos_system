@@ -776,6 +776,43 @@ class RestaurantConfigViewSet(
         obj, _ = RestaurantConfig.objects.get_or_create(pk=1)
         return obj
 
+    @action(detail=False, methods=['post'], url_path='test-telegram')
+    def test_telegram(self, request):
+        """
+        Telegram bot token va chat_id to'g'ri ulanganini tekshirish uchun test xabari yuboradi.
+        """
+        config = self.get_object()
+        bot_token = request.data.get('telegram_bot_token') or config.telegram_bot_token
+        chat_id = request.data.get('telegram_chat_id') or config.telegram_chat_id
+
+        if not bot_token or not chat_id:
+            return Response(
+                {'detail': "Telegram bot token va chat_id kiritilishi shart."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        import requests
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            'chat_id': chat_id,
+            'text': "✅ <b>HamrohPOS Bot Integratsiyasi:</b> Telegram bot muvaffaqiyatli ulandi!",
+            'parse_mode': 'HTML',
+        }
+        try:
+            res = requests.post(url, json=payload, timeout=5)
+            if res.status_code == 200:
+                return Response({'status': 'Telegram test message sent successfully'})
+            else:
+                return Response(
+                    {'detail': f"Telegram API xatosi ({res.status_code}): {res.text}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'detail': f"Telegram ulanishida xatolik: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class AttendanceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AttendanceSerializer
@@ -1108,6 +1145,11 @@ class PublicCallWaiterView(APIView):
                 'created_at': timezone.now().isoformat(),
             }
         )
+
+        try:
+            services.send_telegram_notification(f"🔔 <b>Stol {table.name}:</b> Ofitsiant chaqirildi! ({reason})")
+        except Exception:
+            pass
 
         return Response({'status': 'ok', 'message': 'Ofitsiantga xabar yuborildi.'}, status=status.HTTP_200_OK)
 

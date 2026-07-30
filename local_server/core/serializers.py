@@ -421,7 +421,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class RestaurantConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = RestaurantConfig
-        fields = ('id', 'name', 'logo', 'public_domain', 'latitude', 'longitude', 'attendance_radius', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'logo', 'public_domain', 'latitude', 'longitude', 'attendance_radius', 'service_charge_rate', 'telegram_bot_token', 'telegram_chat_id', 'created_at', 'updated_at')
 
 
 class AttendanceSerializer(serializers.ModelSerializer):
