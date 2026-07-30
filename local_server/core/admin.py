@@ -129,9 +129,7 @@ class TableAdmin(SimpleHistoryAdmin):
         if not obj.qr_code:
             return '-'
         qr_url = self._build_qr_url(obj)
-        img = qrcode.make(qr_url, box_size=5)
-        buf = io.BytesIO()
-        img.save(buf, format='PNG')
+        buf = services.generate_table_qr_code(qr_url, box_size=5)
         data_uri = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode('ascii')
         return format_html(
             '<div style="width:140px;text-align:center">'

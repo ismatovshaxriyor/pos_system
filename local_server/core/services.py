@@ -826,6 +826,55 @@ def get_restaurant_info():
     return name, logo_path
 
 
+def generate_table_qr_code(qr_url, logo_path=None, fill_color="#001712", back_color="#e3c282", box_size=10):
+    """
+    Stol uchun QR kodni o'rtasida restoran logotipi bilan birga PNG formatda yaratadi.
+    Logotip mavjud bo'lsa, ERROR_CORRECT_H (30% xatoni tiklash darajasi) orqali markazga joylashtiriladi.
+    """
+    import io
+    import qrcode
+    from PIL import Image
+
+    if logo_path is None:
+        _, logo_path = get_restaurant_info()
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=box_size,
+        border=4,
+    )
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color=fill_color, back_color=back_color).convert('RGBA')
+
+    if logo_path:
+        try:
+            logo = Image.open(logo_path).convert('RGBA')
+            qr_w, qr_h = img.size
+            logo_max_size = int(qr_w * 0.22)
+
+            resample_flag = getattr(Image, 'Resampling', Image).LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+            logo.thumbnail((logo_max_size, logo_max_size), resample_flag)
+            logo_w, logo_h = logo.size
+
+            padding = 6
+            bg_w, bg_h = logo_w + padding * 2, logo_h + padding * 2
+            logo_bg = Image.new('RGBA', (bg_w, bg_h), back_color)
+
+            logo_bg.paste(logo, (padding, padding), logo)
+            pos = ((qr_w - bg_w) // 2, (qr_h - bg_h) // 2)
+            img.paste(logo_bg, pos, logo_bg)
+        except Exception:
+            pass
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return buf
+
+
 def send_pre_bill_to_printer(order):
     """
     Buyurtmaning hisob-chekini (Pre-bill / Shot) kassa printeriga yuboradi va PrintJob yaratadi.

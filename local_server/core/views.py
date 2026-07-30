@@ -152,21 +152,7 @@ class TableViewSet(viewsets.ModelViewSet):
             domain_override=request.query_params.get('domain'),
         )
 
-        import io
-        import qrcode
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(qr_url)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="#001712", back_color="#e3c282")
-
-        buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
-        buffer.seek(0)
+        buffer = services.generate_table_qr_code(qr_url)
 
         from django.http import HttpResponse
         response = HttpResponse(buffer.getvalue(), content_type='image/png')
