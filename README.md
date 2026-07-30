@@ -42,6 +42,17 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
 
 ---
 
+## Telegram Qarz Bildirishnomalari (Telegram Debt Alerts)
+
+Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilganda, bot faqat **Qarz jarayonlari (Nasiya)** bo'yicha bildirishnoma yuboradi:
+
+1. **Yangi Qarz (Nasiya yopilganda):**
+   - Buyurtma mijozga qarzga yopilganda (`POST /api/orders/{id}/close-on-credit/`), Telegram guruhga `Mijoz nomi`, `Telefon raqami`, `Qarz summasi`, `Jami qarzi`, `Buyurtma #`, hamda `Kassir` ko'rsatilgan bildirishnoma boradi.
+2. **Qarz Qaytarilganda (To'langanda):**
+   - Qarz daftardan mijoz qarzni to'laganda (`POST /api/customers/{id}/repay/`), Telegram guruhga `Mijoz nomi`, `Telefon raqami`, `To'langan summa`, `Qolgan qarzi`, hamda `Kassir` ko'rsatilgan bildirishnoma boradi.
+
+---
+
 ## Buyurtmalar (Orders API)
 
 ### 1. Xizmat haqi (Service Charge) hisoblanishi
