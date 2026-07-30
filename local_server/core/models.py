@@ -369,6 +369,8 @@ class RestaurantConfig(BaseModel):
     """
     Restoranning umumiy sozlamalari (singleton).
     """
+    name = models.CharField(max_length=150, default="Restoran", verbose_name="Restoran nomi")
+    logo = models.ImageField(upload_to="restaurant/", null=True, blank=True, verbose_name="Restoran logotipi (chek uchun)")
     public_domain = models.CharField(
         max_length=255,
         blank=True,

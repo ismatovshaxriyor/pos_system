@@ -88,7 +88,8 @@ def print_job_to_printer(self, job_id):
         snap = job.items_snapshot
         if job.job_type == 'pre_bill' and isinstance(snap, dict):
             payload = escpos.render_pre_bill_receipt(
-                restaurant_name=snap.get('restaurant_name', 'POS RESTORAN'),
+                restaurant_name=snap.get('restaurant_name', 'Restoran'),
+                logo_path=snap.get('logo_path'),
                 order_id=job.order_id,
                 table_name=snap.get('table_name') or (job.order.table.name if job.order.table else 'Takeaway'),
                 waiter_name=snap.get('waiter_name') or (job.order.waiter.first_name if job.order.waiter else "Noma'lum"),
@@ -103,7 +104,8 @@ def print_job_to_printer(self, job_id):
             )
         elif job.job_type == 'receipt' and isinstance(snap, dict):
             payload = escpos.render_payment_receipt(
-                restaurant_name=snap.get('restaurant_name', 'POS RESTORAN'),
+                restaurant_name=snap.get('restaurant_name', 'Restoran'),
+                logo_path=snap.get('logo_path'),
                 order_id=job.order_id,
                 table_name=snap.get('table_name') or (job.order.table.name if job.order.table else 'Takeaway'),
                 waiter_name=snap.get('waiter_name') or (job.order.waiter.first_name if job.order.waiter else "Noma'lum"),

@@ -804,6 +804,20 @@ def get_cashier_printer():
     return printer
 
 
+def get_restaurant_info():
+    """Restoran nomi va logotip fayli yo'lini qaytaradi."""
+    from .models import RestaurantConfig
+    config = RestaurantConfig.objects.first()
+    name = config.name if (config and config.name) else "Restoran"
+    logo_path = None
+    if config and config.logo:
+        try:
+            logo_path = config.logo.path
+        except Exception:
+            logo_path = None
+    return name, logo_path
+
+
 def send_pre_bill_to_printer(order):
     """
     Buyurtmaning hisob-chekini (Pre-bill / Shot) kassa printeriga yuboradi va PrintJob yaratadi.
@@ -812,6 +826,7 @@ def send_pre_bill_to_printer(order):
     from .realtime import broadcast_event
 
     printer = get_cashier_printer()
+    rest_name, logo_path = get_restaurant_info()
     total_amount, final_amount, _ = calculate_order_financials(order)
 
     items = []
@@ -823,6 +838,8 @@ def send_pre_bill_to_printer(order):
         })
 
     snapshot = {
+        'restaurant_name': rest_name,
+        'logo_path': logo_path,
         'items': items,
         'total_amount': float(total_amount),
         'discount_amount': float(order.discount_amount),
@@ -869,6 +886,7 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
     from .realtime import broadcast_event
 
     printer = get_cashier_printer()
+    rest_name, logo_path = get_restaurant_info()
     total_amount, final_amount, _ = calculate_order_financials(order)
 
     items = []
@@ -891,6 +909,8 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
     cashier_name = cashier.first_name if (cashier and cashier.first_name) else (cashier.username if cashier else "Kassir")
 
     snapshot = {
+        'restaurant_name': rest_name,
+        'logo_path': logo_path,
         'items': items,
         'total_amount': float(total_amount),
         'discount_amount': float(order.discount_amount),

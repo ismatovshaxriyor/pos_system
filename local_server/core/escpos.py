@@ -141,12 +141,61 @@ def render_kitchen_ticket(*, station_name, order_id, table_name, waiter_name,
     return b''.join(out)
 
 
-def render_pre_bill_receipt(*, restaurant_name="POS RESTORAN", order_id, table_name, waiter_name,
+def render_logo_raster(image_path, max_width=384):
+    """
+    Logo rasmini (PNG/JPG) ESC/POS 'GS v 0' (Raster bit image) baytlariga o'tkazadi.
+    Pillow kutubxonasi mavjud bo'lmasa yoki rasm fayli yo'q bo'lsa b'' qaytaradi.
+    """
+    if not image_path:
+        return b''
+    try:
+        from PIL import Image
+        img = Image.open(image_path)
+    except Exception:
+        return b''
+
+    try:
+        img = img.convert('L')
+        w, h = img.size
+        if w > max_width:
+            ratio = max_width / float(w)
+            h = int(float(h) * ratio)
+            w = max_width
+            resample_flag = getattr(Image, 'Resampling', Image).LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+            img = img.resize((w, h), resample_flag)
+
+        bytes_per_line = (w + 7) // 8
+        threshold = 128
+        raster_data = bytearray()
+
+        for y in range(h):
+            for x_byte in range(bytes_per_line):
+                byte_val = 0
+                for bit in range(8):
+                    x = x_byte * 8 + bit
+                    if x < w:
+                        pixel = img.getpixel((x, y))
+                        if pixel < threshold:  # Qora piksel
+                            byte_val |= (1 << (7 - bit))
+                raster_data.append(byte_val)
+
+        xL = bytes_per_line % 256
+        xH = bytes_per_line // 256
+        yL = h % 256
+        yH = h // 256
+
+        header = bytes([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH])
+        return ALIGN_CENTER + header + bytes(raster_data) + b'\n'
+    except Exception:
+        return b''
+
+
+def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name,
                             items, total_amount, discount_amount=0, tax_amount=0,
                             service_charge=0, final_amount, created_at=None,
                             width=DEFAULT_WIDTH):
     """
-    Hisob-chek (Shot / Pre-bill) generatori.
+    Hisob-chek (Shot) generatori.
     Mehmon to'lov qilishidan oldin buyurtma hisobini tekshirishi uchun chiqariladi.
     """
     created = created_at or datetime.now(tz=RESTAURANT_TZ)
@@ -157,11 +206,16 @@ def render_pre_bill_receipt(*, restaurant_name="POS RESTORAN", order_id, table_n
             created = datetime.now(tz=RESTAURANT_TZ)
     created = created.astimezone(RESTAURANT_TZ)
 
-    out = [INIT, SELECT_CP866, ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
+    out = [INIT, SELECT_CP866]
+    logo_bytes = render_logo_raster(logo_path)
+    if logo_bytes:
+        out.append(logo_bytes)
+
+    out += [ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
     for line in _wrap(restaurant_name, width // 2):
         out.append(encode(line) + b'\n')
     out += [BOLD_OFF, SIZE_NORMAL]
-    out.append(encode("=== HISOB-CHEK (PRE-BILL) ===") + b'\n')
+    out.append(encode("=== HISOB-CHEK ===") + b'\n')
     out += [ALIGN_LEFT]
     out.append(encode(_two_cols(f"Buyurtma #{order_id}", created.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
     out.append(encode(_two_cols(f"Stol: {table_name}", f"Ofitsiant: {waiter_name}", width)) + b'\n')
@@ -189,14 +243,12 @@ def render_pre_bill_receipt(*, restaurant_name="POS RESTORAN", order_id, table_n
     for line in _wrap(_two_cols("TO'LANISHI KERAK:", f"{int(final_amount):,} so'm".replace(',', ' '), width // 2), width // 2):
         out.append(encode(line) + b'\n')
     out += [BOLD_OFF, SIZE_NORMAL, ALIGN_CENTER]
-    out.append(encode('-' * width) + b'\n')
-    out.append(encode("Bu hisob-chek! To'lov cheki emas.") + b'\n')
-    out.append(encode("Rahmat! Yana kutib qolamiz.") + b'\n')
+    out.append(encode('=' * width) + b'\n')
     out.append(FEED_AND_CUT)
     return b''.join(out)
 
 
-def render_payment_receipt(*, restaurant_name="POS RESTORAN", order_id, table_name, waiter_name, cashier_name,
+def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name, cashier_name,
                            items, total_amount, discount_amount=0, tax_amount=0,
                            service_charge=0, final_amount, payments=None,
                            created_at=None, width=DEFAULT_WIDTH):
@@ -212,7 +264,12 @@ def render_payment_receipt(*, restaurant_name="POS RESTORAN", order_id, table_na
             created = datetime.now(tz=RESTAURANT_TZ)
     created = created.astimezone(RESTAURANT_TZ)
 
-    out = [INIT, SELECT_CP866, ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
+    out = [INIT, SELECT_CP866]
+    logo_bytes = render_logo_raster(logo_path)
+    if logo_bytes:
+        out.append(logo_bytes)
+
+    out += [ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
     for line in _wrap(restaurant_name, width // 2):
         out.append(encode(line) + b'\n')
     out += [BOLD_OFF, SIZE_NORMAL]
@@ -257,7 +314,6 @@ def render_payment_receipt(*, restaurant_name="POS RESTORAN", order_id, table_na
     out += [ALIGN_CENTER]
     out.append(encode('=' * width) + b'\n')
     out.append(encode("Xaridingiz uchun rahmat!") + b'\n')
-    out.append(encode("Yoqimli ishtaha!") + b'\n')
     out.append(FEED_AND_CUT)
     return b''.join(out)
 
