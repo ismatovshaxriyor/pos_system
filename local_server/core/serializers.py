@@ -164,7 +164,7 @@ class StatusMessageSerializer(serializers.Serializer):
 class PrinterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Printer
-        fields = ('id', 'name', 'mac_address', 'ip_address', 'port', 'chars_per_line', 'is_active', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'ip_address', 'port', 'chars_per_line', 'is_active', 'created_at', 'updated_at')
 
     def validate_ip_address(self, value):
         """
@@ -193,26 +193,6 @@ class PrinterSerializer(serializers.ModelSerializer):
                 "Faqat restoran ichki tarmog'idagi (LAN) IP manzil qabul qilinadi."
             )
         return value
-
-    def validate(self, attrs):
-        """
-        Ikki `Printer` yozuvi bir xil IP'ga ega bo'lsa, bitta jismoniy qurilma
-        buyurtmadagi har bir kategoriya-guruh uchun alohida chek chiqarib
-        tashlaydi (`Printer.clean()`dagi izohga qarang - xuddi shu tekshiruv,
-        lekin `ModelSerializer.validate()` `model.clean()`ni o'zi chaqirmaydi).
-        """
-        ip = attrs.get('ip_address', getattr(self.instance, 'ip_address', None))
-        ip = (ip or '').strip()
-        if ip:
-            qs = Printer.objects.filter(ip_address=ip)
-            if self.instance:
-                qs = qs.exclude(pk=self.instance.pk)
-            conflict = qs.first()
-            if conflict:
-                raise serializers.ValidationError({
-                    'ip_address': f"Bu IP manzil allaqachon '{conflict.name}' printerida ishlatilmoqda."
-                })
-        return attrs
 
 class CategorySerializer(serializers.ModelSerializer):
     printer = PrinterSerializer(read_only=True)

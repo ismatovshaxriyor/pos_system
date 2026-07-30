@@ -1,10 +1,8 @@
-import ipaddress
 import logging
 import re
 from datetime import timedelta
 from decimal import Decimal
 
-from django.conf import settings
 from django.contrib.auth.hashers import make_password, check_password
 from django.core.cache import cache
 from django.db import transaction
@@ -71,43 +69,6 @@ def build_table_qr_url(table, request=None, domain_override=None):
         return request.build_absolute_uri(path)
     return path
 
-
-def assign_next_printer_ip():
-    """
-    `Printer.save()` chaqiradi (`mac_address` kiritilib `ip_address` bo'sh
-    qoldirilganda). `settings.PRINTER_IP_POOL_START/END` diapazonidan hali
-    hech qanday `Printer` egallamagan birinchi manzilni qaytaradi - 5 ta
-    printerga tasodifan bir xil IP kiritilib qolish xatosi (kuzatilgan real
-    holat) shu bilan ildizidan yo'q qilinadi: IP endi qo'lda emas, tizim
-    tomonidan tanlanadi, faqat routerdagi MAC->IP reservation qo'lda qoladi.
-    """
-    from .models import Printer
-
-    start = int(ipaddress.ip_address(settings.PRINTER_IP_POOL_START))
-    end = int(ipaddress.ip_address(settings.PRINTER_IP_POOL_END))
-    if end < start:
-        raise ServiceError(
-            "PRINTER_IP_POOL_END PRINTER_IP_POOL_START'dan kichik bo'lmasligi kerak - sozlamani tekshiring.",
-            status=500,
-        )
-
-    used_ips = set(
-        Printer.objects.exclude(ip_address__isnull=True)
-        .exclude(ip_address='')
-        .values_list('ip_address', flat=True)
-    )
-
-    for value in range(start, end + 1):
-        candidate = str(ipaddress.ip_address(value))
-        if candidate not in used_ips:
-            return candidate
-
-    raise ServiceError(
-        f"IP-pool ({settings.PRINTER_IP_POOL_START}-{settings.PRINTER_IP_POOL_END}) to'lgan - "
-        "barcha manzillar band. settings.py'da diapazonni kengaytiring yoki ishlatilmayotgan "
-        "printerlarning IP'sini bo'shating.",
-        status=500,
-    )
 
 
 def generate_registration_code(user, created_by):

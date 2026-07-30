@@ -2,7 +2,6 @@ import uuid
 from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.db.models import Sum
 from django.utils import timezone
@@ -161,17 +160,6 @@ class Table(BaseModel):
 
 class Printer(BaseModel):
     name = models.CharField(max_length=100)
-    mac_address = models.CharField(
-        max_length=17, blank=True, null=True,
-        validators=[RegexValidator(
-            regex=r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$',
-            message="MAC (Ethernet-ID) AA:BB:CC:DD:EE:FF formatida bo'lishi kerak.",
-        )],
-        help_text="Printerning Ethernet-ID'si. Kiritilib IP manzil bo'sh "
-                  "qoldirilsa, tizim PRINTER_IP_POOL diapazonidan bo'sh "
-                  "manzilni o'zi tanlaydi - keyin shu MAC uchun routerda "
-                  "DHCP reservation'ni qo'lda qo'yish qoladi.",
-    )
     ip_address = models.CharField(
         max_length=50, blank=True, null=True,
         help_text="Bo'sh - virtual printer (chek faqat oshxona ekranida ko'rinadi). "
@@ -188,37 +176,6 @@ class Printer(BaseModel):
     def is_network(self):
         """IP kiritilgan printerga jismonan (ESC/POS, TCP 9100) chop etishga urinamiz."""
         return bool(self.ip_address and self.ip_address.strip())
-
-    def clean(self):
-        super().clean()
-        ip = (self.ip_address or '').strip()
-        if not ip:
-            return
-        # Bitta jismoniy printer bir nechta `Printer` yozuviga bo'linib qolsa
-        # (masalan hammasiga sinov uchun bir xil IP kiritilib, keyin
-        # unutilsa), buyurtmadagi har bir kategoriya-guruh uchun alohida
-        # PrintJob shu bitta qurilmaga jo'natiladi - natijada bitta printer
-        # ketma-ket bir necha marta chek chiqarib tashlaydi, ba'zan esa ikki
-        # job bir vaqtda ulanishga urinib biri "connection refused"ga uchraydi
-        # (qulflash `print_job_lock:<job_id>` faqat job darajasida, IP
-        # darajasida emas - tasks.py). Shu sabab bitta IP ikkinchi faol
-        # printerda takrorlanishini saqlash vaqtidayoq taqiqlaymiz.
-        conflict = Printer.objects.filter(ip_address=ip).exclude(pk=self.pk).first()
-        if conflict:
-            raise ValidationError({
-                'ip_address': f"Bu IP manzil allaqachon '{conflict.name}' printerida ishlatilmoqda."
-            })
-
-    def save(self, *args, **kwargs):
-        # `mac_address` kiritilib `ip_address` bo'sh qoldirilgan bo'lsa - bu
-        # "avtomatik IP tanla" signali (admin/API qo'lda IP kiritsa, o'shani
-        # hurmat qilamiz, ustidan yozmaymiz). Har doim shu bitta yo'l orqali
-        # o'tadi (admin ham, API ham, boshqa hech qanday kod ham) - ikkita
-        # o'rinda takrorlash o'rniga.
-        if self.mac_address and not (self.ip_address and self.ip_address.strip()):
-            from .services import assign_next_printer_ip
-            self.ip_address = assign_next_printer_ip()
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

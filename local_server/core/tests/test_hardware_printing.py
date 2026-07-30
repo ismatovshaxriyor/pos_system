@@ -8,8 +8,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
@@ -18,7 +17,6 @@ from core import tasks
 from core.models import (
     User, Table, Category, Product, Order, OrderItem, Printer, PrintJob, Notification,
 )
-from core.services import ServiceError
 
 
 def _auth_header(user):
@@ -86,66 +84,6 @@ class PrinterIPValidationTests(HardwarePrintingBase):
             content_type='application/json', **_auth_header(self.manager),
         )
         self.assertEqual(response.status_code, 201, response.content)
-
-
-class PrinterDuplicateIPTests(HardwarePrintingBase):
-    """
-    Ikki `Printer` bir xil IP bilan saqlanishi taqiqlanadi - aks holda bitta
-    jismoniy qurilma buyurtmadagi har bir kategoriya-guruh uchun alohida
-    PrintJob oladi va ketma-ket bir necha marta chek chiqarib tashlaydi
-    (real holatda 5 ta printerga bitta IP kiritilib qolgani shu sabab
-    muammo edi - `Printer.clean()`/`PrinterSerializer.validate()`).
-    """
-    def test_duplicate_ip_rejected_via_api(self):
-        url = reverse('printer-list')
-        response = self.client.post(
-            url, {"name": "Ikkinchi oshxona", "ip_address": self.network_printer.ip_address},
-            content_type='application/json', **_auth_header(self.manager),
-        )
-        self.assertEqual(response.status_code, 400, response.content)
-
-    def test_duplicate_ip_rejected_at_model_level(self):
-        dup = Printer(name='Nusxa', ip_address=self.network_printer.ip_address)
-        with self.assertRaises(ValidationError):
-            dup.full_clean()
-
-    def test_saving_printer_without_ip_change_does_not_conflict_with_itself(self):
-        self.network_printer.name = 'Oshxona (yangilangan)'
-        self.network_printer.full_clean()
-        self.network_printer.save()
-        self.network_printer.refresh_from_db()
-        self.assertEqual(self.network_printer.name, 'Oshxona (yangilangan)')
-
-
-@override_settings(PRINTER_IP_POOL_START='10.0.0.1', PRINTER_IP_POOL_END='10.0.0.3')
-class PrinterAutoIPAssignmentTests(HardwarePrintingBase):
-    """
-    `mac_address` kiritilib `ip_address` bo'sh qoldirilsa, `Printer.save()`
-    `services.assign_next_printer_ip()` orqali PRINTER_IP_POOL diapazonidan
-    bo'sh manzilni o'zi tanlaydi - bir nechta printerga qo'lda bir xil IP
-    kiritilib qolish xatosi shu bilan oldini olinadi.
-    """
-    def test_assigns_first_free_ip_from_pool(self):
-        printer = Printer.objects.create(name='Bar', mac_address='AA:BB:CC:DD:EE:01')
-        self.assertEqual(printer.ip_address, '10.0.0.1')
-
-    def test_skips_already_used_ip_in_pool(self):
-        Printer.objects.create(name='Boshqa', ip_address='10.0.0.1')
-        printer = Printer.objects.create(name='Dessert', mac_address='AA:BB:CC:DD:EE:02')
-        self.assertEqual(printer.ip_address, '10.0.0.2')
-
-    def test_explicit_ip_not_overridden_even_with_mac(self):
-        printer = Printer.objects.create(
-            name='Salqin', mac_address='AA:BB:CC:DD:EE:03', ip_address='10.0.0.3',
-        )
-        self.assertEqual(printer.ip_address, '10.0.0.3')
-
-    def test_pool_exhausted_raises_clear_error(self):
-        Printer.objects.create(name='P1', ip_address='10.0.0.1')
-        Printer.objects.create(name='P2', ip_address='10.0.0.2')
-        Printer.objects.create(name='P3', ip_address='10.0.0.3')
-        with self.assertRaises(ServiceError):
-            Printer.objects.create(name='P4', mac_address='AA:BB:CC:DD:EE:04')
 
 
 class DispatchTests(HardwarePrintingBase):
