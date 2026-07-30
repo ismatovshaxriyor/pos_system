@@ -143,4 +143,17 @@ class CashierPrintingTests(TestCase):
         self.assertEqual(job.printer, self.cashier_printer)
         self.assertEqual(job.items_snapshot['final_amount'], float(order.final_amount))
 
+    def test_service_charge_rate_config(self):
+        from core.models import RestaurantConfig
+        config, _ = RestaurantConfig.objects.get_or_create(pk=1)
+        config.service_charge_rate = Decimal('10.00')
+        config.save()
+
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=2, price=Decimal('50000'))
+
+        expected_service_charge = (order.total_amount * Decimal('0.10')).quantize(Decimal('0.01'))
+        self.assertEqual(order.calculated_service_charge, expected_service_charge)
+
+
 

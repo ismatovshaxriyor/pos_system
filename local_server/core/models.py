@@ -250,6 +250,14 @@ class Order(BaseModel):
         return final
 
     @property
+    def calculated_service_charge(self):
+        from .models import RestaurantConfig
+        config = RestaurantConfig.objects.first()
+        if config and config.service_charge_rate > Decimal('0'):
+            return (self.total_amount * (config.service_charge_rate / Decimal('100'))).quantize(Decimal('0.01'))
+        return self.service_charge
+
+    @property
     def amount_paid(self):
         return self.payments.filter(is_voided=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
 
@@ -380,6 +388,11 @@ class RestaurantConfig(BaseModel):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Kenglik (Latitude)")
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Uzunlik (Longitude)")
     attendance_radius = models.PositiveIntegerField(default=100, help_text="Ruxsat berilgan radius (metrlarda)")
+    service_charge_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        verbose_name="Xizmat haqi foizi",
+        help_text="Restoran xizmat haqi foizi (masalan 10.00 = 10%). Faqat admin/menejer o'zgartira oladi."
+    )
 
     class Meta:
         verbose_name = "Restoran Sozlamasi"

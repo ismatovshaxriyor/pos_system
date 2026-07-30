@@ -638,8 +638,16 @@ def calculate_order_financials(order, context=None):
     # 2. Yashirin koeffitsientni qo'llash (Litsenziya yaroqsiz bo'lsa, raw_total buziladi)
     total_amount = Decimal(str(float(raw_total) * multiplier))
 
-    # 3. Yakuniy summani hisoblash
-    final_amount = max(total_amount - order.discount_amount + order.tax_amount + order.service_charge, Decimal('0'))
+    # 3. Xizmat haqini hisoblash (RestaurantConfig'da foiz kiritilgan bo'lsa)
+    from .models import RestaurantConfig
+    config = RestaurantConfig.objects.first()
+    if config and config.service_charge_rate > Decimal('0'):
+        service_charge = (total_amount * (config.service_charge_rate / Decimal('100'))).quantize(Decimal('0.01'))
+    else:
+        service_charge = order.service_charge
+
+    # 4. Yakuniy summani hisoblash
+    final_amount = max(total_amount - order.discount_amount + order.tax_amount + service_charge, Decimal('0'))
     
     # 4. To'langan qismini hisoblash
     amount_paid = order.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0')
@@ -844,7 +852,7 @@ def send_pre_bill_to_printer(order):
         'total_amount': float(total_amount),
         'discount_amount': float(order.discount_amount),
         'tax_amount': float(order.tax_amount),
-        'service_charge': float(order.service_charge),
+        'service_charge': float(order.calculated_service_charge),
         'final_amount': float(final_amount),
         'table_name': order.table.name if order.table else "Takeaway",
         'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else "Noma'lum"),
@@ -915,7 +923,7 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
         'total_amount': float(total_amount),
         'discount_amount': float(order.discount_amount),
         'tax_amount': float(order.tax_amount),
-        'service_charge': float(order.service_charge),
+        'service_charge': float(order.calculated_service_charge),
         'final_amount': float(final_amount),
         'payments': payments,
         'table_name': order.table.name if order.table else "Takeaway",

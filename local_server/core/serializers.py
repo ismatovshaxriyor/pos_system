@@ -306,6 +306,7 @@ class OrderSerializer(serializers.ModelSerializer):
     )
 
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    service_charge = serializers.DecimalField(source='calculated_service_charge', max_digits=12, decimal_places=2, read_only=True)
     final_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
