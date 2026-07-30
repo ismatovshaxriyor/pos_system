@@ -11,6 +11,8 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
   - `name`: Restoran nomi (masalan `"Rayhon"`)
   - `logo`: Restoran logotipi rasmi URL manzili
   - `service_charge_rate`: Restoran xizmat haqi foizi (masalan `10.00` = 10%)
+  - `telegram_bot_token`: Telegram bot tokeni (BotFather'dan olinadi)
+  - `telegram_chat_id`: Telegram admin/guruh chat ID'si
   - `public_domain`: Mijozlar stoldagi QR kodni skanerlaganda o'tadigan domen
   - `latitude` / `longitude`: Restoran koordinatalari
   - `attendance_radius`: Davomat radiusi (metrlarda)
@@ -18,7 +20,25 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
 ### 2. Restoran sozlamalarini yangilash
 - **Endpoint:** `PUT /api/restaurant-config/1/` yoki `PATCH /api/restaurant-config/1/`
 - **Ruxsat:** Faqat Admin va Menejerlar (`IsManagerOrAdmin`)
-- **Vazifasi:** Restoran nomi, logotipi va standart xizmat haqi foizini (`service_charge_rate`) tahrirlash.
+- **Vazifasi:** Restoran nomi, logotipi, xizmat haqi foizi (`service_charge_rate`), hamda Telegram bot token/chat_id larini tahrirlash.
+
+### 3. Telegram Bot Ulanishini Tekshirish (Test)
+- **Endpoint:** `POST /api/restaurant-config/test-telegram/`
+- **Ruxsat:** Faqat Admin va Menejerlar (`IsManagerOrAdmin`)
+- **Vazifasi:** Kiritilgan `telegram_bot_token` va `telegram_chat_id` orqali Telegram guruh/chatga sinov xabarini yuboradi.
+- **Body (Ixtiyoriy):**
+```json
+{
+  "telegram_bot_token": "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ",
+  "telegram_chat_id": "-100123456789"
+}
+```
+- **Javob (200 OK):**
+```json
+{
+  "status": "Telegram test message sent successfully"
+}
+```
 
 ---
 
