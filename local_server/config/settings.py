@@ -311,6 +311,16 @@ ERROR_LOG_BATCH_SIZE = int(os.environ.get('ERROR_LOG_BATCH_SIZE', 200))
 ERROR_LOG_RETENTION_DAYS = int(os.environ.get('ERROR_LOG_RETENTION_DAYS', 14))
 ERROR_LOG_MAX_UNREPORTED = int(os.environ.get('ERROR_LOG_MAX_UNREPORTED', 5000))
 
+# Jismoniy (tarmoq) printerlar uchun IP-manzil pool'i: restoran routerida shu
+# diapazon printerlarga MAC bo'yicha DHCP reservation uchun ajratib qo'yiladi
+# (bittadan, qo'lda). Yangi `Printer` yozuviga `mac_address` kiritilib
+# `ip_address` bo'sh qoldirilsa, `core/services.py::assign_next_printer_ip`
+# shu oraliqdan hali band qilinmagan birinchi manzilni tanlaydi - bir nechta
+# printerga tasodifan bir xil IP kiritilib qolish xatosi shu bilan ildizidan
+# yo'q qilinadi.
+PRINTER_IP_POOL_START = os.environ.get('PRINTER_IP_POOL_START', '192.168.1.201')
+PRINTER_IP_POOL_END = os.environ.get('PRINTER_IP_POOL_END', '192.168.1.220')
+
 # ERROR/CRITICAL darajadagi barcha loglarni (view'lardagi unhandled
 # exception'lar, Celery tasklardagi xatoliklar, logger.error()/critical()
 # chaqiruvlari) DatabaseErrorLogHandler orqali ErrorLog jadvaliga yozadi -
