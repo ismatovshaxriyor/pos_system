@@ -679,13 +679,14 @@ def record_credit_sale(*, order, customer, amount, created_by):
 
     cashier_name = created_by.first_name if (created_by and created_by.first_name) else (created_by.username if created_by else "Kassir")
     cust_name = f"{customer.first_name} {customer.last_name}".strip()
-    phone_str = f" ({customer.phone})" if customer.phone else ""
+    phone_val = customer.phone if customer.phone else "Kiritilmagan"
     amt_str = f"{int(amount):,} so'm".replace(',', ' ')
     bal_str = f"{int(customer.balance):,} so'm".replace(',', ' ')
 
     msg = (
         f"🔴 <b>YANGI QARZ YOZILDI (NASIYA)</b>\n\n"
-        f"👤 <b>Mijoz:</b> {cust_name}{phone_str}\n"
+        f"👤 <b>Mijoz:</b> {cust_name}\n"
+        f"📞 <b>Telefon:</b> {phone_val}\n"
         f"💰 <b>Qarz summasi:</b> {amt_str}\n"
         f"📊 <b>Mijozning jami qarzi:</b> {bal_str}\n"
         f"📋 <b>Buyurtma #:</b> #{order.id}\n"
@@ -714,13 +715,14 @@ def record_repayment(*, customer, amount, method, created_by, note=''):
 
     cashier_name = created_by.first_name if (created_by and created_by.first_name) else (created_by.username if created_by else "Kassir")
     cust_name = f"{customer.first_name} {customer.last_name}".strip()
-    phone_str = f" ({customer.phone})" if customer.phone else ""
+    phone_val = customer.phone if customer.phone else "Kiritilmagan"
     amt_str = f"{int(amount):,} so'm".replace(',', ' ')
     bal_str = f"{int(customer.balance):,} so'm".replace(',', ' ')
 
     msg = (
         f"🟢 <b>QARZ TO'LANDI (QAYTARILDI)</b>\n\n"
-        f"👤 <b>Mijoz:</b> {cust_name}{phone_str}\n"
+        f"👤 <b>Mijoz:</b> {cust_name}\n"
+        f"📞 <b>Telefon:</b> {phone_val}\n"
         f"💵 <b>To'langan summa:</b> {amt_str} ({method})\n"
         f"📊 <b>Mijozning qolgan qarzi:</b> {bal_str}\n"
         f"👨‍💼 <b>Qabul qildi:</b> {cashier_name}"
