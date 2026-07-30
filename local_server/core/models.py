@@ -171,6 +171,10 @@ class Printer(BaseModel):
         help_text="Bir qatordagi belgilar soni: 80mm qog'oz (XP-Q80A) - 48, 58mm - 32.",
     )
     is_active = models.BooleanField(default=True)
+    is_cashier = models.BooleanField(
+        default=False,
+        help_text="Kassa printeri (hisob-chek/shot va to'lov cheklari shu printerdan chiqadi).",
+    )
 
     @property
     def is_network(self):
@@ -412,6 +416,11 @@ class Attendance(BaseModel):
         return f"{self.user.username} - {self.check_in}"
 
 class PrintJob(BaseModel):
+    JOB_TYPE_CHOICES = (
+        ('kitchen', 'Oshxona bilet'),
+        ('pre_bill', 'Hisob-chek (Shot)'),
+        ('receipt', "To'lov cheki"),
+    )
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('printed', 'Printed'),
@@ -419,7 +428,8 @@ class PrintJob(BaseModel):
     )
     printer = models.ForeignKey(Printer, related_name='jobs', on_delete=models.CASCADE)
     order = models.ForeignKey(Order, related_name='print_jobs', on_delete=models.CASCADE)
-    items_snapshot = models.JSONField()  # Printed items list: [{"name": str, "quantity": int, "note": str, "modifiers": dict}]
+    job_type = models.CharField(max_length=20, choices=JOB_TYPE_CHOICES, default='kitchen')
+    items_snapshot = models.JSONField()  # Printed items list / receipt snapshot
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     def __str__(self):

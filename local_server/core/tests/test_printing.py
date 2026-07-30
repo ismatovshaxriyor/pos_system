@@ -103,3 +103,44 @@ class KitchenPrintingTests(TestCase):
         # The new item in DB should be marked is_printed=True
         new_item = OrderItem.objects.get(product=self.product_achichik, order=order)
         self.assertTrue(new_item.is_printed)
+
+
+class CashierPrintingTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='+998900000201', role='manager')
+        self.table = Table.objects.create(name='Stol 5')
+        self.cashier_printer = Printer.objects.create(name='Kassa Printeri', is_cashier=True)
+        self.cat = Category.objects.create(name='Ovqatlar')
+        self.product = Product.objects.create(category=self.cat, name='Osh', price=Decimal('30000'))
+
+    def test_print_pre_bill_endpoint(self):
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=2, price=self.product.price)
+
+        url = reverse('order-print-pre-bill', args=[order.id])
+        response = self.client.post(url, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(response.status_code, 200)
+
+        job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
+        self.assertIsNotNone(job)
+        self.assertEqual(job.printer, self.cashier_printer)
+        self.assertEqual(job.items_snapshot['final_amount'], float(order.final_amount))
+
+    def test_automatic_receipt_print_on_close(self):
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        pay_amount = order.final_amount
+        pay_url = reverse('order-add-payment', args=[order.id])
+        self.client.post(pay_url, {"amount": float(pay_amount), "method": "cash"}, content_type='application/json', **_auth_header(self.manager))
+
+        close_url = reverse('order-close', args=[order.id])
+        response = self.client.post(close_url, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(response.status_code, 200)
+
+        job = PrintJob.objects.filter(order=order, job_type='receipt').first()
+        self.assertIsNotNone(job)
+        self.assertEqual(job.printer, self.cashier_printer)
+        self.assertEqual(job.items_snapshot['final_amount'], float(order.final_amount))
+
+

@@ -274,8 +274,8 @@ class AttendanceAdmin(SimpleHistoryAdmin):
 
 @admin.register(Printer)
 class PrinterAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'ip_address', 'port', 'chars_per_line', 'is_active')
-    list_filter = ('is_active',)
+    list_display = ('name', 'ip_address', 'port', 'chars_per_line', 'is_cashier', 'is_active')
+    list_filter = ('is_cashier', 'is_active')
     actions = ['send_test_print']
 
     @admin.action(description="Test chek chiqarish (ulanishni tekshirish)")
@@ -317,7 +317,8 @@ class PrinterAdmin(SimpleHistoryAdmin):
 
 @admin.register(PrintJob)
 class PrintJobAdmin(SimpleHistoryAdmin):
-    list_display = ('id', 'printer', 'order', 'status', 'created_at')
-    list_filter = ('status', 'printer', 'created_at')
+    list_display = ('id', 'printer', 'order', 'job_type', 'status', 'created_at')
+    list_filter = ('job_type', 'status', 'printer', 'created_at')
+
 
 

@@ -788,3 +788,145 @@ def adjust_stock(ingredient, *, new_quantity=None, delta=None, note='', created_
             note=note, created_by=created_by,
         )
     return ingredient
+
+
+def get_cashier_printer():
+    """Kassadagi printerni qaytaradi (is_cashier=True -> birinchi faol printer -> fallback 'Kassa printeri')."""
+    from .models import Printer
+    printer = Printer.objects.filter(is_cashier=True, is_active=True).first()
+    if not printer:
+        printer = Printer.objects.filter(is_active=True).first()
+    if not printer:
+        printer, _ = Printer.objects.get_or_create(
+            name="Kassa printeri",
+            defaults={'is_active': True, 'is_cashier': True}
+        )
+    return printer
+
+
+def send_pre_bill_to_printer(order):
+    """
+    Buyurtmaning hisob-chekini (Pre-bill / Shot) kassa printeriga yuboradi va PrintJob yaratadi.
+    """
+    from .models import PrintJob
+    from .realtime import broadcast_event
+
+    printer = get_cashier_printer()
+    total_amount, final_amount, _ = calculate_order_financials(order)
+
+    items = []
+    for item in order.items.filter(is_voided=False).select_related('product'):
+        items.append({
+            'name': item.product.name,
+            'quantity': item.quantity,
+            'price': float(item.price),
+        })
+
+    snapshot = {
+        'items': items,
+        'total_amount': float(total_amount),
+        'discount_amount': float(order.discount_amount),
+        'tax_amount': float(order.tax_amount),
+        'service_charge': float(order.service_charge),
+        'final_amount': float(final_amount),
+        'table_name': order.table.name if order.table else "Takeaway",
+        'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else "Noma'lum"),
+    }
+
+    with transaction.atomic():
+        job = PrintJob.objects.create(
+            printer=printer,
+            order=order,
+            job_type='pre_bill',
+            items_snapshot=snapshot,
+            status='pending',
+        )
+
+        broadcast_event('new_print_job', {
+            'job_id': job.id,
+            'printer_id': printer.id,
+            'printer_name': printer.name,
+            'order_id': order.id,
+            'job_type': 'pre_bill',
+            'created_at': job.created_at.isoformat() if job.created_at else timezone.now().isoformat(),
+        })
+
+    if printer.is_network:
+        from .tasks import print_job_to_printer
+        job_id = job.id
+        def _dispatch_hardware():
+            print_job_to_printer.delay(job_id)
+        transaction.on_commit(_dispatch_hardware)
+
+    return job
+
+
+def send_payment_receipt_to_printer(order, cashier_user=None):
+    """
+    Buyurtmaning yakuniy to'lov chekini kassa printeriga yuboradi va PrintJob yaratadi.
+    """
+    from .models import PrintJob
+    from .realtime import broadcast_event
+
+    printer = get_cashier_printer()
+    total_amount, final_amount, _ = calculate_order_financials(order)
+
+    items = []
+    for item in order.items.filter(is_voided=False).select_related('product'):
+        items.append({
+            'name': item.product.name,
+            'quantity': item.quantity,
+            'price': float(item.price),
+        })
+
+    payments = []
+    for p in order.payments.filter(is_voided=False):
+        payments.append({
+            'method': p.method,
+            'method_display': p.get_method_display(),
+            'amount': float(p.amount),
+        })
+
+    cashier = cashier_user or order.cashier
+    cashier_name = cashier.first_name if (cashier and cashier.first_name) else (cashier.username if cashier else "Kassir")
+
+    snapshot = {
+        'items': items,
+        'total_amount': float(total_amount),
+        'discount_amount': float(order.discount_amount),
+        'tax_amount': float(order.tax_amount),
+        'service_charge': float(order.service_charge),
+        'final_amount': float(final_amount),
+        'payments': payments,
+        'table_name': order.table.name if order.table else "Takeaway",
+        'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else ""),
+        'cashier_name': cashier_name,
+    }
+
+    with transaction.atomic():
+        job = PrintJob.objects.create(
+            printer=printer,
+            order=order,
+            job_type='receipt',
+            items_snapshot=snapshot,
+            status='pending',
+        )
+
+        broadcast_event('new_print_job', {
+            'job_id': job.id,
+            'printer_id': printer.id,
+            'printer_name': printer.name,
+            'order_id': order.id,
+            'job_type': 'receipt',
+            'created_at': job.created_at.isoformat() if job.created_at else timezone.now().isoformat(),
+        })
+
+    if printer.is_network:
+        from .tasks import print_job_to_printer
+        job_id = job.id
+        def _dispatch_hardware():
+            print_job_to_printer.delay(job_id)
+        transaction.on_commit(_dispatch_hardware)
+
+    return job
+

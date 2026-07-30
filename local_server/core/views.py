@@ -347,6 +347,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             order.cashier = request.user
             order.save()
 
+        services.send_payment_receipt_to_printer(order, cashier_user=request.user)
+
         broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
@@ -401,6 +403,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             order.status = 'completed'
             order.cashier = request.user
             order.save(update_fields=['customer', 'status', 'cashier', 'updated_at'])
+
+        services.send_payment_receipt_to_printer(order, cashier_user=request.user)
 
         broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
@@ -653,6 +657,36 @@ class OrderViewSet(viewsets.ModelViewSet):
                 broadcast_event('table_status_changed', {'table_id': order.table_id})
 
         return Response(OrderSerializer(order, context={'request': request}).data)
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: StatusMessageSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Bekor qilingan buyurtma uchun shot chiqarib bo'lmaydi."),
+        },
+    )
+    @action(detail=True, methods=['post'], url_path='print-pre-bill')
+    def print_pre_bill(self, request, pk=None):
+        order = self.get_object()
+        if order.status == 'cancelled':
+            return Response({'detail': "Bekor qilingan buyurtma uchun hisob-chek chiqarib bo'lmaydi."}, status=status.HTTP_400_BAD_REQUEST)
+        job = services.send_pre_bill_to_printer(order)
+        return Response({'status': 'Pre-bill printed successfully', 'job_id': job.id})
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: StatusMessageSerializer,
+            400: OpenApiResponse(ErrorDetailSerializer, description="Bekor qilingan buyurtma uchun to'lov cheki chiqarib bo'lmaydi."),
+        },
+    )
+    @action(detail=True, methods=['post'], url_path='print-receipt')
+    def print_receipt(self, request, pk=None):
+        order = self.get_object()
+        if order.status == 'cancelled':
+            return Response({'detail': "Bekor qilingan buyurtma uchun to'lov cheki chiqarib bo'lmaydi."}, status=status.HTTP_400_BAD_REQUEST)
+        job = services.send_payment_receipt_to_printer(order, cashier_user=request.user)
+        return Response({'status': 'Receipt printed successfully', 'job_id': job.id})
 
 
 

@@ -85,15 +85,50 @@ def print_job_to_printer(self, job_id):
     if not cache.add(_job_lock_key(job_id), 1, timeout=60):
         return 'locked'
     try:
-        payload = escpos.render_kitchen_ticket(
-            station_name=printer.name,
-            order_id=job.order_id,
-            table_name=job.order.table.name if job.order.table else 'Takeaway',
-            waiter_name=job.order.waiter.first_name if job.order.waiter else "Noma'lum",
-            items=job.items_snapshot,
-            created_at=job.created_at,
-            width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
-        )
+        snap = job.items_snapshot
+        if job.job_type == 'pre_bill' and isinstance(snap, dict):
+            payload = escpos.render_pre_bill_receipt(
+                restaurant_name=snap.get('restaurant_name', 'POS RESTORAN'),
+                order_id=job.order_id,
+                table_name=snap.get('table_name') or (job.order.table.name if job.order.table else 'Takeaway'),
+                waiter_name=snap.get('waiter_name') or (job.order.waiter.first_name if job.order.waiter else "Noma'lum"),
+                items=snap.get('items', []),
+                total_amount=snap.get('total_amount', 0),
+                discount_amount=snap.get('discount_amount', 0),
+                tax_amount=snap.get('tax_amount', 0),
+                service_charge=snap.get('service_charge', 0),
+                final_amount=snap.get('final_amount', 0),
+                created_at=job.created_at,
+                width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
+            )
+        elif job.job_type == 'receipt' and isinstance(snap, dict):
+            payload = escpos.render_payment_receipt(
+                restaurant_name=snap.get('restaurant_name', 'POS RESTORAN'),
+                order_id=job.order_id,
+                table_name=snap.get('table_name') or (job.order.table.name if job.order.table else 'Takeaway'),
+                waiter_name=snap.get('waiter_name') or (job.order.waiter.first_name if job.order.waiter else "Noma'lum"),
+                cashier_name=snap.get('cashier_name') or "Kassir",
+                items=snap.get('items', []),
+                total_amount=snap.get('total_amount', 0),
+                discount_amount=snap.get('discount_amount', 0),
+                tax_amount=snap.get('tax_amount', 0),
+                service_charge=snap.get('service_charge', 0),
+                final_amount=snap.get('final_amount', 0),
+                payments=snap.get('payments', []),
+                created_at=job.created_at,
+                width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
+            )
+        else:
+            items_list = snap.get('items', snap) if isinstance(snap, dict) else snap
+            payload = escpos.render_kitchen_ticket(
+                station_name=printer.name,
+                order_id=job.order_id,
+                table_name=job.order.table.name if job.order.table else 'Takeaway',
+                waiter_name=job.order.waiter.first_name if job.order.waiter else "Noma'lum",
+                items=items_list,
+                created_at=job.created_at,
+                width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
+            )
         escpos.send_tcp(printer.ip_address.strip(), printer.port, payload, timeout=SEND_TIMEOUT)
     except OSError as exc:
         cache.delete(_job_lock_key(job_id))
