@@ -84,3 +84,69 @@ Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilgan
 
 ### 4. Avtomatik To'lov Cheki
 `POST /api/orders/{id}/close/` yoki `POST /api/orders/{id}/close-on-credit/` endpointlari chaqirilib buyurtma yopilganda, tizim avtomatik ravishda kassa printeriga to'lov chekini chop etish topshirig'ini yuboradi.
+
+---
+
+## Kassa Sessiyasi (Register Open/Close API)
+
+Bugungi savdoni **to'liq yopish/ochish** uchun - `Attendance` (xodimning shaxsiy check-in/check-out) dan farqli, butun restoran uchun umumiy holat.
+
+### 1. Kassa holatini olish
+- **Endpoint:** `GET /api/register-session/1/`
+- **Ruxsat:** Barcha tizimga kirgan xodimlar (`IsAuthenticated`)
+- **Izoh:** Restoranda hali hech kim kassani yopmagan/ochmagan bo'lsa ham bu so'rov ishlaydi - qator avtomatik yaratiladi, `is_open: true` (default).
+- **Javob (200 OK):**
+```json
+{
+  "id": 1,
+  "is_open": true,
+  "opened_at": "2026-07-31T05:00:00Z",
+  "opened_by": 3,
+  "opened_by_name": "Aziz",
+  "closed_at": null,
+  "closed_by": null,
+  "closed_by_name": null
+}
+```
+
+### 2. Kassani yopish (bugungi savdoni tugatish)
+- **Endpoint:** `POST /api/register-session/close/`
+- **Ruxsat:** Kassir yoki Menejer (`IsCashierOrManager`) - **Ofitsiant qila olmaydi** (`403`)
+- **Vazifasi:**
+  - `is_open`ni `false`ga o'zgartiradi. Shu daqiqadan boshlab `POST /api/orders/` (yangi buyurtma yaratish) `400` bilan rad etiladi - "Kassa yopiq - yangi buyurtma qabul qilib bo'lmaydi." (oflayn-retry uchun ilgari yaratilgan buyurtmani qayta so'rash, ya'ni bir xil `sync_uuid` bilan qayta yuborish, bunga kirmaydi - u baribir muvaffaqiyatli qaytadi).
+  - **Hozir ochiq (check-out qilinmagan) barcha xodimlarning davomatini avtomatik yopadi** - kim yopganidan qat'iy nazar, hammasi, o'zi ham.
+  - Barcha ulangan mobil ilovalarga WebSocket orqali `register_closed` eventi yuboriladi.
+  - Buyurtma yaratishdan tashqari boshqa hech narsa bloklanmaydi - kassa yopilishidan oldin ochiq qolgan stollarni yakunlash (to'lov qabul qilish, yopish) baribir mumkin.
+- **Javob (200 OK):**
+```json
+{
+  "id": 1,
+  "is_open": false,
+  "opened_at": "2026-07-31T05:00:00Z",
+  "opened_by": 3,
+  "opened_by_name": "Aziz",
+  "closed_at": "2026-07-31T18:00:00Z",
+  "closed_by": 2,
+  "closed_by_name": "Kamila",
+  "checked_out_count": 4
+}
+```
+- **Xato (400):** Kassa allaqachon yopiq bo'lsa - `{"detail": "Kassa allaqachon yopiq."}`
+
+### 3. Kassani ochish (majburiy qayta ochish / yangi kun boshlanishi)
+- **Endpoint:** `POST /api/register-session/open/`
+- **Ruxsat:** Kassir yoki Menejer (`IsCashierOrManager`) - **Ofitsiant qila olmaydi** (`403`)
+- **Vazifasi:** `is_open`ni `true`ga qaytaradi (yangi buyurtma qabul qilish yana ochiladi).
+  - **Kassir** ochsa: barcha menejerlarga `Notification` (`notif_type: "register_opened_by_cashier"`) + WS orqali bildirishnoma boradi - bu nazorat talab qiladigan istisno holat hisoblanadi.
+  - **Menejer/admin** ochsa: hech qanday bildirishnoma yuborilmaydi - bu kunlik oddiy oqim.
+- **Javob (200 OK):** Yuqoridagi kabi struktura, `is_open: true`, `checked_out_count` maydonisiz.
+- **Xato (400):** Kassa allaqachon ochiq bo'lsa - `{"detail": "Kassa allaqachon ochiq."}`
+
+### 4. WebSocket Eventlari (`ws/events/`)
+- `register_closed`: `{"closed_by": <user_id yoki null>, "checked_out_count": <int>}`
+- `register_opened`: `{"opened_by": <user_id yoki null>, "notified_managers": <bool>}`
+
+### 5. Ilova Tomonidagi Kutilgan Xatti-Harakat (MUHIM)
+- **Kassa yopilganda:** Server barcha xodimlarning davomatini avtomatik yopadi. Ilova `register_closed` WS eventini olganda (yoki keyingi so'rovda `GET /api/attendance/` ro'yxatidagi o'zining eng so'nggi yozuvi endi `check_out != null` ekanini ko'rganda) foydalanuvchini **darhol Davomat (Check-in) ekraniga qaytarishi shart** - xuddi ilova birinchi marta ochilganda ko'rsatiladigan "ishga keldingizmi" tekshiruv ekrani kabi. Login/token o'zgarmaydi - faqat ekran holati.
+- **Kassa ochilganda:** Xodim odatdagidek `POST /api/attendance/check-in/` orqali ishga kelganini tasdiqlaydi (koordinata + radius tekshiruvi bilan, mavjud oqim o'zgarmagan) va shundan so'ng POS ekranlariga o'tib ishlashni davom ettiradi.
+- **Ilova ishga tushganda (cold start):** `GET /api/bootstrap/` javobiga qo'shilgan yangi `register_open` (bool) maydonidan foydalanib, kassa holatini alohida so'rovsiz bilib olish mumkin.
