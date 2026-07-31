@@ -137,6 +137,18 @@ Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilgan
 - `method: "debt"` haqiqiy `Payment.METHOD_CHOICES`da yo'q - faqat shu snapshot ichida, chekda/UI'da qarz qismini alohida ko'rsatish uchun qo'shiladi. Bazada bu summaga mos alohida `Payment` qatori yaratilmaydi (u hali ham faqat `DebtTransaction`da).
 - Chekdagi "Xizmat haqi" yorlig'i endi **"Xizmat foizi"** deb yoziladi (`(X%):` formati saqlangan), va har bir chek (pre-bill ham, to'lov cheki ham) oxirida **"Powered by hamrohpos.uz"** qatori chiqadi.
 
+### 6. Stolsiz (Olib ketish / Yetkazib berish) buyurtmalar chekda
+`PrintJob.items_snapshot`da (pre-bill va to'lov cheki uchun) `table_name` endi stol biriktirilmagan buyurtmalarda `"Takeaway"` emas, **`null`** bo'lib keladi, va yangi `order_type` maydoni (`Order.order_type` bilan bir xil: `dine_in`/`takeaway`/`delivery`) qo'shildi:
+```json
+{
+  "table_name": null,
+  "order_type": "takeaway"
+}
+```
+- Chekning o'zida (chop etilgan qog'ozda) bu holatda "Stol: Takeaway" kabi noqulay yozuv o'rniga **"Olib ketish"** (yoki `delivery` uchun **"Yetkazib berish"**) chiqadi - stol yozuvi umuman ko'rinmaydi.
+- Stol biriktirilgan buyurtmalarda hech narsa o'zgarmagan - `table_name` avvalgidek haqiqiy stol nomi.
+- Oshxona cheki (kitchen ticket - bu `items_snapshot`ga emas, to'g'ridan-to'g'ri chop etish vaqtida generatsiya qilinadi, API orqali ko'rinmaydi) sarlavha qatorlari (Buyurtma #/vaqt, Stol/Ofitsiant) endi biroz kattaroq shriftda (2x balandlik) chiqadi - o'qishni osonlashtirish uchun.
+
 ---
 
 ## Kassa Sessiyasi (Register Open/Close API)
