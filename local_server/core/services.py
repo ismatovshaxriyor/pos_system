@@ -956,6 +956,20 @@ def get_restaurant_info():
     return name, logo_path
 
 
+def get_service_charge_rate():
+    """
+    `RestaurantConfig.service_charge_rate` ni chekda foizini yozish uchun
+    qaytaradi (masalan `10.0`). Foiz o'rnatilmagan/0 bo'lsa `0` - bu holda
+    `Order.calculated_service_charge` `Order.service_charge`ga (qo'lda,
+    foizsiz kiritilgan summa) qaytadi va chekda foiz ko'rsatilmaydi.
+    """
+    from .models import RestaurantConfig
+    config = RestaurantConfig.objects.first()
+    if config and config.service_charge_rate > Decimal('0'):
+        return float(config.service_charge_rate)
+    return 0
+
+
 def send_telegram_notification(text, parse_mode='HTML'):
     """
     RestaurantConfig dagi telegram_bot_token va telegram_chat_id orqali Telegram xabar yuboradi.
@@ -1064,6 +1078,7 @@ def send_pre_bill_to_printer(order):
         'discount_amount': float(order.discount_amount),
         'tax_amount': float(order.tax_amount),
         'service_charge': float(order.calculated_service_charge),
+        'service_charge_rate': get_service_charge_rate(),
         'final_amount': float(final_amount),
         'table_name': order.table.name if order.table else "Takeaway",
         'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else "Noma'lum"),
@@ -1135,6 +1150,7 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
         'discount_amount': float(order.discount_amount),
         'tax_amount': float(order.tax_amount),
         'service_charge': float(order.calculated_service_charge),
+        'service_charge_rate': get_service_charge_rate(),
         'final_amount': float(final_amount),
         'payments': payments,
         'table_name': order.table.name if order.table else "Takeaway",

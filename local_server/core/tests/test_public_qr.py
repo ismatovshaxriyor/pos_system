@@ -49,6 +49,18 @@ class PublicQRMenuTests(TestCase):
         self.assertEqual(data['zone_name'], 'Asosiy Zal')
         self.assertEqual(str(data['qr_code']), str(self.table.qr_code))
         self.assertIsNone(data['current_order'])
+        self.assertEqual(data['service_charge_rate'], 0)
+
+    def test_public_table_live_service_charge_rate_from_config(self):
+        # Website savatchasi hali serverga yuborilmagan buyurtma uchun
+        # taxminiy summa hisoblashi kerak - shuning uchun foizni to'g'ridan-
+        # to'g'ri RestaurantConfig'dan olishi lozim, qattiq kodlanmagan holda.
+        from core.models import RestaurantConfig
+        RestaurantConfig.objects.create(pk=1, service_charge_rate=Decimal('12.00'))
+
+        url = reverse('public-table-live', kwargs={'qr_code': self.table.qr_code})
+        response = self.client.get(url)
+        self.assertEqual(response.json()['service_charge_rate'], 12.0)
 
     def test_public_table_live_status_with_active_order(self):
         """Faol buyurtmali stol skanerlanganda hisob summasi va taomlar ko'rinishi kerak."""

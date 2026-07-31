@@ -65,3 +65,53 @@ class EscposTicketTests(SimpleTestCase):
         self.assertIn(b'TEST CHEK', payload)
         self.assertIn(b'192.168.1.50:9100', payload)
         self.assertTrue(payload.endswith(escpos.FEED_AND_CUT))
+
+    def test_service_charge_label_with_rate(self):
+        self.assertEqual(escpos._service_charge_label(10), "Xizmat haqi (10%):")
+        self.assertEqual(escpos._service_charge_label(12.5), "Xizmat haqi (12.5%):")
+
+    def test_service_charge_label_without_rate(self):
+        self.assertEqual(escpos._service_charge_label(0), "Xizmat haqi:")
+        self.assertEqual(escpos._service_charge_label(None), "Xizmat haqi:")
+
+    def _receipt_kwargs(self, **overrides):
+        kwargs = dict(
+            order_id=1, table_name='T1', waiter_name='A',
+            items=[{'name': 'Osh', 'quantity': 1, 'price': 30000}],
+            total_amount=30000, service_charge=3000, final_amount=33000,
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def test_pre_bill_receipt_shows_service_charge_percentage(self):
+        payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs(service_charge_rate=10))
+        self.assertIn(b'Xizmat haqi (10%):', payload)
+
+    def test_pre_bill_receipt_service_charge_without_rate(self):
+        payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs())
+        self.assertIn(b'Xizmat haqi:', payload)
+        self.assertNotIn(b'Xizmat haqi (', payload)
+
+    def test_payment_receipt_shows_service_charge_percentage(self):
+        payload = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila', service_charge_rate=10))
+        self.assertIn(b'Xizmat haqi (10%):', payload)
+
+    def test_pre_bill_receipt_ends_with_brand_footer(self):
+        payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs())
+        self.assertIn(b'Powered by hamrohpos.uz', payload)
+        self.assertTrue(payload.endswith(escpos.FEED_AND_CUT))
+
+    def test_payment_receipt_ends_with_brand_footer(self):
+        payload = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila'))
+        self.assertIn(b'Powered by hamrohpos.uz', payload)
+        self.assertIn(b'Xaridingiz uchun rahmat!', payload)
+        # Footer "rahmat" xabaridan KEYIN kelishi kerak (kesishdan oldingi oxirgi qator).
+        self.assertLess(payload.index(b'Xaridingiz'), payload.index(b'Powered by'))
+
+    def test_kitchen_ticket_has_no_brand_footer(self):
+        # Oshxona cheki xodimlar uchun - mijozga ko'rinmaydi, brend kerak emas.
+        payload = escpos.render_kitchen_ticket(
+            station_name='OSHXONA', order_id=1, table_name='T1', waiter_name='A',
+            items=[{'name': 'Osh', 'quantity': 1, 'note': '', 'modifiers': {}}],
+        )
+        self.assertNotIn(b'hamrohpos.uz', payload)

@@ -653,11 +653,23 @@ class PublicTableLiveSerializer(serializers.Serializer):
     zone_name = serializers.CharField(source='zone.name', default='', allow_null=True)
     qr_code = serializers.UUIDField()
     current_order = serializers.SerializerMethodField()
+    service_charge_rate = serializers.SerializerMethodField()
 
     def get_current_order(self, obj):
         order = obj.orders.filter(status__in=['new', 'in_progress']).order_by('-created_at').first()
         if order:
             return PublicOrderSerializer(order).data
         return None
+
+    def get_service_charge_rate(self, obj):
+        # Mijoz-tomon (website) hali yuborilmagan savatchasi uchun taxminiy
+        # summa hisoblashi kerak - shu maydonsiz u foizni qattiq kodlashga
+        # majbur bo'lardi (haqiqiy `RestaurantConfig.service_charge_rate`dan
+        # farqli, mos kelmaydigan summa ko'rsatib qo'yardi).
+        from .models import RestaurantConfig
+        config = RestaurantConfig.objects.first()
+        if config and config.service_charge_rate > 0:
+            return float(config.service_charge_rate)
+        return 0
 
 

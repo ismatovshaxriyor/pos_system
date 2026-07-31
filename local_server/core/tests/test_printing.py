@@ -155,5 +155,33 @@ class CashierPrintingTests(TestCase):
         expected_service_charge = (order.total_amount * Decimal('0.10')).quantize(Decimal('0.01'))
         self.assertEqual(order.calculated_service_charge, expected_service_charge)
 
+    def test_pre_bill_snapshot_includes_service_charge_rate(self):
+        # Chekda foizni ko'rsatish uchun (escpos._service_charge_label)
+        # snapshot 'service_charge_rate'ni ham olib yurishi kerak.
+        from core.models import RestaurantConfig
+        config, _ = RestaurantConfig.objects.get_or_create(pk=1)
+        config.service_charge_rate = Decimal('10.00')
+        config.save()
+
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=2, price=self.product.price)
+
+        url = reverse('order-print-pre-bill', args=[order.id])
+        response = self.client.post(url, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(response.status_code, 200)
+
+        job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
+        self.assertEqual(job.items_snapshot['service_charge_rate'], 10.0)
+
+    def test_pre_bill_snapshot_service_charge_rate_zero_when_unset(self):
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        url = reverse('order-print-pre-bill', args=[order.id])
+        self.client.post(url, content_type='application/json', **_auth_header(self.manager))
+
+        job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
+        self.assertEqual(job.items_snapshot['service_charge_rate'], 0)
+
 
 

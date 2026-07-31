@@ -38,6 +38,8 @@ FEED_AND_CUT = ESC + b'd\x04' + GS + b'V\x42\x00'  # 4 qator surish + partial cu
 
 DEFAULT_WIDTH = 48  # 80mm qog'oz, Font A. 58mm printer bo'lsa - 32.
 
+BRAND_FOOTER = "Powered by hamrohpos.uz"  # mijozga chiqadigan har ikkala chekning oxirida (kitchen ticket/test chekda emas)
+
 _CHAR_FIXUPS = {
     # O'zbek lotin apostroflari va tipografik belgilar -> ASCII
     'ʻ': "'",  # ʻ (o'zbekcha okina)
@@ -87,6 +89,19 @@ def _two_cols(left, right, width):
     if gap < 1:
         return f"{left} {right}"
     return left + ' ' * gap + right
+
+
+def _service_charge_label(rate):
+    """
+    'Xizmat haqi:' yoki, foiz ma'lum bo'lsa (RestaurantConfig.service_charge_rate
+    dan hisoblangan), 'Xizmat haqi (10%):'. `Order.service_charge` qo'lda,
+    foizsiz kiritilgan bo'lsa `rate` 0 keladi - shu holda foizsiz yoziladi.
+    """
+    if rate and float(rate) > 0:
+        rate = float(rate)
+        rate_str = f"{rate:g}"
+        return f"Xizmat haqi ({rate_str}%):"
+    return "Xizmat haqi:"
 
 
 def _format_modifiers(modifiers):
@@ -192,7 +207,7 @@ def render_logo_raster(image_path, max_width=384):
 
 def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name,
                             items, total_amount, discount_amount=0, tax_amount=0,
-                            service_charge=0, final_amount, created_at=None,
+                            service_charge=0, service_charge_rate=0, final_amount, created_at=None,
                             width=DEFAULT_WIDTH):
     """
     Hisob-chek (Shot) generatori.
@@ -234,7 +249,7 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
     if discount_amount > 0:
         out.append(encode(_two_cols("Chegirma:", f"-{int(discount_amount):,} so'm".replace(',', ' '), width)) + b'\n')
     if service_charge > 0:
-        out.append(encode(_two_cols("Xizmat haqi:", f"+{int(service_charge):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols(_service_charge_label(service_charge_rate), f"+{int(service_charge):,} so'm".replace(',', ' '), width)) + b'\n')
     if tax_amount > 0:
         out.append(encode(_two_cols("Soliq:", f"+{int(tax_amount):,} so'm".replace(',', ' '), width)) + b'\n')
 
@@ -244,13 +259,14 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
         out.append(encode(line) + b'\n')
     out += [BOLD_OFF, SIZE_NORMAL, ALIGN_CENTER]
     out.append(encode('=' * width) + b'\n')
+    out.append(encode(BRAND_FOOTER) + b'\n')
     out.append(FEED_AND_CUT)
     return b''.join(out)
 
 
 def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name, cashier_name,
                            items, total_amount, discount_amount=0, tax_amount=0,
-                           service_charge=0, final_amount, payments=None,
+                           service_charge=0, service_charge_rate=0, final_amount, payments=None,
                            created_at=None, width=DEFAULT_WIDTH):
     """
     To'lov cheki (Final Receipt) generatori.
@@ -294,7 +310,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     if discount_amount > 0:
         out.append(encode(_two_cols("Chegirma:", f"-{int(discount_amount):,} so'm".replace(',', ' '), width)) + b'\n')
     if service_charge > 0:
-        out.append(encode(_two_cols("Xizmat haqi:", f"+{int(service_charge):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols(_service_charge_label(service_charge_rate), f"+{int(service_charge):,} so'm".replace(',', ' '), width)) + b'\n')
     if tax_amount > 0:
         out.append(encode(_two_cols("Soliq:", f"+{int(tax_amount):,} so'm".replace(',', ' '), width)) + b'\n')
 
@@ -314,6 +330,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     out += [ALIGN_CENTER]
     out.append(encode('=' * width) + b'\n')
     out.append(encode("Xaridingiz uchun rahmat!") + b'\n')
+    out.append(encode(BRAND_FOOTER) + b'\n')
     out.append(FEED_AND_CUT)
     return b''.join(out)
 
