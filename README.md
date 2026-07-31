@@ -124,6 +124,19 @@ Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilgan
 ### 4. Avtomatik To'lov Cheki
 `POST /api/orders/{id}/close/` yoki `POST /api/orders/{id}/close-on-credit/` endpointlari chaqirilib buyurtma yopilganda, tizim avtomatik ravishda kassa printeriga to'lov chekini chop etish topshirig'ini yuboradi.
 
+### 5. To'lov usullari ro'yxatida "Qarz"
+`close-on-credit` orqali qarzga yopilgan (yoki qisman naqd + qolgani qarzga yozilgan) buyurtmalarda, chop etilgan to'lov chekining (`PrintJob.items_snapshot.payments`, `GET /api/print-jobs/{id}/` orqali ham ko'rinadi) ro'yxatiga endi haqiqiy `Payment` qatorlari (Cash/Card) bilan bir qatorda **sun'iy "Qarz" yozuvi** ham qo'shiladi:
+```json
+{
+  "payments": [
+    { "method": "cash", "method_display": "Cash", "amount": 10000.0 },
+    { "method": "debt", "method_display": "Qarz", "amount": 20000.0 }
+  ]
+}
+```
+- `method: "debt"` haqiqiy `Payment.METHOD_CHOICES`da yo'q - faqat shu snapshot ichida, chekda/UI'da qarz qismini alohida ko'rsatish uchun qo'shiladi. Bazada bu summaga mos alohida `Payment` qatori yaratilmaydi (u hali ham faqat `DebtTransaction`da).
+- Chekdagi "Xizmat haqi" yorlig'i endi **"Xizmat foizi"** deb yoziladi (`(X%):` formati saqlangan), va har bir chek (pre-bill ham, to'lov cheki ham) oxirida **"Powered by hamrohpos.uz"** qatori chiqadi.
+
 ---
 
 ## Kassa Sessiyasi (Register Open/Close API)
@@ -189,3 +202,14 @@ Bugungi savdoni **to'liq yopish/ochish** uchun - `Attendance` (xodimning shaxsiy
 - **Kassa yopilganda:** Server barcha xodimlarning davomatini avtomatik yopadi. Ilova `register_closed` WS eventini olganda (yoki keyingi so'rovda `GET /api/attendance/` ro'yxatidagi o'zining eng so'nggi yozuvi endi `check_out != null` ekanini ko'rganda) foydalanuvchini **darhol Davomat (Check-in) ekraniga qaytarishi shart** - xuddi ilova birinchi marta ochilganda ko'rsatiladigan "ishga keldingizmi" tekshiruv ekrani kabi. Login/token o'zgarmaydi - faqat ekran holati.
 - **Kassa ochilganda:** Xodim odatdagidek `POST /api/attendance/check-in/` orqali ishga kelganini tasdiqlaydi (koordinata + radius tekshiruvi bilan, mavjud oqim o'zgarmagan) va shundan so'ng POS ekranlariga o'tib ishlashni davom ettiradi.
 - **Ilova ishga tushganda (cold start):** `GET /api/bootstrap/` javobiga qo'shilgan yangi `register_open` (bool) maydonidan foydalanib, kassa holatini alohida so'rovsiz bilib olish mumkin.
+
+---
+
+## Masofadan (Restoran WiFi'sidan Tashqarida) Ulanish
+
+Har bir restoranning o'z Bola'si endi restoranning ochiq domenida (`https://<restoran-subdomeni>.hamrohpos.uz` - `RestaurantConfig.public_domain`dagi domen) ham to'liq ochiq - avval bu manzil faqat mijozga ko'rinadigan QR-menyu sahifasi (`/table/<qr_code>/`) uchun ishlatilgan, endi shu domen orqali **to'liq xodimlar API'si** va **real-vaqt WebSocket kanali** ham ishlaydi.
+
+- **REST API:** ilova bazaviy URL sifatida `https://<subdomen>.hamrohpos.uz` ni ishlatishi mumkin - `/api/...` yo'li mahalliy WiFi'dagi bilan (masalan `http://192.168.1.50:8000` yoki mDNS orqali topilgan manzil) **bir xil ishlaydi**, faqat domen farqlanadi. Autentifikatsiya (`Token` + `X-Device-ID`) va ruxsatlar (kim nima qila oladi) tarmoq yo'liga bog'liq emas - WiFi'da ham, onlaynda ham bir xil.
+- **WebSocket:** `wss://<subdomen>.hamrohpos.uz/ws/events/?token=...&device_id=...` - xuddi mahalliy `ws://.../ws/events/...` bilan bir xil protokol/eventlar, faqat manzil.
+- **Muhim:** bu cheklov ilova darajasida, backend darajasida emas - qaysi ilova shu domenga murojaat qilsa (admin, kassir, ofitsiant ilovasi), o'shanga ishlaydi. Agar faqat ma'lum bir ilova (masalan admin) WiFi'dan tashqarida ham ishlashi kerak bo'lsa, buni o'sha ilovaning tarmoq qatlamida hal qilish kerak (masalan: avval mahalliy manzilni sinab ko'rish, muvaffaqiyatsiz bo'lsa shu domenga fallback qilish).
+- Bu funksiya faqat restoranning `website` konteyneri ishga tushirilgan va Cloudflare Tunnel ingress qoidasi (`<subdomen>.hamrohpos.uz` → `http://website:80`) shu restoran uchun sozlangan bo'lsa ishlaydi - har bir restoran uchun alohida, avtomatlashtirilmagan.
