@@ -10,7 +10,6 @@ export const MenuScreen: React.FC = () => {
     addToCart,
     favorites,
     toggleFavorite,
-    showToast
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -218,44 +217,6 @@ export const MenuScreen: React.FC = () => {
           })}
         </div>
         )}
-      </section>
-
-      {/* Sommelier Pairing Feature Section */}
-      <section className="mt-16 sm:mt-24">
-        <div className="glass-card rounded-2xl p-8 sm:p-12 relative overflow-hidden flex flex-col md:flex-row items-center gap-10 border border-[#0077CC]/40">
-          <div className="w-full md:w-1/3 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl relative border border-[#0077CC]/30">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuABXg1trnQrav0wfmrXTjkSKqXTM1m2qjes4uQelbrmlqdZI-8_v4kKNHIcD8zZJnTxPqmTEbOYbjbsPY_DF2soPFVpEX3LtF8TUg6Dgwzsc-WXTr0iKWz8Bb4VEQtnLISKcaTo8Z0VfIE_GVCJVLfnBjHZffRxFXS1ZvbRTwspd9EzauWvLtibjTuLQO_wtFVHT3KL32zI1ntK1Qn8vA9Jjh38odcdpBRYPTHDumixJV-B0xxaxGCHKPn8l5dysd0wiyiOw5Pr9B-y"
-              alt="Wine Pairing"
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="w-full md:w-2/3">
-            <span className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] mb-3 block uppercase">
-              {t.sommelierSelection}
-            </span>
-            <h2 className="font-serif-display font-semibold text-2xl sm:text-4xl text-[#FFFFFF] mb-4">
-              Pairing Recommendation
-            </h2>
-            <p className="font-sans-body text-sm text-[#9FB0C4] mb-8 max-w-xl leading-relaxed">
-              To elevate the rich flavors of our Wedding Plov, our Sommelier recommends the 2018 Bagizagan Reserve. A complex red with notes of dark berries and local spices.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={() => showToast('2018 Bagizagan Bottle added to order')}
-                className="bg-[#0077CC] text-white px-8 py-3.5 rounded-full font-sans-body text-xs font-bold tracking-widest hover:bg-[#4DA6E0] transition-all uppercase"
-              >
-                ADD BOTTLE • 450,000 UZS
-              </button>
-              <button
-                onClick={() => showToast('2018 Bagizagan Glass added to order')}
-                className="border border-[#0077CC] text-[#0077CC] px-8 py-3.5 rounded-full font-sans-body text-xs font-bold tracking-widest hover:bg-[#0077CC]/10 transition-all uppercase"
-              >
-                BY GLASS • 85,000 UZS
-              </button>
-            </div>
-          </div>
-        </div>
       </section>
     </div>
   );
