@@ -60,6 +60,47 @@ class EscposTicketTests(SimpleTestCase):
         self.assertIn(b'+ limon', payload)
         self.assertIn(b'+ asal', payload)
 
+    def test_kitchen_ticket_header_uses_tall_size(self):
+        payload = escpos.render_kitchen_ticket(
+            station_name='BAR', order_id=1, table_name='T1', waiter_name='A',
+            items=[{'name': 'Choy', 'quantity': 1, 'note': '', 'modifiers': {}}],
+        )
+        header_pos = payload.index(b'Buyurtma #1')
+        separator_pos = payload.index(b'=' * 10)
+        # SIZE_TALL sarlavha qatoridan OLDIN, SIZE_NORMAL sarlavhadan keyin -
+        # "====" ajratuvchidan oldin kelishi kerak (item qatorlari o'ziga
+        # xos SIZE_DOUBLE/SIZE_NORMAL bilan ishlaydi, bunga aralashmasligi kerak).
+        self.assertIn(escpos.SIZE_TALL, payload[:header_pos])
+        self.assertIn(escpos.SIZE_NORMAL, payload[header_pos:separator_pos])
+
+    def test_kitchen_ticket_takeaway_label(self):
+        payload = escpos.render_kitchen_ticket(
+            station_name='BAR', order_id=1, table_name=None, waiter_name='A',
+            items=[{'name': 'Choy', 'quantity': 1, 'note': '', 'modifiers': {}}],
+            order_type='takeaway',
+        )
+        self.assertIn(b'Olib ketish', payload)
+        self.assertNotIn(b'Stol:', payload)
+
+    def test_kitchen_ticket_delivery_label(self):
+        payload = escpos.render_kitchen_ticket(
+            station_name='BAR', order_id=1, table_name=None, waiter_name='A',
+            items=[{'name': 'Choy', 'quantity': 1, 'note': '', 'modifiers': {}}],
+            order_type='delivery',
+        )
+        self.assertIn(b'Yetkazib berish', payload)
+        self.assertNotIn(b'Stol:', payload)
+
+    def test_table_label_with_table(self):
+        self.assertEqual(escpos._table_label('Stol 5'), 'Stol: Stol 5')
+
+    def test_table_label_takeaway_without_table(self):
+        self.assertEqual(escpos._table_label(None, 'takeaway'), 'Olib ketish')
+        self.assertEqual(escpos._table_label(None, 'dine_in'), 'Olib ketish')  # stol biriktirilmagan bo'lsa ham
+
+    def test_table_label_delivery_without_table(self):
+        self.assertEqual(escpos._table_label(None, 'delivery'), 'Yetkazib berish')
+
     def test_test_ticket_contains_probe_lines(self):
         payload = escpos.render_test_ticket(printer_name='XP-Q80A', endpoint='192.168.1.50:9100')
         self.assertIn(b'TEST CHEK', payload)
@@ -107,6 +148,18 @@ class EscposTicketTests(SimpleTestCase):
         self.assertIn(b'Xaridingiz uchun rahmat!', payload)
         # Footer "rahmat" xabaridan KEYIN kelishi kerak (kesishdan oldingi oxirgi qator).
         self.assertLess(payload.index(b'Xaridingiz'), payload.index(b'Powered by'))
+
+    def test_pre_bill_receipt_takeaway_label(self):
+        payload = escpos.render_pre_bill_receipt(
+            **self._receipt_kwargs(table_name=None, order_type='takeaway'))
+        self.assertIn(b'Olib ketish', payload)
+        self.assertNotIn(b'Stol:', payload)
+
+    def test_payment_receipt_delivery_label(self):
+        payload = escpos.render_payment_receipt(
+            **self._receipt_kwargs(cashier_name='Kamila', table_name=None, order_type='delivery'))
+        self.assertIn(b'Yetkazib berish', payload)
+        self.assertNotIn(b'Stol:', payload)
 
     def test_kitchen_ticket_has_no_brand_footer(self):
         # Oshxona cheki xodimlar uchun - mijozga ko'rinmaydi, brend kerak emas.

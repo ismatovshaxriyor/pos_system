@@ -1080,7 +1080,8 @@ def send_pre_bill_to_printer(order):
         'service_charge': float(order.calculated_service_charge),
         'service_charge_rate': get_service_charge_rate(),
         'final_amount': float(final_amount),
-        'table_name': order.table.name if order.table else "Takeaway",
+        'table_name': order.table.name if order.table else None,
+        'order_type': order.order_type,
         'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else "Noma'lum"),
     }
 
@@ -1168,7 +1169,8 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
         'service_charge_rate': get_service_charge_rate(),
         'final_amount': float(final_amount),
         'payments': payments,
-        'table_name': order.table.name if order.table else "Takeaway",
+        'table_name': order.table.name if order.table else None,
+        'order_type': order.order_type,
         'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else ""),
         'cashier_name': cashier_name,
     }

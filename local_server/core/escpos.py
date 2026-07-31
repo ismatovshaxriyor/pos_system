@@ -33,6 +33,7 @@ ALIGN_CENTER = ESC + b'a\x01'
 BOLD_ON = ESC + b'E\x01'
 BOLD_OFF = ESC + b'E\x00'
 SIZE_NORMAL = GS + b'!\x00'
+SIZE_TALL = GS + b'!\x01'  # 2x bo'yi, eni o'zgarmaydi - ustun kengligi buzilmaydi, faqat balandroq
 SIZE_DOUBLE = GS + b'!\x11'  # 2x eni + 2x bo'yi (oshxona uchun yirik)
 FEED_AND_CUT = ESC + b'd\x04' + GS + b'V\x42\x00'  # 4 qator surish + partial cut
 
@@ -104,6 +105,19 @@ def _service_charge_label(rate):
     return "Xizmat foizi:"
 
 
+def _table_label(table_name, order_type='dine_in'):
+    """
+    'Stol: 6' - stol biriktirilgan bo'lsa. Stolsiz buyurtmalar (olib
+    ketish/yetkazib berish) uchun "Stol: Takeaway" kabi noqulay yozuv
+    o'rniga `Order.order_type`ga qarab tabiiy yorliq qaytaradi.
+    """
+    if table_name:
+        return f"Stol: {table_name}"
+    if order_type == 'delivery':
+        return 'Yetkazib berish'
+    return 'Olib ketish'
+
+
 def _format_modifiers(modifiers):
     """`OrderItem.modifiers` JSON (dict/list/str) -> chekka chiqadigan qatorlar."""
     if not modifiers:
@@ -116,14 +130,15 @@ def _format_modifiers(modifiers):
 
 
 def render_kitchen_ticket(*, station_name, order_id, table_name, waiter_name,
-                          items, created_at=None, width=DEFAULT_WIDTH):
+                          items, order_type='dine_in', created_at=None, width=DEFAULT_WIDTH):
     """
     Oshxona chekini ESC/POS baytlariga yig'adi.
 
     `items` - `PrintJob.items_snapshot` formati:
     [{"name": str, "quantity": int, "note": str, "modifiers": dict|list}, ...]
     Taom qatorlari 2x o'lchamda (oshpaz uzoqdan o'qiydi), izoh/modifikatorlar
-    oddiy o'lchamda chiqadi.
+    oddiy o'lchamda chiqadi. Sarlavha qatorlari (buyurtma #/vaqt, stol/ofitsiant)
+    SIZE_TALL bilan - oshxonada uzoqroqdan o'qish osonroq bo'lishi uchun.
     """
     created = created_at or datetime.now(tz=RESTAURANT_TZ)
     created = created.astimezone(RESTAURANT_TZ)
@@ -131,9 +146,10 @@ def render_kitchen_ticket(*, station_name, order_id, table_name, waiter_name,
     out = [INIT, SELECT_CP866, ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
     for line in _wrap(station_name, width // 2):
         out.append(encode(line) + b'\n')
-    out += [BOLD_OFF, SIZE_NORMAL, ALIGN_LEFT]
+    out += [BOLD_OFF, SIZE_TALL, ALIGN_LEFT]
     out.append(encode(_two_cols(f"Buyurtma #{order_id}", created.strftime('%d.%m %H:%M'), width)) + b'\n')
-    out.append(encode(_two_cols(f"Stol: {table_name}", f"Ofitsiant: {waiter_name}", width)) + b'\n')
+    out.append(encode(_two_cols(_table_label(table_name, order_type), f"Ofitsiant: {waiter_name}", width)) + b'\n')
+    out += [SIZE_NORMAL]
     out.append(encode('=' * width) + b'\n')
 
     for item in items:
@@ -207,8 +223,8 @@ def render_logo_raster(image_path, max_width=384):
 
 def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name,
                             items, total_amount, discount_amount=0, tax_amount=0,
-                            service_charge=0, service_charge_rate=0, final_amount, created_at=None,
-                            width=DEFAULT_WIDTH):
+                            service_charge=0, service_charge_rate=0, final_amount, order_type='dine_in',
+                            created_at=None, width=DEFAULT_WIDTH):
     """
     Hisob-chek (Shot) generatori.
     Mehmon to'lov qilishidan oldin buyurtma hisobini tekshirishi uchun chiqariladi.
@@ -233,7 +249,7 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
     out.append(encode("=== HISOB-CHEK ===") + b'\n')
     out += [ALIGN_LEFT]
     out.append(encode(_two_cols(f"Buyurtma #{order_id}", created.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
-    out.append(encode(_two_cols(f"Stol: {table_name}", f"Ofitsiant: {waiter_name}", width)) + b'\n')
+    out.append(encode(_two_cols(_table_label(table_name, order_type), f"Ofitsiant: {waiter_name}", width)) + b'\n')
     out.append(encode('-' * width) + b'\n')
 
     for item in items:
@@ -267,7 +283,7 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
 def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name, cashier_name,
                            items, total_amount, discount_amount=0, tax_amount=0,
                            service_charge=0, service_charge_rate=0, final_amount, payments=None,
-                           created_at=None, width=DEFAULT_WIDTH):
+                           order_type='dine_in', created_at=None, width=DEFAULT_WIDTH):
     """
     To'lov cheki (Final Receipt) generatori.
     Mijoz to'lov qilgandan so'ng kassa printeridan chiqariladi.
@@ -292,7 +308,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     out.append(encode("*** TO'LOV CHEKI ***") + b'\n')
     out += [ALIGN_LEFT]
     out.append(encode(_two_cols(f"Buyurtma #{order_id}", created.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
-    out.append(encode(_two_cols(f"Stol: {table_name}", f"Kassir: {cashier_name}", width)) + b'\n')
+    out.append(encode(_two_cols(_table_label(table_name, order_type), f"Kassir: {cashier_name}", width)) + b'\n')
     if waiter_name:
         out.append(encode(f"Ofitsiant: {waiter_name}") + b'\n')
     out.append(encode('-' * width) + b'\n')

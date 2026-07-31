@@ -93,7 +93,7 @@ def print_job_to_printer(self, job_id):
                 restaurant_name=snap.get('restaurant_name', 'Restoran'),
                 logo_path=snap.get('logo_path'),
                 order_id=job.order_id,
-                table_name=snap.get('table_name') or (job.order.table.name if job.order.table else 'Takeaway'),
+                table_name=snap.get('table_name') or (job.order.table.name if job.order.table else None),
                 waiter_name=snap.get('waiter_name') or (job.order.waiter.first_name if job.order.waiter else "Noma'lum"),
                 items=snap.get('items', []),
                 total_amount=snap.get('total_amount', 0),
@@ -102,6 +102,7 @@ def print_job_to_printer(self, job_id):
                 service_charge=snap.get('service_charge', 0),
                 service_charge_rate=snap.get('service_charge_rate', 0),
                 final_amount=snap.get('final_amount', 0),
+                order_type=snap.get('order_type') or job.order.order_type,
                 created_at=job.created_at,
                 width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
             )
@@ -110,7 +111,7 @@ def print_job_to_printer(self, job_id):
                 restaurant_name=snap.get('restaurant_name', 'Restoran'),
                 logo_path=snap.get('logo_path'),
                 order_id=job.order_id,
-                table_name=snap.get('table_name') or (job.order.table.name if job.order.table else 'Takeaway'),
+                table_name=snap.get('table_name') or (job.order.table.name if job.order.table else None),
                 waiter_name=snap.get('waiter_name') or (job.order.waiter.first_name if job.order.waiter else "Noma'lum"),
                 cashier_name=snap.get('cashier_name') or "Kassir",
                 items=snap.get('items', []),
@@ -121,6 +122,7 @@ def print_job_to_printer(self, job_id):
                 service_charge_rate=snap.get('service_charge_rate', 0),
                 final_amount=snap.get('final_amount', 0),
                 payments=snap.get('payments', []),
+                order_type=snap.get('order_type') or job.order.order_type,
                 created_at=job.created_at,
                 width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
             )
@@ -129,9 +131,10 @@ def print_job_to_printer(self, job_id):
             payload = escpos.render_kitchen_ticket(
                 station_name=printer.name,
                 order_id=job.order_id,
-                table_name=job.order.table.name if job.order.table else 'Takeaway',
+                table_name=job.order.table.name if job.order.table else None,
                 waiter_name=job.order.waiter.first_name if job.order.waiter else "Noma'lum",
                 items=items_list,
+                order_type=job.order.order_type,
                 created_at=job.created_at,
                 width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
             )

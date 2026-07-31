@@ -183,5 +183,19 @@ class CashierPrintingTests(TestCase):
         job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
         self.assertEqual(job.items_snapshot['service_charge_rate'], 0)
 
+    def test_pre_bill_snapshot_table_name_none_for_takeaway(self):
+        # Chekda "Stol: Takeaway" kabi noqulay yozuv chiqmasligi uchun -
+        # stolsiz buyurtmada snapshot table_name=None + order_type saqlaydi,
+        # escpos._table_label shundan "Olib ketish" kabi tabiiy yorliq yasaydi.
+        order = Order.objects.create(waiter=self.manager, status='in_progress', order_type='takeaway')
+        OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        url = reverse('order-print-pre-bill', args=[order.id])
+        self.client.post(url, content_type='application/json', **_auth_header(self.manager))
+
+        job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
+        self.assertIsNone(job.items_snapshot['table_name'])
+        self.assertEqual(job.items_snapshot['order_type'], 'takeaway')
+
 
 
