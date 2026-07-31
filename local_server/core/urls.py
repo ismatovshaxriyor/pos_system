@@ -4,7 +4,7 @@ from .views import (
     UserViewSet, TableViewSet, CategoryViewSet,
     ProductViewSet, OrderViewSet,
     StaffDeviceViewSet, NotificationViewSet, BootstrapView,
-    RestaurantConfigViewSet, AttendanceViewSet, TableZoneViewSet,
+    RestaurantConfigViewSet, AttendanceViewSet, RegisterSessionViewSet, TableZoneViewSet,
     PrinterViewSet, PrintJobViewSet, PublicMenuView, PublicTableLiveView, PublicCallWaiterView,
 )
 from .reports import (
@@ -28,6 +28,7 @@ router.register(r'devices', StaffDeviceViewSet, basename='staffdevice')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'restaurant-config', RestaurantConfigViewSet, basename='restaurantconfig')
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
+router.register(r'register-session', RegisterSessionViewSet, basename='registersession')
 router.register(r'printers', PrinterViewSet, basename='printer')
 router.register(r'print-jobs', PrintJobViewSet, basename='printjob')
 router.register(r'customers', CustomerViewSet, basename='customer')

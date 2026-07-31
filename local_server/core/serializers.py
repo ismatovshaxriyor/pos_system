@@ -5,7 +5,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
-    StaffDevice, Notification, RestaurantConfig, Attendance, TableZone,
+    StaffDevice, Notification, RestaurantConfig, Attendance, RegisterSession, TableZone,
     Printer, PrintJob, Customer, DebtTransaction,
     Supplier, Ingredient, ProductIngredient, Purchase, PurchaseItem, StockMovement,
 )
@@ -279,13 +279,16 @@ class DebtTransactionSerializer(serializers.ModelSerializer):
         model = DebtTransaction
         fields = (
             'id', 'customer', 'amount', 'txn_type', 'order', 'method',
-            'note', 'created_by', 'created_at',
+            'note', 'due_date', 'created_by', 'created_at',
         )
         read_only_fields = fields
 
 class CreditCloseSerializer(serializers.Serializer):
     """`close_on_credit` action so'rov tanasi."""
     customer_id = serializers.IntegerField()
+    # Ixtiyoriy - kassir "qachon qaytarilishi kerak"ni bilsa kiritadi;
+    # bo'sh qoldirilsa muddatsiz qarz sifatida qoladi.
+    due_date = serializers.DateField(required=False, allow_null=True, default=None)
 
 class RepaymentSerializer(serializers.Serializer):
     """`CustomerViewSet.repay` so'rov tanasi."""
@@ -422,6 +425,20 @@ class RestaurantConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = RestaurantConfig
         fields = ('id', 'name', 'logo', 'public_domain', 'latitude', 'longitude', 'attendance_radius', 'service_charge_rate', 'telegram_bot_token', 'telegram_chat_id', 'created_at', 'updated_at')
+
+
+class RegisterSessionSerializer(serializers.ModelSerializer):
+    opened_by_name = serializers.CharField(source='opened_by.first_name', read_only=True, default=None)
+    closed_by_name = serializers.CharField(source='closed_by.first_name', read_only=True, default=None)
+
+    class Meta:
+        model = RegisterSession
+        fields = (
+            'id', 'is_open',
+            'opened_at', 'opened_by', 'opened_by_name',
+            'closed_at', 'closed_by', 'closed_by_name',
+        )
+        read_only_fields = fields
 
 
 class AttendanceSerializer(serializers.ModelSerializer):

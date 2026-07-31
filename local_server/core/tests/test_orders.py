@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
-from core.models import Category, Order, OrderItem, Product, Table, User
+from core.models import Category, Order, OrderItem, Product, RegisterSession, Table, User
 from core.views import RESTAURANT_TZ
 
 def _auth_header(user):
@@ -205,6 +205,39 @@ class OrderLogicTests(TestCase):
         self.assertEqual(
             Order.objects.filter(sync_uuid=client_uuid).count(), 1,
         )
+
+    def test_create_rejected_when_register_closed(self):
+        RegisterSession.objects.create(pk=1, is_open=False)
+        response = self.client.post(
+            reverse('order-list'), {"table_id": self.table.id},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Kassa yopiq', response.data['detail'])
+
+    def test_create_idempotent_retry_allowed_even_when_register_closed(self):
+        # Kassa yopilgach ham, ILGARI ochilgan (javobi yo'qolgan) buyurtmani
+        # qayta so'rash CHINDAN yangi buyurtma emas - to'sib qo'ymasligi kerak.
+        client_uuid = str(uuid.uuid4())
+        url = reverse('order-list')
+        payload = {"table_id": self.table.id, "sync_uuid": client_uuid}
+        first = self.client.post(url, payload, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(first.status_code, 201)
+
+        RegisterSession.objects.create(pk=1, is_open=False)
+        retry = self.client.post(url, payload, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(retry.status_code, 200)
+        self.assertEqual(retry.data['id'], first.data['id'])
+
+    def test_create_allowed_when_no_register_session_row_exists(self):
+        # Feature endi qo'shilgan restoranlarda RegisterSession qatori hali
+        # yo'q - shu holatda ochiq deb hisoblanishi (fail-open) kerak.
+        self.assertFalse(RegisterSession.objects.filter(pk=1).exists())
+        response = self.client.post(
+            reverse('order-list'), {"table_id": self.table.id},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(response.status_code, 201)
 
     def test_create_with_invalid_sync_uuid_returns_400(self):
         response = self.client.post(

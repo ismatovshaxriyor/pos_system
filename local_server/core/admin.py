@@ -11,7 +11,7 @@ from . import escpos, services
 from .models import (
     User, Table, Category, Product, Order, OrderItem, Payment,
     StaffDevice, DeviceRegistrationCode, Notification,
-    RestaurantConfig, Attendance, TableZone, Printer, PrintJob,
+    RestaurantConfig, Attendance, RegisterSession, TableZone, Printer, PrintJob,
     Customer, DebtTransaction,
     Supplier, Ingredient, ProductIngredient, Purchase, PurchaseItem, StockMovement,
 )
@@ -268,6 +268,11 @@ class AttendanceAdmin(SimpleHistoryAdmin):
     list_display = ('user', 'check_in', 'check_out', 'check_in_latitude', 'check_in_longitude', 'created_at')
     list_filter = ('check_in', 'user')
     search_fields = ('user__username', 'user__first_name', 'user__last_name')
+
+
+@admin.register(RegisterSession)
+class RegisterSessionAdmin(SimpleHistoryAdmin):
+    list_display = ('id', 'is_open', 'opened_at', 'opened_by', 'closed_at', 'closed_by')
 
 
 @admin.register(Printer)

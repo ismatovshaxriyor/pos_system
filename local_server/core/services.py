@@ -351,6 +351,83 @@ def check_out_employee(user, latitude, longitude):
     return attendance
 
 
+# ==============================================================================
+# KASSA SESSIYASI (Register open/close)
+# ==============================================================================
+
+def close_register(*, closed_by):
+    """
+    Kassani (bugungi savdoni) yopadi: `RegisterSession.is_open=False` qiladi
+    (`OrderViewSet.create` shu bayroqni tekshirib yangi buyurtmani rad etadi)
+    va barcha ochiq (check-out qilinmagan) `Attendance` yozuvlarini avtomatik
+    yopadi - xodim ilovasi shu bilan navbatdagi so'rovda/WS push'da davomat
+    (check-in) ekraniga qaytadi. Bulk `.update()` emas, har birini `.save()`
+    bilan yopamiz - aks holda `django-simple-history` signal orqali ishlagani
+    uchun avtomatik check-out audit izsiz qolib ketardi.
+    """
+    from .models import Attendance, RegisterSession
+    from .realtime import broadcast_event
+
+    with transaction.atomic():
+        session, _ = RegisterSession.objects.select_for_update().get_or_create(pk=1)
+        if not session.is_open:
+            raise ServiceError("Kassa allaqachon yopiq.")
+
+        now = timezone.now()
+        checked_out = 0
+        for attendance in Attendance.objects.select_for_update().filter(check_out__isnull=True):
+            attendance.check_out = now
+            attendance.save(update_fields=['check_out', 'updated_at'])
+            checked_out += 1
+
+        session.is_open = False
+        session.closed_at = now
+        session.closed_by = closed_by
+        session.save(update_fields=['is_open', 'closed_at', 'closed_by', 'updated_at'])
+
+    broadcast_event('register_closed', {
+        'closed_by': closed_by.id if closed_by else None,
+        'checked_out_count': checked_out,
+    })
+    return session, checked_out
+
+
+def open_register(*, opened_by):
+    """
+    Kassani ochadi - yangi kun boshlanishi yoki yopilgandan keyin majburiy
+    qayta ochish uchun. Kassir ochsa menejerlarga `Notification` + WS orqali
+    xabar boradi (kassir smenadan tashqarida kassani ochishi nazorat talab
+    qiladigan istisno holat); menejer/admin ochganda bildirishnoma shart emas.
+    """
+    from .models import Notification, RegisterSession
+    from .realtime import broadcast_event
+
+    with transaction.atomic():
+        session, _ = RegisterSession.objects.select_for_update().get_or_create(pk=1)
+        if session.is_open:
+            raise ServiceError("Kassa allaqachon ochiq.")
+
+        session.is_open = True
+        session.opened_at = timezone.now()
+        session.opened_by = opened_by
+        session.save(update_fields=['is_open', 'opened_at', 'opened_by', 'updated_at'])
+
+    notified = bool(opened_by and opened_by.role == 'cashier')
+    if notified:
+        actor_name = opened_by.first_name or opened_by.username
+        Notification.objects.create(
+            recipient=None, notif_type='register_opened_by_cashier',
+            message=f"Kassa {actor_name} (kassir) tomonidan majburiy ochildi.",
+            payload={'opened_by': opened_by.id},
+        )
+
+    broadcast_event('register_opened', {
+        'opened_by': opened_by.id if opened_by else None,
+        'notified_managers': notified,
+    })
+    return session
+
+
 def login_waiter(phone, password, device_id, device_label=''):
     """
     Ofitsiantni telefon raqami va paroli orqali tizimga kiritadi.
@@ -662,17 +739,33 @@ def calculate_order_financials(order, context=None):
 # QARZ DAFTAR (Customer debt ledger)
 # ==============================================================================
 
-def record_credit_sale(*, order, customer, amount, created_by):
+def _dispatch_telegram_alert(message):
+    """
+    Telegram xabarini `transaction.on_commit` orqali Celery task'ga topshiradi -
+    chaqiruvchi (masalan `close_on_credit`/`repay`) `select_for_update()` bilan
+    qator qulfini ushlab turgan bo'lishi mumkin, shuning uchun tarmoq so'rovi
+    (sekin/ishlamay qolgan Telegram) shu qulfni band qilib turmasligi kerak.
+    """
+    def _enqueue():
+        from .tasks import send_telegram_notification_task
+        send_telegram_notification_task.delay(message)
+
+    transaction.on_commit(_enqueue)
+
+
+def record_credit_sale(*, order, customer, amount, created_by, due_date=None):
     """
     Buyurtma kreditga (nasiyaga) yopilganda: `DebtTransaction(credit_sale, +amount)` yaratadi,
     `Customer.balance` ni oshiradi va Telegram orqali adminga xabar yuboradi.
+    `due_date` ixtiyoriy - "qachon OLINDI" `created_at`dan (BaseModel) ma'lum,
+    "qachon QAYTARILISHI KERAK" shu maydonda, kassir kiritmasa muddatsiz qoladi.
     """
     from django.db.models import F
     from .models import Customer, DebtTransaction
 
     DebtTransaction.objects.create(
         customer=customer, amount=amount, txn_type='credit_sale',
-        order=order, created_by=created_by,
+        order=order, created_by=created_by, due_date=due_date,
     )
     Customer.objects.filter(pk=customer.pk).update(balance=F('balance') + amount)
     customer.refresh_from_db(fields=['balance'])
@@ -682,6 +775,7 @@ def record_credit_sale(*, order, customer, amount, created_by):
     phone_val = customer.phone if customer.phone else "Kiritilmagan"
     amt_str = f"{int(amount):,} so'm".replace(',', ' ')
     bal_str = f"{int(customer.balance):,} so'm".replace(',', ' ')
+    due_str = due_date.strftime('%d.%m.%Y') if due_date else "Kiritilmagan"
 
     msg = (
         f"🔴 <b>YANGI QARZ YOZILDI (NASIYA)</b>\n\n"
@@ -689,13 +783,11 @@ def record_credit_sale(*, order, customer, amount, created_by):
         f"📞 <b>Telefon:</b> {phone_val}\n"
         f"💰 <b>Qarz summasi:</b> {amt_str}\n"
         f"📊 <b>Mijozning jami qarzi:</b> {bal_str}\n"
+        f"📅 <b>Qaytarish muddati:</b> {due_str}\n"
         f"📋 <b>Buyurtma #:</b> #{order.id}\n"
         f"👨‍💼 <b>Kassir:</b> {cashier_name}"
     )
-    try:
-        send_telegram_notification(msg)
-    except Exception:
-        pass
+    _dispatch_telegram_alert(msg)
 
 
 def record_repayment(*, customer, amount, method, created_by, note=''):
@@ -729,10 +821,7 @@ def record_repayment(*, customer, amount, method, created_by, note=''):
     )
     if note:
         msg += f"\n📝 <b>Izoh:</b> {note}"
-    try:
-        send_telegram_notification(msg)
-    except Exception:
-        pass
+    _dispatch_telegram_alert(msg)
 
 
 # ==============================================================================
@@ -870,7 +959,9 @@ def get_restaurant_info():
 def send_telegram_notification(text, parse_mode='HTML'):
     """
     RestaurantConfig dagi telegram_bot_token va telegram_chat_id orqali Telegram xabar yuboradi.
-    Token yoki chat_id kiritilmagan bo'lsa LicenseState dagi zaxira ma'lumotlaridan foydalanadi.
+    `licensing.LicenseState`dagi Telegram maydonlari ataylab fallback sifatida ISHLATILMAYDI -
+    ular Ona tomonidan sozlanadigan tizim xatoligi ("fail-safe") kanali (`log_handler.py`), mijoz
+    ismi/telefoni/qarz summasi kabi biznes ma'lumotlarini o'sha kanalga oqizib yuborish xato bo'lardi.
     """
     import requests
     from .models import RestaurantConfig
@@ -878,13 +969,6 @@ def send_telegram_notification(text, parse_mode='HTML'):
     config = RestaurantConfig.objects.first()
     bot_token = config.telegram_bot_token if (config and config.telegram_bot_token) else ''
     chat_id = config.telegram_chat_id if (config and config.telegram_chat_id) else ''
-
-    if not bot_token or not chat_id:
-        from licensing.models import LicenseState
-        state = LicenseState.objects.first()
-        if state:
-            bot_token = bot_token or state.telegram_bot_token
-            chat_id = chat_id or state.telegram_chat_id
 
     if not bot_token or not chat_id:
         return False

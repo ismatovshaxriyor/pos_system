@@ -5,8 +5,10 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.authtoken.models import Token
 
+from core import tasks
 from core.models import (
-    Category, Customer, DebtTransaction, Order, OrderItem, Payment, Product, Table, User,
+    Category, Customer, DebtTransaction, Order, OrderItem, Payment, Product, RestaurantConfig,
+    Table, User,
 )
 
 
@@ -47,6 +49,49 @@ class QarzDaftarTests(TestCase):
         txn = DebtTransaction.objects.get(customer=self.customer, txn_type='credit_sale')
         self.assertEqual(txn.amount, Decimal('30000'))
         self.assertEqual(txn.order_id, self.order.id)
+        self.assertIsNone(txn.due_date)  # kiritilmagan bo'lsa muddatsiz qoladi
+
+    def test_close_on_credit_saves_due_date_when_provided(self):
+        url = reverse('order-close-on-credit', args=[self.order.id])
+        resp = self.client.post(
+            url, {'customer_id': self.customer.id, 'due_date': '2026-08-15'},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(resp.status_code, 200)
+        txn = DebtTransaction.objects.get(customer=self.customer, txn_type='credit_sale')
+        self.assertEqual(str(txn.due_date), '2026-08-15')
+
+    def test_close_on_credit_dispatches_telegram_alert_after_commit(self):
+        # Telegram xabari `select_for_update()` qulfi ichida emas, balki
+        # tranzaksiya commit bo'lgandan KEYIN Celery'ga topshirilishi kerak -
+        # aks holda sekin/ishlamay qolgan Telegram boshqa kassa terminalini
+        # shu buyurtma/mijoz qatorida bloklab qo'yadi.
+        url = reverse('order-close-on-credit', args=[self.order.id])
+        with mock.patch.object(tasks.send_telegram_notification_task, 'delay') as delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                resp = self.client.post(
+                    url, {'customer_id': self.customer.id},
+                    content_type='application/json', **_auth_header(self.manager),
+                )
+        self.assertEqual(resp.status_code, 200)
+        delay.assert_called_once()
+        (message,), _ = delay.call_args
+        self.assertIn('YANGI QARZ', message)
+        self.assertIn('Ali', message)
+        self.assertIn(f"#{self.order.id}", message)
+        self.assertIn('Kiritilmagan', message)  # due_date berilmagan
+
+    def test_close_on_credit_telegram_alert_includes_due_date_when_provided(self):
+        url = reverse('order-close-on-credit', args=[self.order.id])
+        with mock.patch.object(tasks.send_telegram_notification_task, 'delay') as delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                resp = self.client.post(
+                    url, {'customer_id': self.customer.id, 'due_date': '2026-08-15'},
+                    content_type='application/json', **_auth_header(self.manager),
+                )
+        self.assertEqual(resp.status_code, 200)
+        (message,), _ = delay.call_args
+        self.assertIn('15.08.2026', message)
 
     def test_close_on_credit_after_partial_payment_only_debits_remainder(self):
         Payment.objects.create(order=self.order, amount=Decimal('10000'), received_by=self.cashier)
@@ -98,6 +143,22 @@ class QarzDaftarTests(TestCase):
         self.assertTrue(
             DebtTransaction.objects.filter(customer=self.customer, txn_type='repayment', amount=Decimal('-12000')).exists()
         )
+
+    def test_repay_dispatches_telegram_alert_after_commit(self):
+        self.customer.balance = Decimal('30000')
+        self.customer.save()
+        url = reverse('customer-repay', args=[self.customer.id])
+        with mock.patch.object(tasks.send_telegram_notification_task, 'delay') as delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                resp = self.client.post(
+                    url, {'amount': '12000', 'method': 'cash'},
+                    content_type='application/json', **_auth_header(self.cashier),
+                )
+        self.assertEqual(resp.status_code, 200)
+        delay.assert_called_once()
+        (message,), _ = delay.call_args
+        self.assertIn("QARZ TO'LANDI", message)
+        self.assertIn('Ali', message)
 
     def test_repay_rejects_overpayment(self):
         self.customer.balance = Decimal('10000')
@@ -166,3 +227,56 @@ class QarzDaftarTests(TestCase):
             reverse('customer-detail', args=[self.customer.id]), **_auth_header(self.waiter),
         )
         self.assertEqual(resp.status_code, 403)
+
+
+class TelegramDebtAlertTests(TestCase):
+    """
+    `services.send_telegram_notification` faqat `RestaurantConfig`dagi
+    telegram_bot_token/chat_id ni ishlatishi kerak - `licensing.LicenseState`
+    dagi maydonlar Ona tomonidan sozlanadigan tizim xatoligi ("fail-safe")
+    kanaliga tegishli va mijoz PII/qarz ma'lumotlarini o'sha kanalga
+    tushirib yubormasligi kerak (endi qasddan fallback qilinmaydi).
+    """
+
+    def test_no_config_skips_send(self):
+        from core import services
+
+        with mock.patch('requests.post') as post:
+            sent = services.send_telegram_notification('salom')
+        self.assertFalse(sent)
+        post.assert_not_called()
+
+    def test_license_state_fallback_is_not_used(self):
+        from licensing.models import LicenseState
+        from core import services
+
+        LicenseState.objects.create(
+            pk=1, license_key='TEST-0000-0000',
+            telegram_bot_token='fail-safe-token', telegram_chat_id='fail-safe-chat',
+        )
+        with mock.patch('requests.post') as post:
+            sent = services.send_telegram_notification('mijoz qarz xabari')
+        self.assertFalse(sent)
+        post.assert_not_called()
+
+    def test_restaurant_config_sends_via_telegram_api(self):
+        from core import services
+
+        RestaurantConfig.objects.create(
+            pk=1, telegram_bot_token='rc-token', telegram_chat_id='rc-chat',
+        )
+        with mock.patch('requests.post') as post:
+            post.return_value = mock.Mock(status_code=200)
+            sent = services.send_telegram_notification('mijoz qarz xabari')
+        self.assertTrue(sent)
+        post.assert_called_once()
+        (url,), kwargs = post.call_args
+        self.assertEqual(url, 'https://api.telegram.org/botrc-token/sendMessage')
+        self.assertEqual(kwargs['json']['chat_id'], 'rc-chat')
+        self.assertEqual(kwargs['json']['text'], 'mijoz qarz xabari')
+
+    def test_task_delegates_to_service_function(self):
+        with mock.patch('core.tasks.services.send_telegram_notification', return_value=True) as send:
+            result = tasks.send_telegram_notification_task('xabar', parse_mode='HTML')
+        send.assert_called_once_with('xabar', parse_mode='HTML')
+        self.assertEqual(result, True)

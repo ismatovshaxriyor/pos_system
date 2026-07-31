@@ -18,7 +18,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from . import escpos, services
-from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, TableZone, Printer, PrintJob, Customer
+from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, RegisterSession, TableZone, Printer, PrintJob, Customer
 from .permissions import IsAdminStaff, IsManagerOrAdmin, IsCashierOrManager
 from .realtime import broadcast_event
 from .serializers import (
@@ -28,6 +28,7 @@ from .serializers import (
     StaffDeviceSerializer, NotificationSerializer,
     RegistrationCodeResponseSerializer, ErrorDetailSerializer, StatusMessageSerializer,
     RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
+    RegisterSessionSerializer,
     TableZoneSerializer, PrinterSerializer, PrintJobSerializer, LiveTableSalesSerializer,
     PublicCategorySerializer, PublicTableLiveSerializer,
 )
@@ -277,6 +278,17 @@ class OrderViewSet(viewsets.ModelViewSet):
                 serializer = self.get_serializer(existing_order)
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
+        # Kassa yopiq bo'lsa yangi buyurtma qabul qilinmaydi (mavjud
+        # buyurtmani yuqoridagi idempotent qayta so'rov hali ham qaytaradi -
+        # bu faqat CHINDAN yangi buyurtma ochishni to'sadi). Qator yo'q bo'lsa
+        # (hali hech kim /register-session/ ga tegmagan restoran) - ochiq deb
+        # hisoblanadi, `RegisterSession.is_open` default'iga mos.
+        if RegisterSession.objects.filter(pk=1, is_open=False).exists():
+            return Response(
+                {'detail': "Kassa yopiq - yangi buyurtma qabul qilib bo'lmaydi."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         self._client_sync_uuid = client_sync_uuid
         try:
             return super().create(request, *args, **kwargs)
@@ -384,6 +396,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
             services.record_credit_sale(
                 order=order, customer=customer, amount=balance_due, created_by=request.user,
+                due_date=serializer.validated_data.get('due_date'),
             )
             order.customer = customer
             order.status = 'completed'
@@ -737,6 +750,11 @@ class BootstrapView(APIView):
         products = Product.objects.filter(is_available=True, is_deleted=False)
         tables = Table.objects.filter(is_active=True).select_related('zone')
         table_zones = TableZone.objects.all()
+        # Qator hali yo'q (hech kim /register-session/ ga tegmagan restoran) -
+        # ochiq deb hisoblanadi, `RegisterSession.is_open` default'iga mos -
+        # ilova ishga tushganda bir so'rovda "kassa ochiqmi" bilib olishi uchun.
+        register_session = RegisterSession.objects.filter(pk=1).first()
+        register_open = register_session.is_open if register_session else True
 
         # context={'request': ...} hammasiga - ImageField'lar (category/product
         # rasmi) kontekstsiz nisbiy URL (/media/...) qaytaradi, ViewSet'lar
@@ -750,6 +768,7 @@ class BootstrapView(APIView):
             'table_zones': TableZoneSerializer(table_zones, many=True, context=context).data,
             'tables': TableSerializer(tables, many=True, context=context).data,
             'active_orders': OrderSerializer(orders_qs, many=True, context=context).data,
+            'register_open': register_open,
         })
 
 
@@ -812,6 +831,54 @@ class RestaurantConfigViewSet(
                 {'detail': f"Telegram ulanishida xatolik: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class RegisterSessionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """
+    Kassa (bugungi savdo) sessiyasi - `RestaurantConfigViewSet` bilan bir xil
+    singleton shartnoma (`GET /1/`). To'g'ridan-to'g'ri PATCH/PUT yo'q - holat
+    faqat `close`/`open` action'lari orqali o'zgaradi, chunki ikkalasi ham yon
+    effektga ega (avtomatik check-out, menejerlarga bildirishnoma) va bu
+    `services.close_register`/`open_register` ichida bajariladi.
+    """
+    queryset = RegisterSession.objects.all()
+    serializer_class = RegisterSessionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        obj, _ = RegisterSession.objects.get_or_create(pk=1)
+        return obj
+
+    def get_permissions(self):
+        if self.action in ('close', 'open'):
+            return [permissions.IsAuthenticated(), IsCashierOrManager()]
+        return [permissions.IsAuthenticated()]
+
+    @extend_schema(
+        request=None,
+        responses={200: RegisterSessionSerializer, 400: OpenApiResponse(ErrorDetailSerializer)},
+    )
+    @action(detail=False, methods=['post'])
+    def close(self, request):
+        try:
+            session, checked_out = services.close_register(closed_by=request.user)
+        except services.ServiceError as exc:
+            return Response({'detail': exc.message}, status=exc.status)
+        data = RegisterSessionSerializer(session).data
+        data['checked_out_count'] = checked_out
+        return Response(data)
+
+    @extend_schema(
+        request=None,
+        responses={200: RegisterSessionSerializer, 400: OpenApiResponse(ErrorDetailSerializer)},
+    )
+    @action(detail=False, methods=['post'])
+    def open(self, request):
+        try:
+            session = services.open_register(opened_by=request.user)
+        except services.ServiceError as exc:
+            return Response({'detail': exc.message}, status=exc.status)
+        return Response(RegisterSessionSerializer(session).data)
 
 
 class AttendanceViewSet(viewsets.ReadOnlyModelViewSet):

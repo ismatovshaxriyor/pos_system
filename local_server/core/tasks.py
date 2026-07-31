@@ -1,5 +1,7 @@
 """
-Oshxona cheklarini jismoniy ESC/POS printerlarga yuboruvchi Celery tasklar.
+Oshxona cheklarini jismoniy ESC/POS printerlarga yuboruvchi Celery tasklar,
+shuningdek boshqa "tez javob talab qilmaydigan tashqi tarmoq so'rovi" tasklari
+(masalan Telegram bildirishnomalari - pastda `send_telegram_notification_task`).
 
 Virtual printerlar (ip_address bo'sh) bu oqimga umuman kirmaydi - ularning
 joblari faqat oshxona ekranida (WS `new_print_job`) ko'rinadi va qo'lda
@@ -15,7 +17,7 @@ from celery import shared_task
 from django.core.cache import cache
 from django.utils import timezone
 
-from . import escpos
+from . import escpos, services
 from .realtime import broadcast_event
 
 logger = logging.getLogger(__name__)
@@ -175,3 +177,18 @@ def sweep_stale_print_jobs():
             print_job_to_printer.delay(job.id)
             resent += 1
     return {'resent': resent, 'failed': failed}
+
+
+@shared_task
+def send_telegram_notification_task(text, parse_mode='HTML'):
+    """
+    `services.send_telegram_notification`ni background'da chaqiradi.
+    Qarz operatsiyalari (`services.record_credit_sale`/`record_repayment`)
+    `select_for_update()` bilan `Order`/`Customer` qatorini qulflab turgan
+    `transaction.atomic()` bloki ichida ishlaydi - Telegram API'ga sinxron
+    so'rov yuborilsa, sekin/ishlamay qolgan tarmoq shu qulfni band qilib,
+    bir xil buyurtma/mijozga yozayotgan boshqa kassa terminalini bloklab
+    qo'yardi. Shuning uchun bu chaqiruv har doim `transaction.on_commit`
+    orqali, lock bo'shagandan keyin ishga tushiriladi (`services._dispatch_telegram_alert`).
+    """
+    return services.send_telegram_notification(text, parse_mode=parse_mode)

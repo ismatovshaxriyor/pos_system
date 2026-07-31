@@ -364,6 +364,10 @@ class DebtTransaction(BaseModel):
     method = models.CharField(max_length=20, blank=True, default='')  # repayment uchun (cash/card/other)
     note = models.CharField(max_length=255, blank=True, default='')
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    # Qachon OLINDI - `created_at` (BaseModel, auto_now_add). Qachon
+    # QAYTARILISHI KERAK - shu maydon. Faqat `credit_sale` uchun ma'noli
+    # (kassir ixtiyoriy kiritadi); `repayment`/`adjustment`da bo'sh qoladi.
+    due_date = models.DateField(null=True, blank=True, verbose_name="Qaytarish muddati")
 
     class Meta:
         ordering = ('-created_at',)
@@ -439,6 +443,28 @@ class Attendance(BaseModel):
 
     def __str__(self):
         return f"{self.user.username} - {self.check_in}"
+
+
+class RegisterSession(BaseModel):
+    """
+    Kassa (bugungi savdo) holati - singleton, `RestaurantConfig`/`licensing.LicenseState`
+    kabi pk har doim 1ga majburlanadi. Yopiq bo'lganda yangi buyurtma qabul
+    qilinmaydi (`OrderViewSet.create`) va yopish paytida barcha ochiq (check-out
+    qilinmagan) `Attendance` yozuvlari avtomatik yopiladi - qarang `services.close_register`.
+    """
+    is_open = models.BooleanField(default=True, verbose_name="Kassa ochiqmi")
+    opened_at = models.DateTimeField(null=True, blank=True)
+    opened_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        verbose_name = "Kassa sessiyasi"
+        verbose_name_plural = "Kassa sessiyalari"
+
+    def __str__(self):
+        return "Kassa: ochiq" if self.is_open else "Kassa: yopiq"
+
 
 class PrintJob(BaseModel):
     JOB_TYPE_CHOICES = (
