@@ -1,5 +1,23 @@
 import { ApiCategory, ApiTableLive, Dish } from '../types';
 
+// Oddiy `fetch()` tarmoq/tunnel osilib qolganda ABADIY kutadi - hech qanday
+// standart timeout yo'q. Bu esa LiveDataGate'ning yuklanish ekranini
+// cheksiz osilib qolishiga olib kelardi (xato holatiga hech qachon
+// o'tmasdan). AbortController bilan qattiq muddat qo'yamiz - shu muddatdan
+// keyin so'rov "xato" sifatida hisoblanadi, mijoz aniq xato/qayta urinish
+// ekranini ko'radi.
+const FETCH_TIMEOUT_MS = 8000;
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // Resolve API base URL dynamically or fallback to dev server
 export function getApiBaseUrl(): string {
   const urlParams = new URLSearchParams(window.location.search);
@@ -24,7 +42,7 @@ export function getApiBaseUrl(): string {
 export async function fetchPublicMenu(): Promise<Dish[] | null> {
   const baseUrl = getApiBaseUrl();
   try {
-    const response = await fetch(`${baseUrl}/api/public/menu/`, {
+    const response = await fetchWithTimeout(`${baseUrl}/api/public/menu/`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -83,7 +101,7 @@ export async function fetchPublicMenu(): Promise<Dish[] | null> {
 export async function fetchTableLive(qrCode: string): Promise<ApiTableLive | null> {
   const baseUrl = getApiBaseUrl();
   try {
-    const response = await fetch(`${baseUrl}/api/public/table/${encodeURIComponent(qrCode)}/`, {
+    const response = await fetchWithTimeout(`${baseUrl}/api/public/table/${encodeURIComponent(qrCode)}/`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -107,7 +125,7 @@ export async function fetchTableLive(qrCode: string): Promise<ApiTableLive | nul
 export async function callWaiterApi(qrCode: string, reason: string): Promise<{ status: string; message?: string } | null> {
   const baseUrl = getApiBaseUrl();
   try {
-    const response = await fetch(`${baseUrl}/api/public/table/${encodeURIComponent(qrCode)}/call-waiter/`, {
+    const response = await fetchWithTimeout(`${baseUrl}/api/public/table/${encodeURIComponent(qrCode)}/call-waiter/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
