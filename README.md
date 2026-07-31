@@ -42,12 +42,51 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
 
 ---
 
+## Qarz Daftar (Debt Ledger API) - Sanalar
+
+Har bir qarz yozuvida (`DebtTransaction`, faqat `credit_sale` turida) endi ikkita sana bor: **qachon OLINDI** va **qachon QAYTARILISHI KERAK**.
+
+### 1. Buyurtmani qarzga (nasiyaga) yopish - muddat bilan
+- **Endpoint:** `POST /api/orders/{id}/close-on-credit/`
+- **Ruxsat:** Kassir yoki Menejer (`IsCashierOrManager`)
+- **Body:**
+```json
+{
+  "customer_id": 7,
+  "due_date": "2026-08-15"
+}
+```
+  - `due_date` - **ixtiyoriy**, `YYYY-MM-DD` formatida. Kiritilmasa yoki `null` yuborilsa - qarz muddatsiz hisoblanadi.
+- **Javob (200 OK):** Yopilgan `Order` obyekti (avvalgidek).
+
+### 2. Qarz yozuvi maydonlari (`DebtTransactionSerializer`)
+`GET /api/customers/{id}/transactions/` (yoki qarz tarixi ko'rsatiladigan boshqa joylar) endi quyidagi ikkala sanani ham qaytaradi:
+```json
+{
+  "id": 55,
+  "customer": 7,
+  "amount": "45000.00",
+  "txn_type": "credit_sale",
+  "order": 128,
+  "method": "",
+  "note": "",
+  "due_date": "2026-08-15",
+  "created_by": { "id": 3, "first_name": "Kamila", "...": "..." },
+  "created_at": "2026-07-31T14:20:00Z"
+}
+```
+- **`created_at`** - qarz **QACHON OLINDI** (avvaldan bor edi).
+- **`due_date`** - qarz **QACHON QAYTARILISHI KERAK** (yangi, faqat `credit_sale` uchun ma'noli; `repayment`/`adjustment` yozuvlarida doim `null`).
+- Hozircha `due_date`ni keyinchalik o'zgartirish/uzaytirish uchun alohida API yo'q - faqat `close-on-credit` paytida bir marta kiritiladi (admin panel orqali qo'lda tuzatish mumkin).
+
+---
+
 ## Telegram Qarz Bildirishnomalari (Telegram Debt Alerts)
 
 Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilganda, bot faqat **Qarz jarayonlari (Nasiya)** bo'yicha bildirishnoma yuboradi:
 
 1. **Yangi Qarz (Nasiya yopilganda):**
-   - Buyurtma mijozga qarzga yopilganda (`POST /api/orders/{id}/close-on-credit/`), Telegram guruhga `Mijoz nomi`, `Telefon raqami`, `Qarz summasi`, `Jami qarzi`, `Buyurtma #`, hamda `Kassir` ko'rsatilgan bildirishnoma boradi.
+   - Buyurtma mijozga qarzga yopilganda (`POST /api/orders/{id}/close-on-credit/`), Telegram guruhga `Mijoz nomi`, `Telefon raqami`, `Qarz summasi`, `Jami qarzi`, **`Qaytarish muddati`** (kiritilmagan bo'lsa "Kiritilmagan"), `Buyurtma #`, hamda `Kassir` ko'rsatilgan bildirishnoma boradi.
 2. **Qarz Qaytarilganda (To'langanda):**
    - Qarz daftardan mijoz qarzni to'laganda (`POST /api/customers/{id}/repay/`), Telegram guruhga `Mijoz nomi`, `Telefon raqami`, `To'langan summa`, `Qolgan qarzi`, hamda `Kassir` ko'rsatilgan bildirishnoma boradi.
 
