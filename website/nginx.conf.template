@@ -1,3 +1,12 @@
+# Bu fayl DOCKER BUILD PAYTIDA emas, KONTEYNER ISHGA TUSHGANDA nginx:alpine
+# image'ining o'rnatilgan entrypoint'i (`envsubst`) orqali qayta ishlanadi -
+# `/etc/nginx/templates/*.template` dagi har qanday fayl shu tarzda
+# `/etc/nginx/conf.d/`ga (`.template` kesib tashlanib) chiqariladi. Shu
+# sababli BIR XIL image ikkala loyihada (cloud_server'ning umumiy marketing
+# sayti VA har bir local_server/Bola'ning o'z restoran-menyu saytida) alohida
+# `BACKEND_WEB` qiymati bilan qurilib ishlatiladi - ikkalasi ham xuddi shu
+# Dockerfile'dan quriladi, faqat compose'dagi environment farqlanadi.
+#
 # Docker'ning ichki DNS'i. Bu shart: `proxy_pass` yoki `upstream` ichida
 # host nomi STATIK yozilsa, nginx uni faqat boot paytida bir marta hal
 # qiladi va IP'ni abadiy keshlab qoladi. `web` konteyneri deploy'da qayta
@@ -17,10 +26,15 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 
-    # Django backend manzili. O'zgaruvchi sifatida berilishi muhim -
-    # yuqoridagi resolver izohiga qarang. `$request_uri` ham shart: o'zgaruvchili
-    # proxy_pass'da nginx original URI'ni avtomatik uzatmaydi.
-    set $backend_web "web:8001";
+    # Django backend manzili. `BACKEND_WEB` konteyner env'idan (compose'dagi
+    # `environment:`) `envsubst` orqali shu yerga qo'yiladi - cloud_server
+    # uchun "web:8001" (Ona), local_server uchun "web:8000" (Bola); ataylab
+    # ikkalasida ham HAR XIL, chunki ikki loyiha ikki xil ichki portda
+    # ishlaydi (repo-root CLAUDE.md, Cloudflare ingress eslatmasiga qarang -
+    # bu xato aynan port aralashib ketgani sabab 502 bergan edi). `$request_uri`
+    # ham shart: o'zgaruvchili proxy_pass'da nginx original URI'ni avtomatik
+    # uzatmaydi.
+    set $backend_web "${BACKEND_WEB}";
 
     # SPA Fallback
     location / {

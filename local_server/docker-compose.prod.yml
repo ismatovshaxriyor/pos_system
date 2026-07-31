@@ -162,10 +162,55 @@ services:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_LOG_LEVEL=debug
 
+  # Mijozga ko'rinadigan QR-menyu sayti (../website - table12 React ilovasi,
+  # stol QR kodi mijozni shu yerga olib keladi). Bir xil ../website Dockerfile
+  # cloud_server'dagi umumiy marketing/tenant-subdomen saytini ham quradi -
+  # farqi shu yerda BACKEND_WEB "web:8000"ga (Bola) ustiga yozilgani, aks
+  # holda Dockerfile default'i "web:8001" (Ona) qolib, har bir restoran
+  # o'zining haqiqiy menyusi/stol holati o'rniga Ona'ga (u yerda bunday
+  # endpoint umuman yo'q) so'rov yuborardi - aynan shu sabab restoran menyusi
+  # sayt bilan sinxron bo'lmagan va stol narxlari chiqmagan edi.
+  #
+  # BU FAQAT KOD TOMONI - `<restoran>.hamrohpos.uz` shu konteynerga
+  # yo'nalishi uchun Cloudflare Zero Trust dashboardida HAR BIR restoran
+  # uchun alohida ingress qoidasi ("<subdomen> -> http://website:80", shu
+  # restoranning O'ZINING pastdagi cloudflared tunnelida) qo'lda qo'shilishi
+  # kerak - buni compose fayl ichidan avtomatlashtirib bo'lmaydi.
+  website:
+    build:
+      context: ../website
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - BACKEND_WEB=web:8000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      # `web`ning o'zida healthcheck yo'q (faqat db/redis'da bor) - shuning
+      # uchun `service_started`, celery_worker/celery_beat'ning `web`ga
+      # bog'liqligi bilan bir xil daraja.
+      web:
+        condition: service_started
+
+  # DIQQAT (cloud_server/docker-compose.prod.yml'dagi bir xil eslatmaga
+  # qarang): `docker compose up -d --build` faqat o'zgargan servislarni
+  # (web/website) qayta yaratadi va ularga yangi Docker network IP beradi;
+  # cloudflared konteyneri o'zi tegilmasa eski IP'ga ulanishda davom etib,
+  # tunnel orqali 502 qaytaradi. `web`/`website` o'zgargan har safar
+  # `docker compose restart cloudflared` ham qo'lda bajarilishi kerak.
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      web:
+        condition: service_started
+      website:
+        condition: service_healthy
 
 volumes:
   postgres_data:
