@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { ToastNotification } from './components/ToastNotification';
+import { LiveDataGate } from './components/LiveDataGate';
 import { HomeScreen } from './components/HomeScreen';
 import { MenuScreen } from './components/MenuScreen';
 import { DishDetailScreen } from './components/DishDetailScreen';
@@ -53,7 +54,9 @@ const AppContent: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <AppContent />
+      <LiveDataGate>
+        <AppContent />
+      </LiveDataGate>
     </AppProvider>
   );
 }

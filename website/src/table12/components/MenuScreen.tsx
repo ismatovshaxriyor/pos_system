@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MENU_DISHES } from '../data/mockData';
 import { Dish } from '../types';
 
 export const MenuScreen: React.FC = () => {
@@ -172,27 +171,32 @@ export const MenuScreen: React.FC = () => {
                     {dish.description}
                   </p>
 
-                  {/* Spec Specs Grid */}
+                  {/* Spec Specs Grid - restoran bu ma'lumotlarni kiritmagan
+                      bo'lsa (hozircha local_server bunday maydonlarni
+                      umuman qo'llamaydi) butunlay yashiriladi, soxta
+                      qiymat ko'rsatilmaydi. */}
+                  {(dish.portion || dish.prepTimeMinutes !== undefined || dish.calories !== undefined) && (
                   <div className="grid grid-cols-3 gap-2 mb-6 text-center bg-[#050D1D]/40 p-2.5 rounded-xl border border-[#0077CC]/10">
                     <div className="flex flex-col">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#0077CC]/70 uppercase">
                         {t.portionLabel}
                       </span>
-                      <span className="font-sans-body text-xs text-[#FFFFFF] font-medium">{dish.portion}</span>
+                      <span className="font-sans-body text-xs text-[#FFFFFF] font-medium">{dish.portion || '—'}</span>
                     </div>
                     <div className="flex flex-col border-x border-[#0077CC]/10">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#0077CC]/70 uppercase">
                         {t.timeLabel}
                       </span>
-                      <span className="font-sans-body text-xs text-[#FFFFFF] font-medium">{dish.prepTimeMinutes} {t.minLabel}</span>
+                      <span className="font-sans-body text-xs text-[#FFFFFF] font-medium">{dish.prepTimeMinutes !== undefined ? `${dish.prepTimeMinutes} ${t.minLabel}` : '—'}</span>
                     </div>
                     <div className="flex flex-col">
                       <span className="font-sans-body text-[9px] font-bold tracking-widest text-[#0077CC]/70 uppercase">
                         {t.caloriesLabel}
                       </span>
-                      <span className="font-sans-body text-xs text-[#FFFFFF] font-medium">{dish.calories} kcal</span>
+                      <span className="font-sans-body text-xs text-[#FFFFFF] font-medium">{dish.calories !== undefined ? `${dish.calories} kcal` : '—'}</span>
                     </div>
                   </div>
+                  )}
 
                   {/* Price & Details Action */}
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-[#0077CC]/15">

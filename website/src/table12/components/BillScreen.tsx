@@ -6,6 +6,7 @@ export const BillScreen: React.FC = () => {
     cart,
     subtotalUZS,
     serviceFeeUZS,
+    serviceChargeRate,
     totalUZS,
     t,
     tableName,
@@ -96,7 +97,7 @@ export const BillScreen: React.FC = () => {
             <span>{subtotalUZS.toLocaleString()} UZS</span>
           </div>
           <div className="flex justify-between font-sans-body text-xs text-[#9FB0C4]">
-            <span>{t.serviceFee}</span>
+            <span>{t.serviceFee}{serviceChargeRate > 0 ? ` (${serviceChargeRate}%)` : ''}</span>
             <span>{serviceFeeUZS.toLocaleString()} UZS</span>
           </div>
           <div className="flex justify-between items-center pt-3 border-t border-[#0077CC]/40">

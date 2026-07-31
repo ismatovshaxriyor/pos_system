@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MENU_DISHES } from '../data/mockData';
 
 export const DishDetailScreen: React.FC = () => {
   const {
@@ -15,8 +14,14 @@ export const DishDetailScreen: React.FC = () => {
 
   const [quantity, setQuantity] = useState(1);
 
-  const basePrice = portionSize === 'Large' 
-    ? Math.round(selectedDish.priceUZS * 1.35) 
+  // openDishDetail (MenuScreen/HomeScreen) doim haqiqiy taom bilan
+  // chaqiriladi - shu ekran shunga bog'liq navigatsiyasiz to'g'ridan-to'g'ri
+  // ochilmaydi, lekin `selectedDish` turi endi `Dish | null` (boshlang'ich
+  // holat), TypeScript uchun aniq tekshiruv kerak.
+  if (!selectedDish) return null;
+
+  const basePrice = portionSize === 'Large'
+    ? Math.round(selectedDish.priceUZS * 1.35)
     : selectedDish.priceUZS;
 
   const totalPrice = basePrice * quantity;
@@ -54,7 +59,9 @@ export const DishDetailScreen: React.FC = () => {
       <div className="px-6 md:px-16 -mt-4 relative z-10 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 max-w-[1440px] mx-auto">
         {/* Left Column */}
         <div className="md:col-span-7 space-y-10">
-          {/* Ingredients Bento */}
+          {/* Ingredients Bento - local_server hozircha ingredient ro'yxatini
+              qo'llamaydi, shu sabab bo'sh bo'lganda butunlay yashiriladi */}
+          {selectedDish.ingredients && selectedDish.ingredients.length > 0 && (
           <section>
             <h3 className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] mb-4 uppercase">
               {t.ingredients}
@@ -72,6 +79,7 @@ export const DishDetailScreen: React.FC = () => {
               ))}
             </div>
           </section>
+          )}
 
           {/* Chef's Recommendation Card */}
           {selectedDish.chefQuote && (
@@ -105,31 +113,45 @@ export const DishDetailScreen: React.FC = () => {
             </section>
           )}
 
-          {/* Nutrition & Allergens */}
+          {/* Nutrition & Allergens - local_server bu ma'lumotlarni
+              qo'llamaydi (o'ylab topilgan qiymat ko'rsatilmaydi, masalan
+              avval har bir taomga "Halal Certified" deb yozib qo'yilar edi -
+              bu tekshirilmagan, noto'g'ri bo'lishi mumkin edi) */}
+          {(selectedDish.calories !== undefined || selectedDish.proteinGrams !== undefined || selectedDish.carbsGrams !== undefined
+            || (selectedDish.allergens && selectedDish.allergens.length > 0)) && (
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            {(selectedDish.calories !== undefined || selectedDish.proteinGrams !== undefined || selectedDish.carbsGrams !== undefined) && (
             <div className="space-y-3">
               <h3 className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] uppercase mb-3">
                 {t.nutritionFacts}
               </h3>
               <div className="space-y-2.5">
+                {selectedDish.calories !== undefined && (
                 <div className="flex justify-between items-end">
                   <span className="font-sans-body text-xs text-[#9FB0C4]">{t.caloriesLabel}</span>
                   <div className="dotted-leader" />
                   <span className="font-sans-body text-xs font-semibold text-[#FFFFFF]">{selectedDish.calories} kcal</span>
                 </div>
+                )}
+                {selectedDish.proteinGrams !== undefined && (
                 <div className="flex justify-between items-end">
                   <span className="font-sans-body text-xs text-[#9FB0C4]">{t.proteinLabel}</span>
                   <div className="dotted-leader" />
                   <span className="font-sans-body text-xs font-semibold text-[#FFFFFF]">{selectedDish.proteinGrams}g</span>
                 </div>
+                )}
+                {selectedDish.carbsGrams !== undefined && (
                 <div className="flex justify-between items-end">
                   <span className="font-sans-body text-xs text-[#9FB0C4]">{t.carbsLabel}</span>
                   <div className="dotted-leader" />
                   <span className="font-sans-body text-xs font-semibold text-[#FFFFFF]">{selectedDish.carbsGrams}g</span>
                 </div>
+                )}
               </div>
             </div>
+            )}
 
+            {selectedDish.allergens && selectedDish.allergens.length > 0 && (
             <div className="space-y-3">
               <h3 className="font-sans-body text-xs font-bold tracking-widest text-[#0077CC] uppercase mb-3">
                 {t.allergens}
@@ -145,7 +167,9 @@ export const DishDetailScreen: React.FC = () => {
                 ))}
               </div>
             </div>
+            )}
           </section>
+          )}
         </div>
 
         {/* Right Column */}

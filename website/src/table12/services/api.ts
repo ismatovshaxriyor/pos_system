@@ -57,16 +57,14 @@ export async function fetchPublicMenu(): Promise<Dish[] | null> {
           category: (cat.name as Dish['category']) || 'Plov',
           priceUZS: priceNum,
           description: prod.description || '',
-          portion: '1 portion',
-          prepTimeMinutes: prod.preparation_time || 20,
-          calories: 550,
-          proteinGrams: 28,
-          carbsGrams: 65,
+          // local_server'ning Product'ida portion/preparation_time/kaloriya/
+          // ingredient/allergen maydonlari umuman yo'q - shu sababli bu
+          // yerda o'ylab topilmaydi (avval "1 portion"/20 min/550 kcal/
+          // "Halal Certified" kabi HAR BIR haqiqiy taomga bir xil soxta
+          // qiymat yopishtirilgan edi). UI shu maydonlar yo'qligida ularni
+          // ko'rsatmaydi (qarang MenuScreen/DishDetailScreen).
+          prepTimeMinutes: prod.preparation_time,
           image: imageUrl,
-          ingredients: [
-            { name: 'Fresh local ingredients', icon: 'skillet' }
-          ],
-          allergens: ['Halal Certified'],
         });
       });
     });

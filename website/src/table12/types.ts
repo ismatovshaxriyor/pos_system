@@ -13,17 +13,20 @@ export interface Dish {
   category: 'Plov' | 'Kebabs' | 'Manti' | 'Soups' | 'Salads' | 'Desserts' | 'Tea' | 'Drinks';
   priceUZS: number;
   description: string;
-  portion: string;
-  prepTimeMinutes: number;
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
+  // local_server'ning Product modelida bu maydonlar umuman yo'q - faqat
+  // qo'lda to'ldirilgan taom uchun bo'lishi mumkin, API'dan kelgan haqiqiy
+  // taomlarda har doim undefined (soxta qiymat o'ylab topilmaydi/ko'rsatilmaydi).
+  portion?: string;
+  prepTimeMinutes?: number;
+  calories?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
   image: string;
   isSignature?: boolean;
-  ingredients: Ingredient[];
+  ingredients?: Ingredient[];
   chefQuote?: string;
   sommelierPairing?: string;
-  allergens: string[];
+  allergens?: string[];
 }
 
 export interface CartItem {
@@ -93,6 +96,9 @@ export interface ApiTableLive {
   zone_name?: string;
   qr_code?: string;
   current_order?: ApiActiveOrder | null;
+  // Restaurant's real service charge % (RestaurantConfig.service_charge_rate),
+  // e.g. 10 for 10%. 0 if the restaurant hasn't configured one.
+  service_charge_rate?: number;
   // Fallbacks for backwards compatibility
   name?: string;
   active_order?: ApiActiveOrder | null;

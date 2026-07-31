@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { MENU_DISHES } from '../data/mockData';
 
 export const HomeScreen: React.FC = () => {
   const { setCurrentScreen, t, dishes, addToCart, setIsOurStoryModalOpen, setIsEmirChamberModalOpen } = useApp();

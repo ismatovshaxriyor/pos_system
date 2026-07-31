@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScreenView, Language, Dish, CartItem, WaiterRequestHistoryItem } from '../types';
-import { MENU_DISHES, TRANSLATIONS } from '../data/mockData';
+import { TRANSLATIONS } from '../data/mockData';
 import { fetchPublicMenu, fetchTableLive, callWaiterApi } from '../services/api';
 
 interface AppContextType {
@@ -13,7 +13,16 @@ interface AppContextType {
   qrCode: string;
   tableName: string;
   isLiveApiConnected: boolean;
-  selectedDish: Dish;
+  // Birinchi urinish hali javob bermagan - shu paytda `dishes` bo'sh, hech
+  // qanday (haqiqiy ham, soxta ham) taom ko'rsatilmasligi kerak.
+  menuLoading: boolean;
+  // true faqat ikkala live so'rov (menyu VA stol) muvaffaqiyatsiz tugab,
+  // hech qanday haqiqiy taom yuklanmaganda. Endi mock ma'lumot umuman yo'q -
+  // shu holatda `dishes` doim bo'sh qoladi, App.tsx to'liq xato holatini
+  // ko'rsatadi (LiveDataGate).
+  connectionError: boolean;
+  retryConnection: () => void;
+  selectedDish: Dish | null;
   setSelectedDish: (dish: Dish) => void;
   portionSize: 'Standard' | 'Large';
   setPortionSize: (portion: 'Standard' | 'Large') => void;
@@ -48,6 +57,7 @@ interface AppContextType {
   // Helpers
   subtotalUZS: number;
   serviceFeeUZS: number;
+  serviceChargeRate: number;
   totalUZS: number;
   openDishDetail: (dish: Dish) => void;
 }
@@ -59,8 +69,8 @@ const INITIAL_CART: CartItem[] = [];
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentScreen, setCurrentScreen] = useState<ScreenView>('home');
   const [language, setLanguage] = useState<Language>('UZ');
-  const [dishes, setDishes] = useState<Dish[]>(MENU_DISHES);
-  const [selectedDish, setSelectedDish] = useState<Dish>(MENU_DISHES[0]);
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [portionSize, setPortionSize] = useState<'Standard' | 'Large'>('Standard');
   const [cart, setCart] = useState<CartItem[]>(INITIAL_CART);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -71,6 +81,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLiveApiConnected, setIsLiveApiConnected] = useState(false);
   const [tableName, setTableName] = useState('Stol');
+  // Restoranning haqiqiy xizmat haqi foizi (RestaurantConfig.service_charge_rate).
+  // Qattiq kodlangan taxmin (masalan 15%) o'rniga jonli qiymat kelguncha 0 -
+  // noto'g'ri summa ko'rsatishdan ko'ra hech narsa ko'rsatmagan afzal.
+  const [serviceChargeRate, setServiceChargeRate] = useState(0);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
+  const retryConnection = () => setRetryToken((n) => n + 1);
 
   // Extract QR code from URL path (e.g. /table/<qr_code>/) or query parameters (?qr=... or ?table=... or default 'demo')
   const pathParts = window.location.pathname.split('/').filter(Boolean);
@@ -96,6 +114,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let isMounted = true;
 
     async function loadLiveData() {
+      if (isMounted) {
+        setConnectionError(false);
+        setMenuLoading(true);
+      }
+
       // 1. Fetch live menu items and prices
       const apiDishes = await fetchPublicMenu();
       if (apiDishes && apiDishes.length > 0 && isMounted) {
@@ -106,10 +129,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // 2. Fetch live table details and current order
       const tableData = await fetchTableLive(qrCode);
+
+      // Ikkalasi ham (menyu VA stol) muvaffaqiyatsiz bo'lsa - haqiqiy
+      // ulanish muammosi (agar faqat menyu bo'sh bo'lsa-yu, stol so'rovi
+      // muvaffaqiyatli bo'lsa, bu chindan bo'sh menyu, xato emas -
+      // MenuScreen o'zining "hozircha taom yo'q" holatini ko'rsatadi).
+      if (!(apiDishes && apiDishes.length > 0) && !tableData && isMounted) {
+        setConnectionError(true);
+      }
+
+      if (isMounted) setMenuLoading(false);
+
       if (tableData && isMounted) {
         const name = tableData.table_name || tableData.name || 'Stol';
         setTableName(name);
         setIsLiveApiConnected(true);
+        setServiceChargeRate(typeof tableData.service_charge_rate === 'number' ? tableData.service_charge_rate : 0);
 
         const order = tableData.current_order || tableData.active_order;
         if (order && order.items && order.items.length > 0) {
@@ -148,7 +183,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => {
       isMounted = false;
     };
-  }, [qrCode]);
+  }, [qrCode, retryToken]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -233,9 +268,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Request cancelled');
   };
 
-  // Financial calculations
+  // Financial calculations. Bu - hali serverga yuborilmagan savatcha uchun
+  // MIJOZ TOMONIDAGI TAXMIN, real hisob-kitob buyurtma yopilganda backend'da
+  // `calculate_order_financials` orqali qilinadi - shuning uchun bu yerda
+  // ham xuddi shu manba (RestaurantConfig.service_charge_rate) ishlatilishi
+  // shart, aks holda saytda ko'rsatilgan summa haqiqiy chekdan farq qilardi.
   const subtotalUZS = cart.reduce((acc, item) => acc + (item.priceUZS * item.quantity), 0);
-  const serviceFeeUZS = Math.round(subtotalUZS * 0.15);
+  const serviceFeeUZS = Math.round(subtotalUZS * (serviceChargeRate / 100));
   const totalUZS = subtotalUZS + serviceFeeUZS;
 
   return (
@@ -250,6 +289,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         qrCode,
         tableName,
         isLiveApiConnected,
+        menuLoading,
+        connectionError,
+        retryConnection,
         selectedDish,
         setSelectedDish,
         portionSize,
@@ -281,6 +323,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsEmirChamberModalOpen,
         subtotalUZS,
         serviceFeeUZS,
+        serviceChargeRate,
         totalUZS,
         openDishDetail,
       }}
