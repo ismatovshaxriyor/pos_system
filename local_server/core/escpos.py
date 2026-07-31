@@ -227,7 +227,7 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
         price = float(item.get('price', 0))
         total = price * qty
         out.append(encode(f"{qty} x {name}") + b'\n')
-        out.append(encode(_two_cols(f"   @{int(price):,} so'm".replace(',', ' '), f"{int(total):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols(f"   {int(price):,} so'm".replace(',', ' '), f"{int(total):,} so'm".replace(',', ' '), width)) + b'\n')
 
     out.append(encode('-' * width) + b'\n')
     out.append(encode(_two_cols("Jami taomlar:", f"{int(total_amount):,} so'm".replace(',', ' '), width)) + b'\n')
@@ -287,7 +287,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
         price = float(item.get('price', 0))
         total = price * qty
         out.append(encode(f"{qty} x {name}") + b'\n')
-        out.append(encode(_two_cols(f"   @{int(price):,} so'm".replace(',', ' '), f"{int(total):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols(f"   {int(price):,} so'm".replace(',', ' '), f"{int(total):,} so'm".replace(',', ' '), width)) + b'\n')
 
     out.append(encode('-' * width) + b'\n')
     out.append(encode(_two_cols("Jami taomlar:", f"{int(total_amount):,} so'm".replace(',', ' '), width)) + b'\n')
