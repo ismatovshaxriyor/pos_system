@@ -67,12 +67,12 @@ class EscposTicketTests(SimpleTestCase):
         self.assertTrue(payload.endswith(escpos.FEED_AND_CUT))
 
     def test_service_charge_label_with_rate(self):
-        self.assertEqual(escpos._service_charge_label(10), "Xizmat haqi (10%):")
-        self.assertEqual(escpos._service_charge_label(12.5), "Xizmat haqi (12.5%):")
+        self.assertEqual(escpos._service_charge_label(10), "Xizmat foizi (10%):")
+        self.assertEqual(escpos._service_charge_label(12.5), "Xizmat foizi (12.5%):")
 
     def test_service_charge_label_without_rate(self):
-        self.assertEqual(escpos._service_charge_label(0), "Xizmat haqi:")
-        self.assertEqual(escpos._service_charge_label(None), "Xizmat haqi:")
+        self.assertEqual(escpos._service_charge_label(0), "Xizmat foizi:")
+        self.assertEqual(escpos._service_charge_label(None), "Xizmat foizi:")
 
     def _receipt_kwargs(self, **overrides):
         kwargs = dict(
@@ -85,16 +85,16 @@ class EscposTicketTests(SimpleTestCase):
 
     def test_pre_bill_receipt_shows_service_charge_percentage(self):
         payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs(service_charge_rate=10))
-        self.assertIn(b'Xizmat haqi (10%):', payload)
+        self.assertIn(b'Xizmat foizi (10%):', payload)
 
     def test_pre_bill_receipt_service_charge_without_rate(self):
         payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs())
-        self.assertIn(b'Xizmat haqi:', payload)
-        self.assertNotIn(b'Xizmat haqi (', payload)
+        self.assertIn(b'Xizmat foizi:', payload)
+        self.assertNotIn(b'Xizmat foizi (', payload)
 
     def test_payment_receipt_shows_service_charge_percentage(self):
         payload = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila', service_charge_rate=10))
-        self.assertIn(b'Xizmat haqi (10%):', payload)
+        self.assertIn(b'Xizmat foizi (10%):', payload)
 
     def test_pre_bill_receipt_ends_with_brand_footer(self):
         payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs())

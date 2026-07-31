@@ -1139,6 +1139,21 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
             'amount': float(p.amount),
         })
 
+    # `close_on_credit` naqd/karta Payment qatori YARATMAYDI - qolgan qarz
+    # faqat DebtTransaction(credit_sale)da qayd etiladi (qarang
+    # record_credit_sale). Shu summani ham "To'lov usullari"ga "Qarz" nomi
+    # bilan qo'shmasak, chekda mijoz nechchi pul to'lagani va nechchisi
+    # qarzga yozilganini ajratib bo'lmas edi.
+    from django.db.models import Sum
+    credit_amount = order.debt_transactions.filter(txn_type='credit_sale').aggregate(
+        total=Sum('amount'))['total'] or 0
+    if credit_amount:
+        payments.append({
+            'method': 'debt',
+            'method_display': 'Qarz',
+            'amount': float(credit_amount),
+        })
+
     cashier = cashier_user or order.cashier
     cashier_name = cashier.first_name if (cashier and cashier.first_name) else (cashier.username if cashier else "Kassir")
 

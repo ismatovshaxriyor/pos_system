@@ -7,8 +7,8 @@ from rest_framework.authtoken.models import Token
 
 from core import tasks
 from core.models import (
-    Category, Customer, DebtTransaction, Order, OrderItem, Payment, Product, RestaurantConfig,
-    Table, User,
+    Category, Customer, DebtTransaction, Order, OrderItem, Payment, PrintJob, Product,
+    RestaurantConfig, Table, User,
 )
 
 
@@ -103,6 +103,26 @@ class QarzDaftarTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.balance, Decimal('20000'))
+
+    def test_close_on_credit_receipt_shows_debt_as_qarz(self):
+        # close_on_credit o'zi Payment qatori yaratmaydi - qolgan qarz
+        # faqat DebtTransaction'da. Chekda "Naqd"/karta bilan bir qatorda
+        # "Qarz" ham ko'rinishi kerak, aks holda mijoz nechchisini
+        # to'lagani va nechchisi qarzga yozilgani chekdan bilinmas edi.
+        Payment.objects.create(order=self.order, amount=Decimal('10000'), received_by=self.cashier)
+        url = reverse('order-close-on-credit', args=[self.order.id])
+        resp = self.client.post(
+            url, {'customer_id': self.customer.id},
+            content_type='application/json', **_auth_header(self.manager),
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        job = PrintJob.objects.filter(order=self.order, job_type='receipt').latest('id')
+        payments = job.items_snapshot['payments']
+        methods = {p['method_display']: p['amount'] for p in payments}
+        self.assertEqual(methods.get('Qarz'), 20000.0)
+        self.assertIn('Cash', methods)  # avvalgi qisman naqd to'lov ham chekda qolishi kerak
+        self.assertEqual(methods['Cash'], 10000.0)
 
     def test_close_on_credit_allowed_for_cashier(self):
         url = reverse('order-close-on-credit', args=[self.order.id])

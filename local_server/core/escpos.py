@@ -93,15 +93,15 @@ def _two_cols(left, right, width):
 
 def _service_charge_label(rate):
     """
-    'Xizmat haqi:' yoki, foiz ma'lum bo'lsa (RestaurantConfig.service_charge_rate
-    dan hisoblangan), 'Xizmat haqi (10%):'. `Order.service_charge` qo'lda,
+    'Xizmat foizi:' yoki, foiz ma'lum bo'lsa (RestaurantConfig.service_charge_rate
+    dan hisoblangan), 'Xizmat foizi (10%):'. `Order.service_charge` qo'lda,
     foizsiz kiritilgan bo'lsa `rate` 0 keladi - shu holda foizsiz yoziladi.
     """
     if rate and float(rate) > 0:
         rate = float(rate)
         rate_str = f"{rate:g}"
-        return f"Xizmat haqi ({rate_str}%):"
-    return "Xizmat haqi:"
+        return f"Xizmat foizi ({rate_str}%):"
+    return "Xizmat foizi:"
 
 
 def _format_modifiers(modifiers):
