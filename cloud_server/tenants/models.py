@@ -268,3 +268,84 @@ class DemoRequest(models.Model):
     def __str__(self):
         return f"{self.restaurant_name} - {self.contact_name} ({self.phone})"
 
+
+class MobileApp(models.Model):
+    """
+    Xodim ilovalarining (Manager/Kassir/Ofitsiant) e'lon qilingan versiyalari
+    - veb-sayt (hamrohpos.uz)ning "Ilovalar" sahifasi shu yerdan yuklab olish
+    havolasini oladi. Bitta markazda boshqariladi (fleet update'lar kabi) -
+    har bir restoran o'zining local_server'ida emas, shu yerda.
+
+    Bitta xodim roli (masalan Kassir) bir nechta platformada chiqishi mumkin
+    (Android planshet VA Windows kassa terminali) - shu sabab noyoblik
+    `slug` yolg'iz emas, `(slug, platform)` juftligi bo'yicha: har bir rol
+    har bir platforma uchun alohida qator, lekin bitta rolning bir platformada
+    ikkita "joriy" versiyasi bo'lishi mumkin emas.
+    """
+    PLATFORM_CHOICES = (
+        ('android', 'Android'),
+        ('windows', 'Windows'),
+    )
+
+    slug = models.SlugField(max_length=30, help_text="masalan: manager, kassir, ofitsiant")
+    name = models.CharField(max_length=100)
+    role = models.CharField(max_length=200, help_text="Qisqa tavsif, masalan: 'Kassa va to'lovlar'")
+    version = models.CharField(max_length=30)
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES, default='android')
+    size_mb = models.DecimalField(max_digits=6, decimal_places=1)
+    min_os = models.CharField(max_length=50, blank=True, default='', help_text="masalan 'Android 8.0' yoki 'Windows 10 64-bit'")
+    is_required = models.BooleanField(default=False, help_text="Majburiy yangilanish sifatida belgilansinmi")
+    apk_file = models.FileField(upload_to='mobile_apps/', help_text="Admin shu yerdan o'rnatuvchi faylni (APK yoki Windows uchun EXE/MSI) yuklaydi - havola emas, fayl o'zi bizning serverda saqlanadi.")
+    notes = models.JSONField(default=list, blank=True, help_text="O'zgarishlar ro'yxati (matn qatorlari)")
+    is_active = models.BooleanField(default=True, help_text="O'chirilsa ro'yxatda ko'rinmaydi")
+    released_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'platform']
+        constraints = [
+            models.UniqueConstraint(fields=['slug', 'platform'], name='unique_mobileapp_slug_platform'),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_platform_display()}) v{self.version}"
+
+
+class PricingPlan(models.Model):
+    """
+    Veb-sayt (hamrohpos.uz)ning "Narx" bo'limidagi tariflar (Tarif A/B/C) -
+    matn, narx yorlig'i va xususiyatlar ro'yxati to'liq admin orqali
+    sozlanadi, frontend'da qattiq kodlanmagan.
+    """
+    tier_label = models.CharField(max_length=50, help_text="masalan: 'Tarif A'")
+    title = models.CharField(max_length=100, help_text="masalan: 'Boshlang'ich'")
+    subtitle = models.CharField(max_length=200, blank=True, default='', help_text="masalan: 'Bitta zal, bitta kassa'")
+    price_label = models.CharField(max_length=50, default='KELISHUV', help_text="masalan: 'KELISHUV' yoki '500 000 so'm/oy'")
+    cta_label = models.CharField(max_length=50, default="Bog'lanish", help_text="Tugma matni, masalan: 'Bog'lanish' yoki 'Narxni kelishish'")
+    is_highlighted = models.BooleanField(default=False, help_text="Markazda ajratib ko'rsatiladi ('Ko'p tanlanadi' belgisi bilan)")
+    is_active = models.BooleanField(default=True, help_text="O'chirilsa sahifada ko'rinmaydi")
+    order = models.PositiveIntegerField(default=0, help_text="Chapdan o'ngga tartib - kichik son oldinroq turadi")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.tier_label} - {self.title}"
+
+
+class PricingFeature(models.Model):
+    """PricingPlan kartasidagi bitta qator (masalan '3 kassa terminali')."""
+    plan = models.ForeignKey(PricingPlan, related_name='features', on_delete=models.CASCADE)
+    text = models.CharField(max_length=200)
+    is_included = models.BooleanField(default=True, help_text="Yo'q bo'lsa xira (o'chirilgan) ko'rinishda chiziladi")
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.plan.tier_label}: {self.text}"
+

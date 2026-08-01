@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from tenants.models import MobileApp, PricingPlan, PricingFeature
 
 MAX_EVENTS_PER_BATCH = 500
 
@@ -100,4 +101,41 @@ class DemoRequestSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=50)
     branch_count = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
     note = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class PublicMobileAppSerializer(serializers.ModelSerializer):
+    # ImageField/FileField'ning nisbiy '/media/...' yo'lini emas, to'liq
+    # URL'ni qaytarish uchun har doim context={'request': request} bilan
+    # chaqirilishi shart (local_server/core/CLAUDE.md'dagi bir xil gotcha).
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MobileApp
+        fields = (
+            'slug', 'name', 'role', 'version', 'platform', 'size_mb',
+            'min_os', 'is_required', 'download_url', 'notes', 'released_at',
+        )
+
+    def get_download_url(self, obj):
+        request = self.context.get('request')
+        if not obj.apk_file:
+            return ''
+        return request.build_absolute_uri(obj.apk_file.url) if request else obj.apk_file.url
+
+
+class PublicPricingFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PricingFeature
+        fields = ('text', 'is_included')
+
+
+class PublicPricingPlanSerializer(serializers.ModelSerializer):
+    features = PublicPricingFeatureSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PricingPlan
+        fields = (
+            'tier_label', 'title', 'subtitle', 'price_label', 'cta_label',
+            'is_highlighted', 'features',
+        )
 

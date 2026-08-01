@@ -159,7 +159,23 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# MobileApp.apk_file (xodim ilovalari, admin orqali yuklanadi) uchun.
+# Whitenoise faqat STATIC_ROOT'ni xizmat qiladi - media alohida route talab
+# qiladi (config/urls.py, DEBUG'dan qat'i nazar - local_server/config/urls.py
+# bilan bir xil sabab: gunicorn/whitenoise ham runserver kabi buni avtomatik
+# qilmaydi). Prod tomonda `media_data:/app/media` volume allaqachon mavjud
+# (docker-compose.prod.yml).
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 STORAGES = {
+    # MobileApp.apk_file uchun - Django 4.2+'da STORAGES o'rnatilsa 'default'
+    # kalitsiz FileField/ImageField.save() "Could not find config for
+    # 'default'" bilan xato beradi (eski DEFAULT_FILE_STORAGE'dan farqli,
+    # yashirin fallback yo'q).
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
     'staticfiles': {
         # Manifest (hashed-filename) storage needs `collectstatic` to have
         # already run, or any {% static %} lookup raises - fine for prod

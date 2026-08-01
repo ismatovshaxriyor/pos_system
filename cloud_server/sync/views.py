@@ -14,15 +14,15 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from tenants.models import (
     License, Restaurant, RestaurantStatus, RemoteCommand, RestaurantAdminAccount,
-    ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest,
-    validate_subdomain,
+    ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest, MobileApp,
+    PricingPlan, validate_subdomain,
 )
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token_batch, get_public_key_pem
 from .serializers import (
     ActivationSerializer, RenewSerializer, HeartbeatSerializer, CommandResultSerializer,
     ErrorLogBatchSerializer, OrderSyncBatchSerializer, PublicLicenseCheckSerializer,
-    DemoRequestSerializer,
+    DemoRequestSerializer, PublicMobileAppSerializer, PublicPricingPlanSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -568,5 +568,36 @@ class PublicSubdomainCheckView(APIView):
             'full_domain': f"{subdomain}.hamrohpos.uz",
             'detail': f"'{subdomain}' subdomeni bo'sh va foydalanish uchun tayyor."
         }, status=status.HTTP_200_OK)
+
+
+class PublicAppsView(APIView):
+    """
+    Veb-sayt (hamrohpos.uz)ning "Ilovalar" sahifasi uchun xodim mobil
+    ilovalarining (Manager/Kassir/Ofitsiant) oxirgi e'lon qilingan
+    versiyalari ro'yxati.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
+
+    def get(self, request):
+        apps = MobileApp.objects.filter(is_active=True)
+        serializer = PublicMobileAppSerializer(apps, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PublicPricingView(APIView):
+    """
+    Veb-sayt (hamrohpos.uz)ning "Narx" bo'limidagi tariflar - matn va
+    xususiyatlar ro'yxati admin orqali to'liq sozlanadi.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [throttling.AnonRateThrottle]
+
+    def get(self, request):
+        plans = PricingPlan.objects.filter(is_active=True).prefetch_related('features')
+        serializer = PublicPricingPlanSerializer(plans, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 

@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from .models import (
     Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
-    SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest,
+    SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest, MobileApp, PricingPlan, PricingFeature,
 )
 from .signals import compute_default_license_expiry
 from sync.jwt_utils import issue_license_token
@@ -536,4 +536,28 @@ class DemoRequestAdmin(admin.ModelAdmin):
     def mark_uncontacted(self, request, queryset):
         updated = queryset.update(is_contacted=False)
         self.message_user(request, f"{updated} ta so'rov kutilmoqda holatiga qaytarildi.")
+
+
+@admin.register(MobileApp)
+class MobileAppAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'version', 'platform', 'released_at', 'is_required', 'is_active')
+    list_filter = ('platform', 'is_active', 'is_required')
+    search_fields = ('name', 'slug', 'role')
+    prepopulated_fields = {'slug': ('name',)}
+    ordering = ('name',)
+
+
+class PricingFeatureInline(admin.TabularInline):
+    model = PricingFeature
+    extra = 1
+    fields = ('text', 'is_included', 'order')
+
+
+@admin.register(PricingPlan)
+class PricingPlanAdmin(admin.ModelAdmin):
+    list_display = ('tier_label', 'title', 'price_label', 'is_highlighted', 'is_active', 'order')
+    list_filter = ('is_active', 'is_highlighted')
+    search_fields = ('tier_label', 'title')
+    ordering = ('order',)
+    inlines = [PricingFeatureInline]
 

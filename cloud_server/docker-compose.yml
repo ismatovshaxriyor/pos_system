@@ -23,6 +23,8 @@ services:
     volumes:
       - .:/app
       - ./keys:/app/keys:ro
+    ports:
+      - "127.0.0.1:8001:8001"
     environment:
       - DEBUG=1
       - DB_NAME=pos_cloud_db
