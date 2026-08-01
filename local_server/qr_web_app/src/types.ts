@@ -1,51 +1,53 @@
-export type ScreenView = 'home' | 'menu' | 'dish-detail' | 'bill' | 'waiter';
+export type TabView = 'menu' | 'bill';
 
-export type Language = 'EN' | 'UZ' | 'RU';
-
-export interface Ingredient {
+export interface Product {
+  id: number;
   name: string;
-  icon: string;
+  price: string;
+  image: string | null;
+  barcode: string;
+  is_available: boolean;
 }
 
-export interface Dish {
-  id: string;
+export interface Category {
+  id: number;
   name: string;
-  category: 'Plov' | 'Kebabs' | 'Manti' | 'Soups' | 'Salads' | 'Desserts' | 'Tea' | 'Drinks';
-  priceUZS: number;
-  description: string;
-  portion: string;
-  prepTimeMinutes: number;
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
-  image: string;
-  isSignature?: boolean;
-  ingredients: Ingredient[];
-  chefQuote?: string;
-  sommelierPairing?: string;
-  allergens: string[];
+  image: string | null;
+  products: Product[];
 }
 
-export interface CartItem {
-  dish: Dish;
+export type OrderItemStatus = 'new' | 'in_progress' | 'ready' | 'served' | 'cancelled';
+
+export interface OrderItem {
+  id: number;
+  product_name: string;
   quantity: number;
-  portionSize: 'Standard' | 'Large';
-  priceUZS: number;
+  price: string;
+  status: OrderItemStatus;
+  modifiers: Record<string, unknown>;
+  is_printed: boolean;
 }
 
-export interface WaiterRequestHistoryItem {
-  id: string;
-  title: string;
-  time: string;
-  status: 'COMPLETED' | 'IN_PROGRESS';
+export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
+
+export interface LiveOrder {
+  id: number;
+  status: string;
+  order_type: OrderType;
+  items: OrderItem[];
+  tax_amount: string;
+  service_charge: string;
+  discount_amount: string;
+  total_amount: string;
+  final_amount: string;
+  created_at: string;
 }
 
-export interface TableOrder {
-  tableNumber: number;
-  station: number;
-  dateTime: string;
-  items: CartItem[];
-  subtotalUZS: number;
-  serviceFeePercent: number;
-  totalUZS: number;
+export interface TableLive {
+  table_id: number;
+  table_name: string;
+  zone_name: string;
+  qr_code: string;
+  current_order: LiveOrder | null;
+  service_charge_rate: number;
 }
