@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HamrohPOS — Menyu va hisob</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+html,body{height:100%}
+body{background:var(--paper);overscroll-behavior:none}
+/* qurilma ramkasi (keng ekranda) */
+body.framed{background:#2A2A28;display:grid;place-items:center;padding:20px}
+body.framed #app{width:400px;height:min(844px,calc(100vh - 40px));border:10px solid #0d0d0d;border-radius:26px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+#app{width:100%;height:100%;max-width:520px;margin:0 auto;background:var(--paper);position:relative;overflow:hidden;display:flex;flex-direction:column}
+#fsBtn{position:fixed;top:16px;right:16px;z-index:80;display:none}
+body.framed #fsBtn{display:inline-flex;background:transparent;border-color:#6a6a66;color:#dedeD8}
+body.framed #fsBtn:hover{background:#dedeD8;color:#131313}
+/* header */
+.hd{flex:0 0 auto;border-bottom:1px solid var(--ink);background:var(--paper)}
+.hd__top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 10px}
+.mark{display:flex;align-items:baseline;gap:6px}
+.mark b{font-family:var(--f-display);font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:-.01em}
+.mark i{width:7px;height:7px;background:var(--signal);border-radius:1px;display:block}
+.hd__tbl{display:flex;align-items:baseline;gap:8px}
+.hd__tbl split-flap{font-family:var(--f-mono);font-weight:600;font-size:16px;--sf-w:.68em;--sf-gap:.04em}
+.tabs{display:grid;grid-template-columns:1fr 1fr;border-top:var(--hair)}
+.tab{padding:12px 0;background:transparent;border:0;border-bottom:2px solid transparent;font-family:var(--f-mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-60);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--signal)}
+/* demo bar */
+.demobar{display:flex;align-items:center;gap:8px;padding:7px 16px;background:var(--ink);color:var(--paper)}
+.demobar .lbl{color:rgba(247,247,243,.55);margin-right:auto}
+.dbtn{background:transparent;border:1px solid rgba(247,247,243,.35);color:var(--paper);font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:1px;cursor:pointer}
+.dbtn[aria-pressed="true"]{background:var(--signal);border-color:var(--signal)}
+/* scroll body */
+.scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:104px}
+.view[hidden]{display:none}
+/* kategoriya chiplari */
+.catbar{position:sticky;top:0;z-index:10;display:flex;gap:0;overflow-x:auto;background:var(--paper);border-bottom:var(--hair);scrollbar-width:none}
+.catbar::-webkit-scrollbar{display:none}
+.catbar button{flex:0 0 auto;padding:11px 15px;background:transparent;border:0;border-right:var(--hair);font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60);cursor:pointer;white-space:nowrap}
+.catbar button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+/* kategoriya sarlavhasi */
+.cathd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:20px 16px 8px;border-bottom:1px solid var(--ink);margin-bottom:0}
+.cathd h3{font-family:var(--f-display);font-weight:800;font-size:27px;text-transform:uppercase;line-height:1}
+/* taom qatori */
+.item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;padding:12px 16px;background:transparent;border:0;border-bottom:var(--hair);cursor:pointer;min-height:60px}
+.item:active{background:var(--panel)}
+.thumb{width:56px;height:56px;background:var(--panel);border:var(--hair);border-radius:1px;display:grid;place-items:center;overflow:hidden;position:relative}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb span{font-family:var(--f-display);font-weight:800;font-size:24px;color:var(--ink-40);text-transform:uppercase;line-height:1}
+.item__n{font-family:var(--f-display);font-weight:700;font-size:21px;text-transform:uppercase;line-height:1.02}
+.item__m{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-40);margin-top:3px}
+.item__p{font-family:var(--f-mono);font-weight:500;font-size:14px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.item--off{opacity:.45}
+.item--off .item__p{text-decoration:line-through}
+.tag-off{display:inline-block;font-family:var(--f-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--paper);background:var(--ink-40);padding:2px 5px;border-radius:1px;margin-top:4px}
+/* hisob */
+.billhd{padding:20px 16px 14px;border-bottom:1px solid var(--ink)}
+.billhd__r{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.stpill{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:4px 8px;border-radius:1px;color:var(--paper);background:var(--ok)}
+.brow{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 16px 12px 13px;border-bottom:var(--hair);border-left:3px solid var(--grid)}
+.brow--new{border-left-color:var(--warn)}
+.brow--ready{border-left-color:var(--ok)}
+.brow__n{font-size:15px;font-weight:500;line-height:1.2}
+.brow__m{font-family:var(--f-mono);font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink-60);margin-top:4px}
+.brow__s{font-family:var(--f-mono);font-size:14px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.sums{padding:0 16px}
+.sum{display:flex;justify-content:space-between;padding:10px 0;border-bottom:var(--hair);font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-60)}
+.sum b{color:var(--ink);font-weight:500}
+.final{margin:0 16px;border-top:2px solid var(--ink);padding-top:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.final split-flap{font-family:var(--f-mono);font-weight:600;font-size:30px;--sf-w:.68em;--sf-gap:.04em;margin-top:6px}
+.note{margin:18px 16px 0;padding:13px 14px;background:var(--panel);border-left:3px solid var(--signal);font-size:13.5px;line-height:1.45}
+.empty{padding:60px 24px;text-align:center}
+.empty__t{font-family:var(--f-display);font-weight:800;font-size:34px;text-transform:uppercase;line-height:.98;margin:16px 0 10px}
+.empty__l{width:44px;height:2px;background:var(--signal);margin:0 auto}
+/* FAB */
+.fab{position:absolute;left:16px;right:16px;bottom:16px;z-index:40;height:52px;width:auto}
+/* taom tafsiloti */
+.sheet{position:absolute;inset:0;z-index:60;background:var(--paper);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .28s var(--ease);visibility:hidden}
+.sheet[open]{transform:none;visibility:visible}
+.sheet__hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--ink)}
+.sheet__body{flex:1;overflow-y:auto}
+.hero-img{aspect-ratio:4/3;background:var(--panel);border-bottom:1px solid var(--ink);display:grid;place-items:center;overflow:hidden}
+.hero-img img{width:100%;height:100%;object-fit:cover}
+.hero-img span{font-family:var(--f-display);font-weight:900;font-size:96px;color:var(--grid);line-height:1}
+.sheet__n{font-family:var(--f-display);font-weight:800;font-size:40px;text-transform:uppercase;line-height:.96;padding:20px 16px 0}
+.kv{margin:18px 16px 24px;border-top:2px solid var(--ink)}
+.kv__r{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:var(--hair)}
+.kv__r span:first-child{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60);align-self:center}
+.kv__r span:last-child{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+/* toast */
+.toast{position:absolute;inset:0;z-index:90;background:rgba(19,19,19,.9);display:grid;place-items:center;opacity:0;visibility:hidden;transition:opacity .2s var(--ease)}
+.toast[open]{opacity:1;visibility:visible}
+.toast__in{text-align:center;padding:24px}
+.toast split-flap{font-family:var(--f-display);font-weight:800;font-size:44px;--sf-w:.6em;--sf-gap:.045em}
+.toast .lbl{color:rgba(247,247,243,.6);margin-top:14px}
+.spin{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-40);padding:40px 16px;text-align:center}
+</style>
+</head>
+<body>
+<button class="btn btn--sm" id="fsBtn">To'liq ekran</button>
+<div id="app">
+  <div class="demobar" id="demobar" hidden>
+    <span class="lbl">Demo · backend ulanmagan</span>
+    <button class="dbtn" data-demo="order" aria-pressed="true">Buyurtma bor</button>
+    <button class="dbtn" data-demo="empty" aria-pressed="false">Bo'sh</button>
+  </div>
+  <header class="hd">
+    <div class="hd__top">
+      <div class="mark"><b>HamrohPOS</b><i></i></div>
+      <div class="hd__tbl"><span class="lbl">Stol</span><split-flap id="sfTable" mode="alpha" text="—" pad="8" step="56"></split-flap></div>
+    </div>
+    <div class="tabs"><button class="tab" data-tab="menu" aria-selected="true">Menyu</button><button class="tab" data-tab="bill" aria-selected="false">Hisob</button></div>
+  </header>
+  <div class="scr" id="scr">
+    <section class="view" id="vMenu"><div class="catbar" id="catbar"></div><div id="menuList"><div class="spin">Menyu yuklanmoqda</div></div></section>
+    <section class="view" id="vBill" hidden><div class="spin">Hisob yuklanmoqda</div></section>
+  </div>
+  <button class="btn btn--sig fab" id="fab">Ofitsiantni chaqirish</button>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Taom tafsiloti">
+    <div class="sheet__hd"><span class="lbl">Taom tafsiloti</span><button class="btn btn--sm" id="sheetClose">Yopish</button></div>
+    <div class="sheet__body" id="sheetBody"></div>
+  </div>
+  <div class="toast" id="toast"><div class="toast__in"><split-flap id="sfToast" theme="board" text="CHAQIRILDI" pad="10" step="54"></split-flap><div class="lbl" id="toastMsg">Ofitsiant tez orada keladi</div></div></div>
+</div>
+<script src="splitflap.js"></script>
+<script src="qr-app.js"></script>
+</body>
+</html>

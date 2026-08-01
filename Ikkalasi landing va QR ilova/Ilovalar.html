@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HamrohPOS — Ilovalar</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+.nav{position:sticky;top:0;z-index:60;background:var(--paper);border-bottom:var(--hair)}
+.nav__in{display:flex;align-items:center;justify-content:space-between;gap:24px;height:64px}
+.logo{display:flex;align-items:baseline;gap:9px;border:0}
+.logo__m{font-family:var(--f-display);font-weight:900;font-size:24px;letter-spacing:-.01em;text-transform:uppercase}
+.logo__d{width:9px;height:9px;background:var(--signal);border-radius:1px;transform:translateY(-1px)}
+.nav__links{display:flex;gap:26px;align-items:center}
+.nav__links a{font-family:var(--f-mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;border:0;padding:4px 0;border-bottom:2px solid transparent}
+.nav__links a:hover{color:var(--ink);border-bottom-color:var(--signal)}
+.nav__links a[aria-current]{border-bottom-color:var(--signal)}
+@media(max-width:900px){.nav__links{display:none}}
+.head{padding-top:clamp(30px,4vw,56px)}
+.head__meta{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.board{margin:clamp(16px,2.4vw,30px) 0 22px;font-family:var(--f-display);font-weight:800;font-size:clamp(38px,9.4vw,132px);--sf-w:.62em;--sf-gap:.048em;--sf-h:1.02em}
+.head__grid{display:grid;grid-template-columns:6fr 6fr;gap:var(--gut);align-items:end;border-top:var(--hair);padding-top:22px}
+@media(max-width:900px){.head__grid{grid-template-columns:1fr}}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gut)}
+/* jadval sarlavhasi */
+.thead{display:grid;grid-template-columns:52px 3fr 2fr 1.4fr 1.2fr 178px;gap:var(--gut);padding:0 0 9px;border-bottom:1px solid var(--ink);margin-top:clamp(34px,4vw,60px)}
+.thead span{font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60)}
+.thead span:last-child,.row__dl{text-align:right}
+@media(max-width:1000px){.thead{display:none}}
+/* ilova qatori */
+.row{display:grid;grid-template-columns:52px 3fr 2fr 1.4fr 1.2fr 178px;gap:var(--gut);align-items:center;padding:20px 0;border-bottom:var(--hair);border-left:3px solid transparent;transition:background .15s var(--ease),border-color .15s var(--ease)}
+.row:hover{background:var(--panel);border-left-color:var(--signal);padding-left:11px}
+.row__n{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--signal)}
+.row__t{font-family:var(--f-display);font-weight:800;font-size:clamp(24px,2.4vw,32px);line-height:1;text-transform:uppercase}
+.row__r{margin-top:5px}
+.row__v{display:flex;align-items:baseline;gap:8px}
+.row__v split-flap{font-family:var(--f-mono);font-weight:600;font-size:19px;--sf-w:.66em;--sf-gap:.04em}
+.row__d{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.row__dl{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.row__dl .btn{width:100%}
+@media(max-width:1000px){
+ .row{grid-template-columns:52px 1fr;row-gap:12px}
+ .row>*:not(:first-child):not(:nth-child(2)){grid-column:2}
+ .row__dl{align-items:flex-start}.row__dl .btn{width:auto}.row__dl .lbl{text-align:left}
+}
+.badge{display:inline-block;font-family:var(--f-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:3px 6px;border-radius:1px;color:var(--paper);background:var(--ink-40)}
+.badge--new{background:var(--signal)}
+.badge--req{background:var(--warn)}
+/* changelog */
+.notes{grid-column:1/-1;padding:2px 0 0 52px;display:none}
+@media(max-width:1000px){.notes{padding-left:0;grid-column:2}}
+.row[data-open] .notes{display:block}
+.notes ul{list-style:none;margin:12px 0 4px;padding:0;max-width:760px;border-top:var(--hair)}
+.notes li{font-size:14px;padding:8px 0 8px 14px;border-bottom:var(--hair);border-left:3px solid var(--ok);margin-left:0}
+.togg{background:transparent;border:0;padding:0;cursor:pointer;font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60);border-bottom:1px solid var(--grid)}
+.togg:hover{color:var(--signal);border-color:var(--signal)}
+/* qo'shimcha bloklar */
+.two{display:grid;grid-template-columns:7fr 5fr;gap:var(--gut);margin-top:clamp(40px,5vw,72px)}
+@media(max-width:900px){.two{grid-template-columns:1fr}}
+.spec{width:100%;border-collapse:collapse}
+.spec th,.spec td{text-align:left;padding:11px 12px;border-bottom:var(--hair);font-size:14px;vertical-align:top}
+.spec th{font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60);border-bottom:1px solid var(--ink);width:170px}
+.spec td:last-child{font-family:var(--f-mono);font-size:12px;color:var(--ink-60)}
+.side{background:var(--panel);border:var(--hair);padding:22px}
+.side ol{margin:14px 0 0;padding:0;list-style:none;counter-reset:s}
+.side li{counter-increment:s;display:grid;grid-template-columns:26px 1fr;gap:10px;padding:11px 0;border-top:var(--hair);font-size:14px}
+.side li::before{content:counter(s,decimal-leading-zero);font-family:var(--f-mono);font-size:11px;color:var(--signal);padding-top:3px}
+.foot{border-top:var(--hair);padding:36px 0 22px;margin-top:clamp(46px,6vw,86px)}
+.foot__bot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.spin{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-40);padding:44px 0}
+</style>
+</head>
+<body>
+<header class="nav">
+<div class="wrap nav__in">
+<a class="logo" href="HamrohPOS.html"><span class="logo__m">HamrohPOS</span><span class="logo__d"></span></a>
+<nav class="nav__links">
+<a href="HamrohPOS.html#imkoniyatlar">Imkoniyatlar</a><a href="HamrohPOS.html#arxitektura">Arxitektura</a><a href="HamrohPOS.html#narx">Narx</a><a href="Ilovalar.html" aria-current="page">Ilovalar</a>
+</nav>
+<a class="btn btn--sm" href="QR ilova.html" target="_blank" rel="noopener">QR ilova</a>
+</div>
+</header>
+
+<main class="wrap head">
+<div class="head__meta"><span class="eyebrow">Xodimlar uchun mobil ilovalar · Android</span><span class="eyebrow" id="synced">—</span></div>
+<div class="board"><split-flap theme="board" text="ILOVALAR" auto step="56"></split-flap></div>
+<div class="head__grid">
+<p class="lede">Manager, kassir va ofitsiant ilovalarining oxirgi versiyalari. Mobil dasturchi yangi versiya chiqarganda ro'yxat shu yerda avtomatik yangilanadi.</p>
+<div class="stat">
+<div class="dblk"><div class="lbl">Ilovalar</div><div class="dblk__v" id="sCount">—</div></div>
+<div class="dblk"><div class="lbl">Platforma</div><div class="dblk__v">Android</div></div>
+<div class="dblk"><div class="lbl">Kanal</div><div class="dblk__v">Barqaror</div></div>
+</div>
+</div>
+
+<div class="thead"><span>№</span><span>Ilova</span><span>Versiya · Chiqarilgan</span><span>Hajmi</span><span>Min. OS</span><span>Yuklab olish</span></div>
+<div id="list"><div class="spin">Ro'yxat yuklanmoqda</div></div>
+
+<div class="two">
+<div>
+<h3 class="h3" style="margin-bottom:14px">O'rnatish talablari</h3>
+<table class="spec">
+<tr><th>Platforma</th><td>Android 8.0+ · APK to'g'ridan-to'g'ri o'rnatiladi (Play Store shart emas)</td></tr>
+<tr><th>Tarmoq</th><td>Restoran Wi-Fi tarmog'i — ilova lokal serverni o'zi topadi (mDNS)</td></tr>
+<tr><th>Offline</th><td>Ulanish uzilsa ilova lokal serverga yozishda davom etadi</td></tr>
+<tr><th>Kirish</th><td>Xodim PIN kodi · huquqlar bulutdan boshqariladi</td></tr>
+<tr><th>Yangilanish</th><td>Ilova ochilganda yangi versiyani o'zi tekshiradi va shu sahifadan yuklaydi</td></tr>
+</table>
+</div>
+<aside class="side">
+<span class="eyebrow eyebrow--sig">Qo'llanma</span>
+<h3 class="h3" style="margin:10px 0 4px">Qanday o'rnatiladi</h3>
+<ol>
+<li>Telefondan shu sahifani oching va kerakli ilovani yuklab oling.</li>
+<li>Android so'raganda "Noma'lum manbalarga ruxsat" ni yoqing.</li>
+<li>APK ni o'rnating va restoran Wi-Fi tarmog'iga ulaning.</li>
+<li>Xodim PIN kodi bilan kiring — qolgani avtomatik sozlanadi.</li>
+</ol>
+</aside>
+</div>
+</main>
+
+<footer class="foot"><div class="wrap foot__bot">
+<span class="lbl">© 2026 HamrohPOS</span><span class="lbl">Asia/Tashkent</span><span class="lbl"><a href="HamrohPOS.html" style="border:0">hamrohpos.uz</a></span>
+</div></footer>
+
+<script src="splitflap.js"></script>
+<script>
+/* Backend: GET {BASE}/api/public/apps/  → quyidagi shakl.
+   Ulash: <script>window.HAMROH_API_BASE="https://…"<\/script> */
+(function(){
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const BASE=window.HAMROH_API_BASE??'';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dt=iso=>{try{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tashkent',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date(iso)).reduce((a,x)=>(a[x.type]=x.value,a),{});return `${p.day}.${p.month}.${p.year}`}catch(e){return '—'}};
+const MOCK=[
+{slug:"manager",name:"Manager",role:"Restoran egasi va menejer",version:"2.4.1",platform:"android",size_mb:"28.6",released_at:"2026-07-28T10:00:00+05:00",min_os:"Android 8.0",is_required:false,download_url:"#",
+ notes:["Filiallar bo'yicha solishtirma savdo hisoboti","Menyu narxini ommaviy o'zgartirish","Smena yopilishida avtomatik xabarnoma"]},
+{slug:"kassir",name:"Kassir",role:"Kassa va to'lovlar",version:"2.4.0",platform:"android",size_mb:"24.2",released_at:"2026-07-24T10:00:00+05:00",min_os:"Android 8.0",is_required:true,download_url:"#",
+ notes:["Hisobni bo'lib to'lash (split-bill)","Fiskal chek shabloni yangilandi","Offline navbat tiklanishi tezlashtirildi"]},
+{slug:"ofitsiant",name:"Ofitsiant",role:"Zal va buyurtmalar",version:"2.3.7",platform:"android",size_mb:"19.8",released_at:"2026-07-19T10:00:00+05:00",min_os:"Android 8.0",is_required:false,download_url:"#",
+ notes:["Stol chaqiruvlari jonli ro'yxati","Buyurtmaga izoh va modifikator qo'shish","QR stol kodini skanerlash"]}];
+function render(apps){
+  const newest=apps.reduce((a,b)=>new Date(a.released_at)>new Date(b.released_at)?a:b,apps[0]);
+  $('#sCount').textContent=String(apps.length).padStart(2,'0');
+  $('#synced').textContent='Oxirgi yangilanish · '+dt(newest.released_at);
+  $('#list').innerHTML=apps.map((a,i)=>`<div class="row" data-i="${i}">
+    <div class="row__n">${String(i+1).padStart(2,'0')}</div>
+    <div><div class="row__t">${esc(a.name)}</div><div class="lbl row__r">${esc(a.role)}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">${a===newest?'<span class="badge badge--new">Yangi</span>':''}${a.is_required?'<span class="badge badge--req">Majburiy</span>':''}</div></div>
+    <div><div class="row__v"><split-flap mode="num" text="${esc(a.version)}" step="46"></split-flap></div><div class="lbl" style="margin-top:6px">${dt(a.released_at)}</div>
+      <button class="togg" data-t="${i}" style="margin-top:9px">Nima yangilandi</button></div>
+    <div class="row__d">${esc(a.size_mb)} MB</div>
+    <div class="row__d">${esc(a.min_os)}</div>
+    <div class="row__dl"><a class="btn btn--sm btn--sig" href="${esc(a.download_url)}" download>APK yuklab olish</a><span class="lbl">v${esc(a.version)} · ${esc(a.platform)}</span></div>
+    <div class="notes"><ul>${(a.notes||[]).map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>
+  </div>`).join('');
+}
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('.togg');if(!b)return;
+  const row=b.closest('.row');const open=row.hasAttribute('data-open');
+  if(open){row.removeAttribute('data-open');b.textContent='Nima yangilandi'}
+  else{row.setAttribute('data-open','');b.textContent='Yopish'}
+});
+fetch(BASE+'/api/public/apps/').then(r=>{if(!r.ok)throw 0;return r.json()})
+ .then(d=>render(Array.isArray(d)?d:(d.results||MOCK)))
+ .catch(()=>render(MOCK));
+})();
+</script>
+</body>
+</html>

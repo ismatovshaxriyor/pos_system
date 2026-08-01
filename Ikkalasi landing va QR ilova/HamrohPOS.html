@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HamrohPOS — Internetsiz ishlaydigan restoran POS tizimi</title>
+<link rel="stylesheet" href="tokens.css">
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<style>
+/* ——— Navbar ——— */
+.nav{position:sticky;top:0;z-index:60;background:var(--paper);border-bottom:var(--hair)}
+.nav__in{display:flex;align-items:center;justify-content:space-between;gap:24px;height:64px}
+.logo{display:flex;align-items:baseline;gap:9px;border:0}
+.logo__m{font-family:var(--f-display);font-weight:900;font-size:24px;letter-spacing:-.01em;text-transform:uppercase}
+.logo__d{width:9px;height:9px;background:var(--signal);border-radius:1px;transform:translateY(-1px)}
+.nav__links{display:flex;gap:26px;align-items:center}
+.nav__links a{font-family:var(--f-mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;border:0;padding:4px 0;border-bottom:2px solid transparent}
+.nav__links a:hover{color:var(--ink);border-bottom-color:var(--signal)}
+.nav__r{display:flex;gap:10px;align-items:center}
+@media(max-width:1080px){.nav__links{display:none}}
+@media(max-width:520px){.nav__r .btn:not(.btn--sig){display:none}}
+/* ——— Hero ——— */
+.hero{padding-top:clamp(32px,5vw,72px);padding-bottom:0}
+.hero__meta{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.board{margin:clamp(18px,2.6vw,34px) 0 clamp(20px,3vw,40px);display:flex;flex-direction:column;gap:.07em;font-family:var(--f-display);font-weight:800;font-size:clamp(38px,10.2vw,148px);--sf-w:.62em;--sf-gap:.048em;--sf-h:1.02em}
+.hero__grid{display:grid;grid-template-columns:5fr 7fr;gap:var(--gut);align-items:start;border-top:var(--hair);padding-top:26px}
+@media(max-width:900px){.hero__grid{grid-template-columns:1fr}}
+.hero__cta{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
+.hero__facts{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gut);margin-top:34px}
+#hero3d{width:100%;height:clamp(300px,42vw,520px);background:var(--panel);border:var(--hair);position:relative}
+.hero3d__tag{position:absolute;left:12px;bottom:10px;z-index:2}
+.ticker{border-top:var(--hair);border-bottom:var(--hair);margin-top:clamp(40px,5vw,72px);overflow:hidden;background:var(--panel)}
+.ticker__t{display:flex;gap:0;white-space:nowrap;animation:tick 38s linear infinite}
+.ticker span{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-60);padding:11px 26px;border-right:var(--hair)}
+.ticker span b{color:var(--signal);font-weight:500}
+@keyframes tick{to{transform:translateX(-50%)}}
+/* ——— Features ——— */
+.ftable{border-top:2px solid var(--ink)}
+.frow{display:grid;grid-template-columns:64px 3.2fr 5fr 1.4fr;gap:var(--gut);align-items:baseline;padding:22px 0;border-bottom:var(--hair);transition:background .15s var(--ease),padding .15s var(--ease)}
+.frow:hover{background:var(--panel)}
+.frow__n{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--signal)}
+.frow__t{font-family:var(--f-display);font-weight:700;font-size:clamp(21px,2.2vw,29px);line-height:1.02;text-transform:uppercase}
+.frow__d{color:var(--ink-60);font-size:15px}
+.frow__k{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-40);text-align:right}
+@media(max-width:900px){.frow{grid-template-columns:44px 1fr;row-gap:8px}.frow__d{grid-column:2}.frow__k{grid-column:2;text-align:left}}
+/* ——— Demo terminal ——— */
+.pos{border:1px solid var(--ink);background:var(--panel);display:grid;grid-template-columns:1fr 380px}
+@media(max-width:960px){.pos{grid-template-columns:1fr}}
+.pos__bar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 16px;background:var(--ink);color:var(--paper)}
+.pos__bar .lbl{color:rgba(247,247,243,.6)}
+.pos__l{padding:16px;border-right:1px solid var(--ink)}
+@media(max-width:960px){.pos__l{border-right:0;border-bottom:1px solid var(--ink)}}
+.cats{display:flex;gap:0;border:var(--hair);margin-bottom:14px;flex-wrap:wrap}
+.cat{flex:1 0 auto;padding:9px 14px;background:transparent;border:0;border-right:var(--hair);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;color:var(--ink-60)}
+.cat:last-child{border-right:0}
+.cat[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.prods{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.prod{text-align:left;background:var(--paper);border:var(--hair);border-radius:1px;padding:11px 12px 12px;cursor:pointer;transition:border-color .12s var(--ease),transform .12s var(--ease)}
+.prod:hover{border-color:var(--ink)}
+.prod:active{transform:translateY(1px)}
+.prod__n{font-family:var(--f-display);font-weight:700;font-size:19px;text-transform:uppercase;line-height:1}
+.prod__p{font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-60);margin-top:7px}
+.pos__r{padding:16px;background:var(--paper);display:flex;flex-direction:column}
+.ord{flex:1;min-height:170px;border-top:var(--hair);margin-top:10px}
+.ord__row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:9px 0 9px 11px;border-bottom:var(--hair);border-left:3px solid var(--warn)}
+.ord__n{font-size:14px;font-weight:500}
+.ord__q{display:flex;align-items:center;gap:6px}
+.qbtn{width:22px;height:22px;border:var(--hair);background:transparent;line-height:1;cursor:pointer;font-family:var(--f-mono);font-size:13px;border-radius:1px;display:grid;place-items:center}
+.qbtn:hover{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.ord__s{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums;min-width:76px;text-align:right}
+.ord__empty{padding:38px 0;text-align:center}
+.tot{border-top:2px solid var(--ink);margin-top:12px;padding-top:10px}
+.tot__l{display:flex;justify-content:space-between;padding:5px 0;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-60)}
+.tot__f{display:flex;justify-content:space-between;align-items:flex-end;padding-top:10px;margin-top:6px;border-top:var(--hair)}
+/* ——— Architecture ——— */
+.arch{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--ink)}
+@media(max-width:900px){.arch{grid-template-columns:1fr}}
+.node{padding:22px;border-right:1px solid var(--ink);position:relative;background:var(--paper)}
+.node:last-child{border-right:0}
+@media(max-width:900px){.node{border-right:0;border-bottom:1px solid var(--ink)}.node:last-child{border-bottom:0}}
+.node--mid{background:var(--panel)}
+.node__t{font-family:var(--f-display);font-weight:800;font-size:26px;text-transform:uppercase;line-height:1;margin:8px 0 4px}
+.node ul{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:0}
+.node li{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-60);padding:7px 0;border-top:var(--hair)}
+.arrow{position:absolute;top:50%;right:-1px;width:0;height:0;z-index:2}
+.spec{width:100%;border-collapse:collapse;margin-top:var(--gut)}
+.spec th,.spec td{text-align:left;padding:11px 12px;border-bottom:var(--hair);font-size:14px;vertical-align:top}
+.spec th{font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60);border-bottom:1px solid var(--ink);width:180px}
+.spec td:last-child{font-family:var(--f-mono);font-size:12px;color:var(--ink-60)}
+/* ——— Pricing ——— */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--ink)}
+@media(max-width:900px){.plans{grid-template-columns:1fr}}
+.plan{padding:24px 22px 22px;border-right:1px solid var(--ink);display:flex;flex-direction:column}
+.plan:last-child{border-right:0}
+@media(max-width:900px){.plan{border-right:0;border-bottom:1px solid var(--ink)}.plan:last-child{border-bottom:0}}
+.plan--pick{background:var(--panel)}
+.plan__t{font-family:var(--f-display);font-weight:800;font-size:34px;text-transform:uppercase;line-height:1;margin-top:8px}
+.plan__price{margin:20px 0 4px;font-family:var(--f-mono);font-weight:500;font-size:clamp(18px,2vw,26px);--sf-w:.68em;--sf-gap:.05em}
+.plan ul{list-style:none;margin:18px 0 22px;padding:0;flex:1}
+.plan li{display:grid;grid-template-columns:16px 1fr;gap:8px;padding:9px 0;border-top:var(--hair);font-size:14px}
+.plan li::before{content:"—";font-family:var(--f-mono);color:var(--signal);font-size:12px;line-height:1.5}
+.plan li[data-off]{color:var(--ink-40)}
+.plan li[data-off]::before{content:"·";color:var(--grid)}
+/* ——— License ——— */
+.lic{display:grid;grid-template-columns:6fr 6fr;gap:var(--gut);border-top:2px solid var(--ink);padding-top:26px}
+@media(max-width:900px){.lic{grid-template-columns:1fr}}
+.field{display:flex;gap:0;border:1px solid var(--ink);margin-top:14px}
+.field input{flex:1;min-width:0;border:0;background:var(--paper);padding:0 14px;height:48px;font-family:var(--f-mono);font-size:14px;letter-spacing:.06em;text-transform:uppercase;outline:0}
+.field input::placeholder{color:var(--ink-40);text-transform:none;letter-spacing:0}
+.field input:focus{background:var(--panel)}
+.field .btn{border:0;border-left:1px solid var(--ink);border-radius:0}
+.lic__out{background:var(--panel);border:var(--hair);padding:22px;min-height:210px;display:flex;flex-direction:column;justify-content:space-between}
+.lic__badge{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,4vw,50px);--sf-w:.6em;--sf-gap:.045em;margin:14px 0 18px}
+.lic__rows{border-top:var(--hair)}
+.lic__row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:var(--hair);font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.lic__row span:first-child{color:var(--ink-60);letter-spacing:.08em;text-transform:uppercase;font-size:10px;align-self:center}
+.codes{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.chip{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;padding:6px 10px;border:var(--hair);background:var(--paper);cursor:pointer;border-radius:1px}
+.chip:hover{border-color:var(--signal);color:var(--signal)}
+/* ——— CTA + Footer ——— */
+.endcta{background:var(--ink);color:var(--paper);padding:clamp(48px,6vw,86px) 0}
+.endcta .lede{color:rgba(247,247,243,.62)}
+.endcta .btn{border-color:var(--paper);color:var(--paper)}
+.endcta .btn:hover{background:var(--paper);color:var(--ink)}
+.endcta .btn--sig{background:var(--signal);border-color:var(--signal)}
+.endcta .btn--sig:hover{background:var(--paper);border-color:var(--paper);color:var(--ink)}
+.endcta a{color:var(--paper);border-bottom-color:rgba(247,247,243,.35)}
+.endcta a:hover{color:var(--signal);border-bottom-color:var(--signal)}
+.foot{border-top:var(--hair);padding:44px 0 22px}
+.foot__cols{display:grid;grid-template-columns:4fr 2fr 2fr 2fr;gap:var(--gut)}
+@media(max-width:900px){.foot__cols{grid-template-columns:1fr 1fr}}
+.foot h4{font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-60);padding-bottom:10px;border-bottom:1px solid var(--ink);margin-bottom:4px}
+.foot ul{list-style:none;margin:0;padding:0}
+.foot li{padding:8px 0;border-bottom:var(--hair)}
+.foot li a{border:0;font-size:14px}
+.foot__bot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:34px;padding-top:14px;border-top:var(--hair)}
+/* ——— Modal ——— */
+.modal{position:fixed;inset:0;z-index:200;display:none}
+.modal[open]{display:block}
+.modal__bd{position:absolute;inset:0;background:rgba(19,19,19,.72)}
+.modal__pn{position:absolute;inset:0;margin:auto;width:min(1100px,calc(100% - 32px));height:min(720px,calc(100% - 32px));background:var(--paper);border:1px solid var(--ink);display:grid;grid-template-rows:auto 1fr}
+.modal__hd{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 14px;background:var(--ink);color:var(--paper)}
+.modal__hd .lbl{color:rgba(247,247,243,.6)}
+.xbtn{background:transparent;border:1px solid rgba(247,247,243,.4);color:var(--paper);width:30px;height:30px;cursor:pointer;font-family:var(--f-mono);border-radius:1px}
+.xbtn:hover{background:var(--signal);border-color:var(--signal)}
+.modal__bd2{display:grid;grid-template-columns:1fr 420px;overflow:hidden}
+@media(max-width:900px){.modal__bd2{grid-template-columns:1fr}.modal__side{display:none}}
+.modal__side{padding:26px;border-right:1px solid var(--ink);overflow:auto}
+.phone{display:grid;place-items:center;background:var(--panel);overflow:hidden;padding:18px}
+.phone__d{width:340px;height:100%;max-height:660px;border:10px solid var(--ink);border-radius:22px;overflow:hidden;background:var(--paper);position:relative}
+.phone__d iframe{width:100%;height:100%;border:0;display:block}
+/* ——— Loading ——— */
+.load{position:fixed;inset:0;z-index:500;background:var(--paper);display:grid;place-items:center;transition:opacity .35s var(--ease)}
+.load[hidden]{display:none}
+.load.out{opacity:0;pointer-events:none}
+.load__in{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,6vw,66px);--sf-w:.6em;--sf-gap:.045em}
+</style>
+</head>
+<body>
+
+<div class="load" id="load"><div><split-flap class="load__in" theme="board" text="HAMROHPOS" pad="9" step="52"></split-flap><div class="lbl" style="text-align:center;margin-top:14px">Yuklanmoqda</div></div></div>
+
+<header class="nav">
+<div class="wrap nav__in">
+<a class="logo" href="#top"><span class="logo__m">HamrohPOS</span><span class="logo__d"></span></a>
+<nav class="nav__links">
+<a href="#imkoniyatlar">Imkoniyatlar</a><a href="#demo">Kassa demosi</a><a href="#arxitektura">Arxitektura</a><a href="#narx">Narx</a><a href="#litsenziya">Litsenziya</a><a href="Ilovalar.html">Ilovalar</a>
+</nav>
+<div class="nav__r"><a class="btn btn--sm" href="QR ilova.html" target="_blank" rel="noopener">QR ilova</a><button class="btn btn--sm btn--sig" data-modal="open">Demo ko'rish</button></div>
+</div>
+</header>
+
+<main id="top">
+
+<section class="wrap hero">
+<div class="hero__meta">
+<span class="eyebrow">Internetsiz ishlaydigan POS · Restoran va kafelar uchun</span>
+<span class="eyebrow">Toshkent · hamrohpos.uz</span>
+</div>
+<div class="board">
+<split-flap theme="board" text="INTERNETSIZ" auto step="58"></split-flap>
+<split-flap theme="bare" text="ISHLAYDI" auto step="58"></split-flap>
+</div>
+<div class="hero__grid">
+<div>
+<p class="lede">Internet uzilsa ham kassa to'xtamaydi. Restoran ichidagi lokal server buyurtmani qabul qiladi va saqlaydi, ulanish tiklanganda bulut bilan o'zi sinxronlanadi.</p>
+<div class="hero__cta"><button class="btn btn--sig" data-modal="open">Demo ko'rish</button><a class="btn" href="#narx">Narxni kelishish</a></div>
+<div class="hero__facts">
+<div class="dblk"><div class="lbl">Rejim</div><div class="dblk__v">Offline</div></div>
+<div class="dblk"><div class="lbl">Server</div><div class="dblk__v">Lokal + Bulut</div></div>
+<div class="dblk"><div class="lbl">Mijoz</div><div class="dblk__v">QR</div></div>
+</div>
+</div>
+<div id="hero3d"><span class="hero3d__tag lbl">Sxema 01 — Ona-Bola tugunlari</span></div>
+</div>
+</section>
+
+<div class="ticker"><div class="ticker__t" id="tick"></div></div>
+
+<section class="wrap sec" id="imkoniyatlar">
+<div class="sec__head"><span class="sec__num">01</span><h2 class="h2">Imkoniyatlar</h2><span class="eyebrow" style="margin-left:auto">Olti modul · bitta tizim</span></div>
+<div class="ftable" id="ftable"></div>
+</section>
+
+<section class="wrap sec" id="demo">
+<div class="sec__head"><span class="sec__num">02</span><h2 class="h2">Kassa displeyi</h2><span class="eyebrow" style="margin-left:auto">Interaktiv · bosib ko'ring</span></div>
+<div class="pos">
+<div class="pos__bar"><span class="lbl">Terminal 01 · Stol 12 (VIP)</span><span class="lbl" id="posClock">—</span><span class="lbl" style="color:var(--paper)">Rejim: Offline</span></div>
+<div class="pos__l">
+<div class="cats" id="cats"></div>
+<div class="prods" id="prods"></div>
+</div>
+<div class="pos__r">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Joriy buyurtma</span><span class="lbl" id="ordCount">0 pozitsiya</span></div>
+<div class="ord" id="ord"></div>
+<div class="tot">
+<div class="tot__l"><span>Oraliq jami</span><span id="tSub">0</span></div>
+<div class="tot__l"><span>Xizmat haqi 10%</span><span id="tSrv">0</span></div>
+<div class="tot__f"><div><div class="lbl">Yakuniy summa</div><split-flap id="tFinal" class="sf-mono" mode="num" text="0" pad="9" step="48" style="font-size:clamp(22px,2.4vw,32px);margin-top:6px"></split-flap></div><span class="lbl">so'm</span></div>
+</div>
+<button class="btn btn--sig" id="printBtn" style="margin-top:14px;width:100%" disabled>Chekni chop etish</button>
+<div class="lbl" id="printMsg" style="margin-top:10px;text-align:center;min-height:14px"></div>
+</div>
+</div>
+</section>
+
+<section class="wrap sec" id="arxitektura">
+<div class="sec__head"><span class="sec__num">03</span><h2 class="h2">Ona-Bola arxitekturasi</h2><span class="eyebrow" style="margin-left:auto">Sxema 02</span></div>
+<div class="arch">
+<div class="node"><span class="eyebrow eyebrow--sig">Ona</span><div class="node__t">Bulut</div><div class="lbl">hamrohpos.uz</div><ul><li>Barcha filial ma'lumoti</li><li>Menyu va narx boshqaruvi</li><li>Konsolidatsiyalangan hisobot</li><li>Litsenziya nazorati</li></ul></div>
+<div class="node node--mid"><span class="eyebrow eyebrow--sig">Bola</span><div class="node__t">Lokal server</div><div class="lbl">Restoran ichida · LAN</div><ul><li>Buyurtma va to'lov yozuvi</li><li>Navbatli sinxronizatsiya</li><li>QR public API</li><li>Internetsiz to'liq ishlaydi</li></ul></div>
+<div class="node"><span class="eyebrow">Uchinchi qatlam</span><div class="node__t">Terminallar</div><div class="lbl">Zal · Oshxona · Mijoz</div><ul><li>Kassa (ofitsiant/kassir)</li><li>Oshxona displeyi</li><li>QR menyu va hisob</li><li>Chek printeri</li></ul></div>
+</div>
+<table class="spec">
+<tr><th>Ulanish uzilganda</th><td>Lokal server buyurtmani qabul qilishda davom etadi; yozuvlar navbatga tushadi.</td></tr>
+<tr><th>Tiklanganda</th><td>Navbat bulutga ketma-ket yuboriladi, konflikt vaqt belgisi bo'yicha hal qilinadi.</td></tr>
+<tr><th>Mijoz kanali</th><td>QR orqali faqat ko'rish: menyu, joriy hisob va ofitsiant chaqiruvi</td></tr>
+<tr><th>Vaqt zonasi</th><td>Asia/Tashkent · barcha hisobot va chek shu zonada</td></tr>
+</table>
+</section>
+
+<section class="wrap sec" id="narx">
+<div class="sec__head"><span class="sec__num">04</span><h2 class="h2">Narx</h2><span class="eyebrow" style="margin-left:auto">Restoran hajmiga qarab</span></div>
+<div class="plans">
+<div class="plan"><span class="eyebrow">Tarif A</span><div class="plan__t">Boshlang'ich</div><split-flap class="plan__price" mode="alpha" text="KELISHUV" auto step="55"></split-flap><div class="lbl">Bitta zal, bitta kassa</div>
+<ul><li>1 kassa terminali</li><li>QR menyu va hisob</li><li>Asosiy savdo hisoboti</li><li data-off>Oshxona displeyi</li><li data-off>Ko'p filial</li></ul>
+<button class="btn" data-modal="open">Bog'lanish</button></div>
+<div class="plan plan--pick"><span class="eyebrow eyebrow--sig">Tarif B · Ko'p tanlanadi</span><div class="plan__t">Restoran</div><split-flap class="plan__price" mode="alpha" text="KELISHUV" auto step="55"></split-flap><div class="lbl">To'liq zal + oshxona</div>
+<ul><li>3 kassa terminali</li><li>QR menyu va hisob</li><li>Oshxona displeyi</li><li>Lokal server (offline)</li><li data-off>Ko'p filial</li></ul>
+<button class="btn btn--sig" data-modal="open">Narxni kelishish</button></div>
+<div class="plan"><span class="eyebrow">Tarif C</span><div class="plan__t">Tarmoq</div><split-flap class="plan__price" mode="alpha" text="KELISHUV" auto step="55"></split-flap><div class="lbl">Bir nechta filial</div>
+<ul><li>Cheksiz terminal</li><li>Ko'p filial boshqaruvi</li><li>Konsolidatsiyalangan hisobot</li><li>API va maxsus integratsiya</li><li>Ajratilgan qo'llab-quvvatlash</li></ul>
+<button class="btn" data-modal="open">Bog'lanish</button></div>
+</div>
+<p class="lbl" style="margin-top:14px">Narx terminal soni, filial soni va integratsiya hajmiga qarab kelishiladi. Demo va hisob-kitob uchun biz bilan bog'laning.</p>
+</section>
+
+<section class="wrap sec" id="litsenziya">
+<div class="sec__head"><span class="sec__num">05</span><h2 class="h2">Litsenziya tekshiruvi</h2><span class="eyebrow" style="margin-left:auto">Ochiq xizmat</span></div>
+<div class="lic">
+<div>
+<p class="lede">Restoraningizga berilgan litsenziya kalitini kiriting — holat va amal qilish muddati darhol ko'rsatiladi.</p>
+<div class="field"><input id="licIn" placeholder="HMR-XXXX-XXXX" autocomplete="off" spellcheck="false"><button class="btn btn--sig" id="licBtn">Tekshirish</button></div>
+<div class="codes"><span class="lbl" style="align-self:center">Demo kalitlar:</span><button class="chip" data-code="HMR-2026-DEMO">HMR-2026-DEMO</button><button class="chip" data-code="HMR-2025-TEST">HMR-2025-TEST</button></div>
+</div>
+<div class="lic__out">
+<div><span class="lbl">Holat</span><split-flap class="lic__badge" id="licBadge" theme="bare" text="KUTILMOQDA" pad="15" step="54"></split-flap></div>
+<div class="lic__rows" id="licRows"></div>
+</div>
+</div>
+</section>
+
+<section class="endcta">
+<div class="wrap" style="display:grid;grid-template-columns:7fr 5fr;gap:var(--gut);align-items:end">
+<div><span class="eyebrow" style="color:var(--signal)">Keyingi qadam</span><h2 class="h2" style="margin:10px 0 14px">Restoraningizni<br>ko'chiring</h2><p class="lede">Demo ko'rsatuv 20 daqiqa. Mavjud menyu va stol jadvalingizni ko'chirishga biz yordam beramiz.</p></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end"><button class="btn btn--sig" data-modal="open">Demo ko'rish</button><a class="btn" href="QR ilova.html" target="_blank" rel="noopener">QR ilova</a></div>
+</div>
+</section>
+
+</main>
+
+<footer class="foot">
+<div class="wrap">
+<div class="foot__cols">
+<div><div class="logo" style="margin-bottom:12px"><span class="logo__m">HamrohPOS</span><span class="logo__d"></span></div><p class="lede" style="font-size:14px">Restoranlar uchun savdo tizimi — internetsiz ham ishlaydi. Ona-Bola arxitekturasi: bulut boshqaruvi, restoran ichida mustaqil ishlaydigan lokal server.</p></div>
+<div><h4>Mahsulot</h4><ul><li><a href="#imkoniyatlar">Imkoniyatlar</a></li><li><a href="#demo">Kassa displeyi</a></li><li><a href="#arxitektura">Arxitektura</a></li><li><a href="QR ilova.html" target="_blank" rel="noopener">QR menyu</a></li></ul></div>
+<div><h4>Xizmat</h4><ul><li><a href="#narx">Narx</a></li><li><a href="#litsenziya">Litsenziya</a></li><li><a href="Ilovalar.html">Ilovalar</a></li><li><a href="#">Qo'llab-quvvatlash</a></li></ul></div>
+<div><h4>Aloqa</h4><ul><li><a href="tel:+998900000000">+998 90 000 00 00</a></li><li><a href="mailto:info@hamrohpos.uz">info@hamrohpos.uz</a></li><li><a href="https://hamrohpos.uz">hamrohpos.uz</a></li><li><a href="#">Toshkent, O'zbekiston</a></li></ul></div>
+</div>
+<div class="foot__bot"><span class="lbl">© 2026 HamrohPOS</span><span class="lbl">Asia/Tashkent · Narxlar so'mda</span><span class="lbl">Shveytsariya tartibi · v1.0</span></div>
+</div>
+</footer>
+
+<div class="modal" id="modal">
+<div class="modal__bd" data-modal="close"></div>
+<div class="modal__pn" role="dialog" aria-modal="true" aria-label="Demo">
+<div class="modal__hd"><span class="lbl">Demo · Mijoz QR ilovasi</span><span class="lbl" style="margin-left:auto">Stol 12 (VIP)</span><button class="xbtn" data-modal="close" aria-label="Yopish">×</button></div>
+<div class="modal__bd2">
+<div class="modal__side">
+<span class="eyebrow eyebrow--sig">Qanday ishlaydi</span>
+<h3 class="h3" style="margin:10px 0 14px">Mijoz stoldagi QR kodni skan qiladi</h3>
+<p class="lede" style="font-size:15px">Menyu va joriy hisob ochiladi. Buyurtma va to'lovni faqat xodim kiritadi — mijoz ilovasi faqat ko'rsatadi va ofitsiantni chaqira oladi.</p>
+<div style="margin-top:22px" class="lic__rows">
+<div class="lic__row"><span>Menyu</span><span>Kategoriyalar va taomlar</span></div>
+<div class="lic__row"><span>Stol</span><span>Joriy hisob, jonli</span></div>
+<div class="lic__row"><span>Chaqiruv</span><span>Ofitsiantni chaqirish</span></div>
+</div>
+<a class="btn btn--sm" href="QR ilova.html" target="_blank" rel="noopener" style="margin-top:20px">Alohida oynada ochish</a>
+</div>
+<div class="phone"><div class="phone__d"><iframe id="demoFrame" title="QR ilova demosi" loading="lazy" src="about:blank"></iframe></div></div>
+</div>
+</div>
+</div>
+
+<script src="splitflap.js"></script>
+<script src="landing.js"></script>
+<script type="module" src="hero3d.js"></script>
+</body>
+</html>
