@@ -22,6 +22,11 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # MobileApp.apk_file admin orqali yuklanadi (Ilovalar sahifasi) - Django
+    # o'zi bu limitni qo'ymaydi, lekin nginx'ning standart 1M'i buni /admin/
+    # orqali yuklashda susib qoladi (413).
+    client_max_body_size 100M;
+
     # Gzip compression
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
@@ -36,12 +41,14 @@ server {
     # uzatmaydi.
     set $backend_web "${BACKEND_WEB}";
 
-    # SPA Fallback
+    # SPA Fallback - client-side routing (/, /ilovalar, /table/<uuid>/) shu
+    # orqali ishlaydi, chunki haqiqatda bitta index.html bor.
     location / {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy API requests to Django Gunicorn web container
+    # Proxy API requests to Django backend (local_server: /api/public/*,
+    # cloud_server: /api/sync/*).
     location /api/ {
         proxy_pass http://$backend_web$request_uri;
         proxy_set_header Host $host;
@@ -50,7 +57,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Proxy Admin requests to Django Gunicorn web container
+    # Proxy Admin requests to Django backend
     location /admin/ {
         proxy_pass http://$backend_web$request_uri;
         proxy_set_header Host $host;
@@ -61,6 +68,17 @@ server {
 
     # Django admin static files
     location /static/ {
+        proxy_pass http://$backend_web$request_uri;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Media fayllar (masalan MobileApp.apk_file, Product/Category rasmlari) -
+    # backend'ning o'zi xizmat qiladi (local_server/cloud_server ikkalasi ham
+    # /media/<path> route'iga ega).
+    location /media/ {
         proxy_pass http://$backend_web$request_uri;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

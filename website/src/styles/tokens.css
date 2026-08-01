@@ -1,0 +1,75 @@
+/* HamrohPOS — "Shveytsariya tartibi" dizayn tokenlari
+   Fontlar index.html'da <link> orqali yuklanadi (bu yerda @import yo'q — ikki marta yuklanmasin). */
+:root{
+--paper:#F7F7F3;--panel:#EFEFEA;--ink:#131313;--signal:#D91E18;--grid:#B7B7B2;--ok:#2E7D5B;--warn:#C98A1D;
+--ink-60:#5c5c5a;--ink-40:#8a8a86;
+--hair:1px solid var(--grid);
+--f-display:'Big Shoulders Display','Archivo',sans-serif;
+--f-body:'Archivo',system-ui,sans-serif;
+--f-mono:'IBM Plex Mono',ui-monospace,monospace;
+--ease:cubic-bezier(0.4,0,0.2,1);
+--pad:40px;--gut:24px;
+}
+@media(max-width:900px){:root{--pad:20px;--gut:16px}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;text-wrap:pretty}
+img{display:block;max-width:100%}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--grid);transition:color .15s var(--ease),border-color .15s var(--ease)}
+a:hover{color:var(--signal);border-color:var(--signal)}
+h1,h2,h3,h4,p,figure{margin:0}
+.wrap{max-width:1440px;margin:0 auto;padding:0 var(--pad)}
+.g12{display:grid;grid-template-columns:repeat(12,1fr);gap:var(--gut)}
+@media(max-width:900px){.g12{grid-template-columns:repeat(4,1fr)}}
+/* typography */
+.eyebrow{font-family:var(--f-mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.16em;color:var(--ink-60)}
+.eyebrow--sig{color:var(--signal)}
+.dh{font-family:var(--f-display);font-weight:800;line-height:.95;letter-spacing:-.01em;text-transform:uppercase}
+.h2{font-family:var(--f-display);font-weight:800;font-size:clamp(34px,5vw,64px);line-height:.95;letter-spacing:-.01em;text-transform:uppercase}
+.h3{font-family:var(--f-display);font-weight:700;font-size:clamp(22px,2.4vw,30px);line-height:1;letter-spacing:-.005em;text-transform:uppercase}
+.lede{font-size:clamp(15px,1.25vw,19px);line-height:1.5;color:var(--ink-60);max-width:52ch}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.num{font-family:var(--f-mono);font-weight:500;font-variant-numeric:tabular-nums}
+.lbl{display:block;font-family:var(--f-mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-60)}
+/* rules */
+.rule{height:1px;background:var(--grid);border:0}
+.rule--ink{background:var(--ink)}
+.rule--sig{background:var(--signal);height:2px}
+/* section scaffold */
+.sec{padding:clamp(56px,7vw,110px) 0;border-top:var(--hair)}
+.sec__head{display:flex;align-items:baseline;gap:20px;flex-wrap:wrap;margin-bottom:clamp(28px,3.5vw,52px)}
+.sec__num{font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.14em;color:var(--signal)}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:48px;padding:0 22px;border:1px solid var(--ink);background:transparent;border-radius:1px;font-family:var(--f-mono);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease)}
+.btn:hover{background:var(--ink);color:var(--paper)}
+.btn--sig{background:var(--signal);border-color:var(--signal);color:var(--paper)}
+.btn--sig:hover{background:var(--ink);border-color:var(--ink)}
+.btn--sm{height:38px;padding:0 14px;font-size:11px}
+.btn[disabled]{opacity:.35;pointer-events:none}
+a.btn{border-bottom:1px solid var(--ink)}
+a.btn:hover{color:var(--paper)}
+a.btn--sig{border-bottom-color:var(--signal)}
+/* data block: label above, big value below */
+.dblk{border-top:2px solid var(--ink);padding-top:10px}
+.dblk__v{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,3.2vw,44px);line-height:1;text-transform:uppercase;letter-spacing:-.01em;margin-top:6px}
+/* status left-bar */
+.st{border-left:3px solid var(--grid);padding-left:12px}
+.st--new{border-left-color:var(--warn)}
+.st--ready{border-left-color:var(--ok)}
+.st--closed{border-left-color:var(--ink-40)}
+.st--sig{border-left-color:var(--signal)}
+/* split-flap temalari */
+split-flap{--sf-bg:var(--panel);--sf-fg:var(--ink);--sf-seam:rgba(19,19,19,.16)}
+split-flap[theme="board"]{--sf-bg:var(--ink);--sf-fg:var(--paper);--sf-seam:rgba(247,247,243,.22)}
+split-flap[theme="sig"]{--sf-bg:var(--signal);--sf-fg:#fff;--sf-seam:rgba(255,255,255,.3)}
+split-flap[theme="ok"]{--sf-bg:var(--ok);--sf-fg:#fff;--sf-seam:rgba(255,255,255,.3)}
+split-flap[theme="warn"]{--sf-bg:var(--warn);--sf-fg:#fff;--sf-seam:rgba(255,255,255,.3)}
+split-flap[theme="bare"]{--sf-bg:transparent;--sf-seam:rgba(19,19,19,.12)}
+.sf-mono{font-family:var(--f-mono);font-weight:500;--sf-w:.66em}
+.sf-disp{font-family:var(--f-display);font-weight:800;--sf-w:.6em}
+/* scroll reveal */
+[data-rv]{opacity:0;transform:translateY(10px);transition:opacity .3s var(--ease),transform .3s var(--ease)}
+[data-rv].in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){[data-rv]{opacity:1;transform:none;transition:none}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+::selection{background:var(--signal);color:var(--paper)}
