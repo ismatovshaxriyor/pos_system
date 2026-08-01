@@ -13,7 +13,8 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
   - `service_charge_rate`: Restoran xizmat haqi foizi (masalan `10.00` = 10%)
   - `telegram_bot_token`: Telegram bot tokeni (BotFather'dan olinadi)
   - `telegram_chat_id`: Telegram admin/guruh chat ID'si
-  - `public_domain`: Mijozlar stoldagi QR kodni skanerlaganda o'tadigan domen
+  - `public_domain`: Mijozlar stoldagi QR kodni skanerlaganda o'tadigan domen (to'lov chekidagi QR kod ham shu domenga - qarang pastda "To'lov chekidagi QR kod")
+  - `phone`: Restoran telefon raqami - to'lov chekining pastida ko'rsatiladi (masalan `"+998901234567"`)
   - `latitude` / `longitude`: Restoran koordinatalari
   - `attendance_radius`: Davomat radiusi (metrlarda)
 
@@ -148,6 +149,22 @@ Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilgan
 - Chekning o'zida (chop etilgan qog'ozda) bu holatda "Stol: Takeaway" kabi noqulay yozuv o'rniga **"Olib ketish"** (yoki `delivery` uchun **"Yetkazib berish"**) chiqadi - stol yozuvi umuman ko'rinmaydi.
 - Stol biriktirilgan buyurtmalarda hech narsa o'zgarmagan - `table_name` avvalgidek haqiqiy stol nomi.
 - Oshxona cheki (kitchen ticket - bu `items_snapshot`ga emas, to'g'ridan-to'g'ri chop etish vaqtida generatsiya qilinadi, API orqali ko'rinmaydi) sarlavha qatorlari (Buyurtma #/vaqt, Stol/Ofitsiant) endi biroz kattaroq shriftda (2x balandlik) chiqadi - o'qishni osonlashtirish uchun.
+
+### 7. Chek ko'rinishi yangilandi (ustunli jadval, ikkita sana, QR kod)
+`PrintJob.items_snapshot` (`GET /api/print-jobs/{id}/` orqali ko'rinadi, pre-bill va to'lov cheki ikkalasida ham) endi qo'shimcha maydonlar bilan keladi:
+```json
+{
+  "table_name": "5 (Ko'cha)",
+  "order_created_at": "2026-07-31T16:51:00+00:00",
+  "phone": "+998901234567",
+  "website_url": "https://filial1.hamrohpos.uz/"
+}
+```
+- **`table_name` endi stol hududi (`TableZone`) bilan birga keladi** - avval faqat `"5"` bo'lsa, endi `"5 (Ko'cha)"` (`str(Table)` bilan bir xil format). Zona biriktirilmagan stolda o'zgarish yo'q (faqat `"5"`).
+- **`order_created_at`** (yangi maydon, ISO 8601) - buyurtma ochilgan vaqt (`Order.created_at`). Chekning o'zida "Ochilgan:" qatorida ko'rinadi, mavjud `created_at`/chek chiqarilgan vaqt esa pre-bill'da "Chek vaqti:", to'lov chekida "Yopilgan:" sifatida - ya'ni endi chekda **ikkita sana** bor.
+- **`phone`** va **`website_url`** (ikkalasi ham faqat to'lov chekida, ya'ni `job_type == "receipt"`; pre-bill'da yo'q) - `RestaurantConfig.phone` va `public_domain`dan olinadi. Ikkalasi ham bo'sh/`null` bo'lishi mumkin (restoran sozlamasa) - bu holda chekda tegishli qator/QR kod umuman chiqmaydi.
+- Chekdagi taomlar ro'yxati endi ustunli jadval ko'rinishida (`Nomi | Soni | Narxi | Jami`, sarlavha qatori bilan) chiqadi - avvalgi ikki qatorli (`qty x nom` + narx pastki qatorda) format o'rniga.
+- To'lov chekining pastida (mavjud bo'lsa) `Tel: <phone>` qatori, so'ng "Xaridingiz uchun rahmat!" xabari, so'ng `website_url`ga yo'naltiruvchi **QR kod** chop etiladi (printerning o'zi generatsiya qiladi - qo'shimcha rasm/URL API orqali kelmaydi, faqat `website_url` matn maydoni).
 
 ---
 
