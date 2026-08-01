@@ -41,6 +41,16 @@ server {
     # uzatmaydi.
     set $backend_web "${BACKEND_WEB}";
 
+    # DIQQAT: `X-Forwarded-Proto $scheme` YOZILMASIN - `$scheme` shu nginx'ga
+    # KELGAN ulanishning sxemasi (har doim "http", chunki `listen 80` va TLS
+    # Cloudflare chekkasida tugaydi), mijozning HAQIQIY sxemasi emas. Bu buni
+    # doim "http" deb Django'ga uzatib, `request.build_absolute_uri()` orqali
+    # qurilgan har qanday havolani (masalan MobileApp.apk_file yuklab olish
+    # linki) noto'g'ri `http://` bilan chiqargan - Android ba'zi brauzerlari
+    # .apk kabi fayllarni cleartext (http) orqali yuklashni butunlay
+    # rad etadi. Bu konteyner FAQAT Cloudflare tunnel orqali ochiladi (public
+    # port yo'q), shuning uchun qattiq "https" yozish xavfsiz va to'g'ri.
+
     # SPA Fallback - client-side routing (/, /ilovalar, /table/<uuid>/) shu
     # orqali ishlaydi, chunki haqiqatda bitta index.html bor.
     location / {
@@ -54,7 +64,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     # Proxy Admin requests to Django backend
@@ -63,7 +73,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     # Django admin static files
@@ -72,7 +82,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     # Media fayllar (masalan MobileApp.apk_file, Product/Category rasmlari) -
@@ -83,7 +93,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 
     # Real-vaqt WebSocket kanali (local_server/core/routing.py::EventsConsumer,
@@ -100,7 +110,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
         # Default 60s - WS ulanishi uzoq bo'sh turishi mumkin (real-vaqt
         # push kutib), nginx uni muddatidan oldin uzib qo'ymasligi kerak.
         proxy_read_timeout 3600s;

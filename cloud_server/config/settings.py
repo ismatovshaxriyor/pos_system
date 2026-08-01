@@ -42,8 +42,17 @@ if not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = ['https://*.hamrohpos.uz', 'https://*.ismatov.uz', 'https://*.example.uz', 'http://localhost', 'http://127.0.0.1']
 CORS_ALLOW_ALL_ORIGINS = True
 
-if os.environ.get('SECURE_PROXY_SSL_HEADER', '0') == '1':
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Prod'da Django hech qachon to'g'ridan-to'g'ri TLS bilan gaplashmaydi (TLS
+# Cloudflare chekkasida tugaydi, `web` esa 127.0.0.1'da ochiq, faqat
+# `website` nginx konteyneri orqali ochiladi - hech qanday boshqa ochiq yo'l
+# yo'q). Shu sababli bu sozlamani ilgari qilingandek maxsus env o'zgaruvchi
+# ortida yashirish shart emas edi - agar prodda `SECURE_PROXY_SSL_HEADER=1`
+# unutilib qolsa, `request.build_absolute_uri()` (masalan MobileApp.apk_file
+# yuklab olish havolasi) hamisha noto'g'ri `http://` qaytarardi. Django faqat
+# header'ning qiymati "https"ga TENG bo'lsagina xavfsiz deb hisoblaydi -
+# header umuman kelmasa (masalan lokal dev runserver'da, nginx yo'q) xatti-
+# harakat o'zgarmaydi, shuning uchun bu har doim yoqilgan bo'lishi xavfsiz.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
