@@ -26,8 +26,12 @@ export const IlovalarPage: React.FC = () => {
   const [openRow, setOpenRow] = useState<string | null>(null);
 
   useEffect(() => {
+    // Bo'sh ro'yxat ham HAQIQIY javob - hali birorta ilova qo'shilmagan
+    // degani, backend ulanmagan degani emas. Mock faqat so'rov chinakam
+    // muvaffaqiyatsiz bo'lganda (tarmoq xatosi) ko'rsatiladi, "Demo"
+    // yorlig'i bilan.
     fetchApps()
-      .then((data) => setApps(data.length ? data : MOCK_APPS))
+      .then((data) => setApps(data))
       .catch(() => { setApps(MOCK_APPS); setLive(false); });
   }, []);
 
@@ -77,6 +81,9 @@ export const IlovalarPage: React.FC = () => {
         <div className="thead"><span>№</span><span>Ilova</span><span>Versiya · Chiqarilgan</span><span>Hajmi</span><span>Min. OS</span><span>Yuklab olish</span></div>
         <div>
           {!apps && <div className="spin">Ro'yxat yuklanmoqda</div>}
+          {apps && apps.length === 0 && (
+            <div className="spin">Hozircha hech qanday ilova e'lon qilinmagan</div>
+          )}
           {apps && apps.map((a, i) => {
             const open = openRow === a.slug;
             return (

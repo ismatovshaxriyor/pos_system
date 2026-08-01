@@ -7,12 +7,16 @@ interface Props {
 }
 
 export const Pricing: React.FC<Props> = ({ onCta }) => {
-  const [plans, setPlans] = useState<PricingPlanEntry[]>(MOCK_PLANS);
+  // Bo'sh ro'yxat ham HAQIQIY javob - mock faqat so'rov chinakam
+  // muvaffaqiyatsiz bo'lganda (tarmoq xatosi) ko'rsatiladi. Boshida
+  // hech narsa ko'rsatmaymiz (yuklanish holati), aks holda backend
+  // javob berguncha soxta tariflar bir zumga chaqib qolardi.
+  const [plans, setPlans] = useState<PricingPlanEntry[] | null>(null);
 
   useEffect(() => {
     fetchPricingPlans()
-      .then((data) => { if (data.length) setPlans(data); })
-      .catch(() => {});
+      .then((data) => setPlans(data))
+      .catch(() => setPlans(MOCK_PLANS));
   }, []);
 
   return (
@@ -23,7 +27,10 @@ export const Pricing: React.FC<Props> = ({ onCta }) => {
         <span className="eyebrow" style={{ marginLeft: 'auto' }}>Restoran hajmiga qarab</span>
       </div>
       <div className="plans">
-        {plans.map((p) => (
+        {plans && plans.length === 0 && (
+          <p className="lede" style={{ padding: '24px 22px' }}>Tariflar hozircha kiritilmagan.</p>
+        )}
+        {plans && plans.map((p) => (
           <div className={`plan${p.is_highlighted ? ' plan--pick' : ''}`} key={p.tier_label}>
             <span className={`eyebrow${p.is_highlighted ? ' eyebrow--sig' : ''}`}>{p.tier_label}</span>
             <div className="plan__t">{p.title}</div>
