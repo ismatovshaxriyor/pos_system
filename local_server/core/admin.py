@@ -260,7 +260,7 @@ class StockMovementAdmin(SimpleHistoryAdmin):
 
 @admin.register(RestaurantConfig)
 class RestaurantConfigAdmin(SimpleHistoryAdmin):
-    list_display = ('id', 'name', 'service_charge_rate', 'telegram_bot_token', 'telegram_chat_id', 'public_domain', 'updated_at')
+    list_display = ('id', 'name', 'phone', 'service_charge_rate', 'telegram_bot_token', 'telegram_chat_id', 'public_domain', 'updated_at')
 
 
 @admin.register(Attendance)

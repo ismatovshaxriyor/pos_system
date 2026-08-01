@@ -168,3 +168,71 @@ class EscposTicketTests(SimpleTestCase):
             items=[{'name': 'Osh', 'quantity': 1, 'note': '', 'modifiers': {}}],
         )
         self.assertNotIn(b'hamrohpos.uz', payload)
+
+    def test_order_type_label(self):
+        self.assertEqual(escpos._order_type_label('dine_in'), 'Stolga')
+        self.assertEqual(escpos._order_type_label('takeaway'), 'Olib ketish')
+        self.assertEqual(escpos._order_type_label('delivery'), 'Yetkazib berish')
+
+    def test_items_table_header_and_columns(self):
+        lines = escpos._items_table_lines(
+            [{'name': 'Osh', 'quantity': 2, 'price': 30000}], width=48)
+        self.assertEqual(lines[0][:4], 'Nomi')
+        self.assertTrue(lines[0].rstrip().endswith('Jami'))
+        self.assertEqual(len(lines[0]), 48)
+        self.assertIn('Osh', lines[2])
+        self.assertIn('60 000', lines[2])  # 2 x 30000
+
+    def test_items_table_wraps_long_name_without_numbers_on_continuation(self):
+        long_name = "Aksiya farsh o'rdak barbekuola supasi bilan"
+        lines = escpos._items_table_lines(
+            [{'name': long_name, 'quantity': 1, 'price': 150000}], width=48)
+        # Birinchi qatorda raqamlar bor, davomida yo'q.
+        self.assertIn('150 000', lines[2])
+        self.assertNotIn('150 000', lines[3])
+
+    def test_items_table_half_quantity_shown_without_trailing_zero(self):
+        lines = escpos._items_table_lines(
+            [{'name': 'Jiz', 'quantity': 0.5, 'price': 240000}], width=48)
+        self.assertIn('0.5', lines[2])
+
+    def test_render_qr_code_empty_data_returns_empty(self):
+        self.assertEqual(escpos.render_qr_code(''), b'')
+        self.assertEqual(escpos.render_qr_code(None), b'')
+
+    def test_render_qr_code_contains_store_and_print_commands(self):
+        payload = escpos.render_qr_code('https://example.uz/')
+        self.assertTrue(payload.startswith(escpos.ALIGN_CENTER))
+        self.assertIn(b'https://example.uz/', payload)
+        # Chop etish buyrug'i (fn=81='Q', m=48='0') oxirida bo'lishi kerak.
+        self.assertTrue(payload.endswith(escpos.GS + b'(k' + bytes([3, 0, 0x31, 0x51, 0x30])))
+
+    def test_pre_bill_receipt_shows_open_and_print_time_rows(self):
+        payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs(
+            order_created_at=datetime(2026, 7, 31, 16, 51, tzinfo=dt_timezone.utc),
+            created_at=datetime(2026, 7, 31, 17, 25, tzinfo=dt_timezone.utc),
+        ))
+        self.assertIn(b'Ochilgan:', payload)
+        self.assertIn(b'Chek vaqti:', payload)
+        self.assertIn(b'21:51', payload)  # UTC 16:51 -> Toshkent 21:51
+        self.assertIn(b'22:25', payload)
+
+    def test_pre_bill_receipt_omits_open_row_without_order_created_at(self):
+        payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs())
+        self.assertNotIn(b'Ochilgan:', payload)
+
+    def test_payment_receipt_shows_table_name_with_zone(self):
+        payload = escpos.render_payment_receipt(
+            **self._receipt_kwargs(cashier_name='Kamila', table_name="2 (Ko'cha)"))
+        self.assertIn(b'Stol raqami:', payload)
+        self.assertIn(b"2 (Ko'cha)", payload)
+
+    def test_payment_receipt_phone_and_qr_only_when_provided(self):
+        with_contact = escpos.render_payment_receipt(**self._receipt_kwargs(
+            cashier_name='Kamila', phone='+998901234567', website_url='https://example.uz/'))
+        self.assertIn(b'Tel: +998901234567', with_contact)
+        self.assertIn(b'https://example.uz/', with_contact)
+
+        without_contact = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila'))
+        self.assertNotIn(b'Tel:', without_contact)
+        self.assertNotIn(escpos.GS + b'(k', without_contact)

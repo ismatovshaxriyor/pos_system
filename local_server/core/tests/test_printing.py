@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.authtoken.models import Token
-from core.models import User, Table, Category, Product, Order, OrderItem, Printer, PrintJob
+from core.models import User, Table, TableZone, Category, Product, Order, OrderItem, Printer, PrintJob
 from core import services
 
 def _auth_header(user):
@@ -196,6 +196,39 @@ class CashierPrintingTests(TestCase):
         job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
         self.assertIsNone(job.items_snapshot['table_name'])
         self.assertEqual(job.items_snapshot['order_type'], 'takeaway')
+
+    def test_snapshot_table_name_includes_zone(self):
+        # Chekda "5 (Ko'cha)" kabi ko'rinishi uchun snapshot endi bare
+        # nom emas, `str(Table)` (zona bilan) saqlaydi.
+        zone = TableZone.objects.create(name="Ko'cha")
+        table = Table.objects.create(name='5', zone=zone)
+        order = Order.objects.create(table=table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        url = reverse('order-print-pre-bill', args=[order.id])
+        self.client.post(url, content_type='application/json', **_auth_header(self.manager))
+
+        job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
+        self.assertEqual(job.items_snapshot['table_name'], "5 (Ko'cha)")
+
+    def test_payment_receipt_snapshot_includes_order_created_at_and_contact_info(self):
+        from core.models import RestaurantConfig
+        config, _ = RestaurantConfig.objects.get_or_create(pk=1)
+        config.phone = '+998901234567'
+        config.public_domain = 'filial1.hamrohpos.uz'
+        config.save()
+
+        order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+
+        pay_url = reverse('order-add-payment', args=[order.id])
+        self.client.post(pay_url, {"amount": float(order.final_amount), "method": "cash"}, content_type='application/json', **_auth_header(self.manager))
+        self.client.post(reverse('order-close', args=[order.id]), content_type='application/json', **_auth_header(self.manager))
+
+        job = PrintJob.objects.filter(order=order, job_type='receipt').first()
+        self.assertEqual(job.items_snapshot['order_created_at'], order.created_at.isoformat())
+        self.assertEqual(job.items_snapshot['phone'], '+998901234567')
+        self.assertEqual(job.items_snapshot['website_url'], 'https://filial1.hamrohpos.uz/')
 
 
 

@@ -407,6 +407,11 @@ class RestaurantConfig(BaseModel):
         verbose_name="Telegram Chat ID",
         help_text="Bildirishnomalar yuboriladigan Telegram guruh yoki admin chat_id"
     )
+    phone = models.CharField(
+        max_length=20, blank=True, default='', validators=[User.phone_regex],
+        verbose_name="Restoran telefon raqami",
+        help_text="To'lov chekining pastida ko'rsatiladi (masalan +998901234567)"
+    )
 
     class Meta:
         verbose_name = "Restoran Sozlamasi"

@@ -118,6 +118,59 @@ def _table_label(table_name, order_type='dine_in'):
     return 'Olib ketish'
 
 
+def _order_type_label(order_type='dine_in'):
+    """
+    Hisob-chek/to'lov chekidagi "Buyurtma turi:" qatori uchun - stol
+    biriktirilgan-biriktirilmaganidan qat'i nazar mustaqil qator sifatida
+    (stol raqami alohida qatorda ko'rsatiladi, qarang `_items_table_lines`
+    yaqinidagi chek qurish kodi).
+    """
+    if order_type == 'delivery':
+        return 'Yetkazib berish'
+    if order_type == 'takeaway':
+        return 'Olib ketish'
+    return 'Stolga'
+
+
+def _item_columns(width):
+    """Taomlar jadvali uchun 4 ustun kengligi: Nomi/Soni/Narxi/Jami. 48 belgida 24/6/9/9."""
+    qty_w = max(4, width // 8)
+    price_w = max(7, (width * 9) // 48)
+    total_w = price_w
+    name_w = max(8, width - qty_w - price_w - total_w)
+    return name_w, qty_w, price_w, total_w
+
+
+def _money(amount):
+    return f"{int(round(amount)):,}".replace(',', ' ')
+
+
+def _items_table_lines(items, width):
+    """
+    Hisob-chek/to'lov cheki uchun ustunli taomlar jadvali: sarlavha qatori
+    + har bir taom uchun bitta qator (uzun nom bo'lsa, raqamlar birinchi
+    qatorda, qolgani faqat nom davomi bo'lib pastga tushadi).
+    """
+    name_w, qty_w, price_w, total_w = _item_columns(width)
+    lines = [
+        'Nomi'.ljust(name_w) + 'Soni'.rjust(qty_w) + 'Narxi'.rjust(price_w) + 'Jami'.rjust(total_w),
+        '-' * width,
+    ]
+    for item in items:
+        qty = item.get('quantity', 1)
+        name = item.get('name', '')
+        price = float(item.get('price', 0))
+        total = price * qty
+        qty_str = f"{qty:g}" if isinstance(qty, float) else str(qty)
+        wrapped = _wrap(name, name_w)
+        lines.append(
+            wrapped[0].ljust(name_w) + qty_str.rjust(qty_w) +
+            _money(price).rjust(price_w) + _money(total).rjust(total_w)
+        )
+        lines.extend(line.ljust(name_w) for line in wrapped[1:])
+    return lines
+
+
 def _format_modifiers(modifiers):
     """`OrderItem.modifiers` JSON (dict/list/str) -> chekka chiqadigan qatorlar."""
     if not modifiers:
@@ -221,21 +274,53 @@ def render_logo_raster(image_path, max_width=384):
         return b''
 
 
+def render_qr_code(data, size=6, ec_level='M'):
+    """
+    QR kodni printerning o'ziga chizdiradi (Epson-mos 'GS ( k' funksiyasi
+    165/167/169/080/081 - model/o'lcham/xato-tuzatish/ma'lumot/chop).
+    Hech qanday tashqi kutubxona (qrcode/Pillow) kerak emas - printer
+    matnni o'zi kodlaydi. Ko'pchilik ESC/POS termoprinterlar (Xprinter
+    klonlari ham) buni qo'llab-quvvatlaydi. `data` bo'sh bo'lsa b'' qaytadi.
+    """
+    if not data:
+        return b''
+    payload = str(data).encode('utf-8')
+    ec = {'L': 48, 'M': 49, 'Q': 50, 'H': 51}.get(ec_level, 49)
+
+    model_cmd = GS + b'(k' + bytes([4, 0, 0x31, 0x41, 50, 0])
+    size_cmd = GS + b'(k' + bytes([3, 0, 0x31, 0x43, size])
+    ec_cmd = GS + b'(k' + bytes([3, 0, 0x31, 0x45, ec])
+    store_len = len(payload) + 3
+    store_cmd = GS + b'(k' + bytes([store_len % 256, store_len // 256, 0x31, 0x50, 0x30]) + payload
+    print_cmd = GS + b'(k' + bytes([3, 0, 0x31, 0x51, 0x30])
+
+    return ALIGN_CENTER + model_cmd + size_cmd + ec_cmd + store_cmd + print_cmd
+
+
+def _parse_dt(value):
+    """
+    `created_at`/`order_created_at` ISO-string yoki datetime bo'lishi mumkin
+    (`PrintJob.items_snapshot` JSON orqali keladi) - RESTAURANT_TZ'ga
+    normallashtiradi, xato/bo'sh bo'lsa hozirgi vaqtga tushadi.
+    """
+    dt = value or datetime.now(tz=RESTAURANT_TZ)
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except ValueError:
+            dt = datetime.now(tz=RESTAURANT_TZ)
+    return dt.astimezone(RESTAURANT_TZ)
+
+
 def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name,
                             items, total_amount, discount_amount=0, tax_amount=0,
                             service_charge=0, service_charge_rate=0, final_amount, order_type='dine_in',
-                            created_at=None, width=DEFAULT_WIDTH):
+                            order_created_at=None, created_at=None, width=DEFAULT_WIDTH):
     """
     Hisob-chek (Shot) generatori.
     Mehmon to'lov qilishidan oldin buyurtma hisobini tekshirishi uchun chiqariladi.
     """
-    created = created_at or datetime.now(tz=RESTAURANT_TZ)
-    if isinstance(created, str):
-        try:
-            created = datetime.fromisoformat(created)
-        except ValueError:
-            created = datetime.now(tz=RESTAURANT_TZ)
-    created = created.astimezone(RESTAURANT_TZ)
+    printed = _parse_dt(created_at)
 
     out = [INIT, SELECT_CP866]
     logo_bytes = render_logo_raster(logo_path)
@@ -248,30 +333,31 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
     out += [BOLD_OFF, SIZE_NORMAL]
     out.append(encode("=== HISOB-CHEK ===") + b'\n')
     out += [ALIGN_LEFT]
-    out.append(encode(_two_cols(f"Buyurtma #{order_id}", created.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
-    out.append(encode(_two_cols(_table_label(table_name, order_type), f"Ofitsiant: {waiter_name}", width)) + b'\n')
+    out.append(encode(f"Buyurtma #{order_id}") + b'\n')
+    if order_created_at:
+        out.append(encode(_two_cols("Ochilgan:", _parse_dt(order_created_at).strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
+    out.append(encode(_two_cols("Chek vaqti:", printed.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
+    out.append(encode(_two_cols("Buyurtma turi:", _order_type_label(order_type), width)) + b'\n')
+    if table_name:
+        out.append(encode(_two_cols("Stol raqami:", table_name, width)) + b'\n')
+    out.append(encode(_two_cols("Ofitsiant:", waiter_name, width)) + b'\n')
     out.append(encode('-' * width) + b'\n')
 
-    for item in items:
-        qty = item.get('quantity', 1)
-        name = item.get('name', '')
-        price = float(item.get('price', 0))
-        total = price * qty
-        out.append(encode(f"{qty} x {name}") + b'\n')
-        out.append(encode(_two_cols(f"   {int(price):,} so'm".replace(',', ' '), f"{int(total):,} so'm".replace(',', ' '), width)) + b'\n')
+    for line in _items_table_lines(items, width):
+        out.append(encode(line) + b'\n')
 
     out.append(encode('-' * width) + b'\n')
-    out.append(encode(_two_cols("Jami taomlar:", f"{int(total_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+    out.append(encode(_two_cols("Jami taomlar:", f"{_money(total_amount)} so'm", width)) + b'\n')
     if discount_amount > 0:
-        out.append(encode(_two_cols("Chegirma:", f"-{int(discount_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols("Chegirma:", f"-{_money(discount_amount)} so'm", width)) + b'\n')
     if service_charge > 0:
-        out.append(encode(_two_cols(_service_charge_label(service_charge_rate), f"+{int(service_charge):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols(_service_charge_label(service_charge_rate), f"+{_money(service_charge)} so'm", width)) + b'\n')
     if tax_amount > 0:
-        out.append(encode(_two_cols("Soliq:", f"+{int(tax_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols("Soliq:", f"+{_money(tax_amount)} so'm", width)) + b'\n')
 
     out.append(encode('=' * width) + b'\n')
     out += [SIZE_DOUBLE, BOLD_ON]
-    for line in _wrap(_two_cols("TO'LANISHI KERAK:", f"{int(final_amount):,} so'm".replace(',', ' '), width // 2), width // 2):
+    for line in _wrap(_two_cols("TO'LANISHI KERAK:", f"{_money(final_amount)} so'm", width // 2), width // 2):
         out.append(encode(line) + b'\n')
     out += [BOLD_OFF, SIZE_NORMAL, ALIGN_CENTER]
     out.append(encode('=' * width) + b'\n')
@@ -283,18 +369,13 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
 def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_id, table_name, waiter_name, cashier_name,
                            items, total_amount, discount_amount=0, tax_amount=0,
                            service_charge=0, service_charge_rate=0, final_amount, payments=None,
-                           order_type='dine_in', created_at=None, width=DEFAULT_WIDTH):
+                           order_type='dine_in', order_created_at=None, created_at=None,
+                           phone='', website_url=None, width=DEFAULT_WIDTH):
     """
     To'lov cheki (Final Receipt) generatori.
     Mijoz to'lov qilgandan so'ng kassa printeridan chiqariladi.
     """
-    created = created_at or datetime.now(tz=RESTAURANT_TZ)
-    if isinstance(created, str):
-        try:
-            created = datetime.fromisoformat(created)
-        except ValueError:
-            created = datetime.now(tz=RESTAURANT_TZ)
-    created = created.astimezone(RESTAURANT_TZ)
+    closed = _parse_dt(created_at)
 
     out = [INIT, SELECT_CP866]
     logo_bytes = render_logo_raster(logo_path)
@@ -307,32 +388,33 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     out += [BOLD_OFF, SIZE_NORMAL]
     out.append(encode("*** TO'LOV CHEKI ***") + b'\n')
     out += [ALIGN_LEFT]
-    out.append(encode(_two_cols(f"Buyurtma #{order_id}", created.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
-    out.append(encode(_two_cols(_table_label(table_name, order_type), f"Kassir: {cashier_name}", width)) + b'\n')
+    out.append(encode(f"Buyurtma #{order_id}") + b'\n')
+    if order_created_at:
+        out.append(encode(_two_cols("Ochilgan:", _parse_dt(order_created_at).strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
+    out.append(encode(_two_cols("Yopilgan:", closed.strftime('%d.%m.%Y %H:%M'), width)) + b'\n')
+    out.append(encode(_two_cols("Buyurtma turi:", _order_type_label(order_type), width)) + b'\n')
+    if table_name:
+        out.append(encode(_two_cols("Stol raqami:", table_name, width)) + b'\n')
     if waiter_name:
-        out.append(encode(f"Ofitsiant: {waiter_name}") + b'\n')
+        out.append(encode(_two_cols("Ofitsiant:", waiter_name, width)) + b'\n')
+    out.append(encode(_two_cols("Kassir:", cashier_name, width)) + b'\n')
     out.append(encode('-' * width) + b'\n')
 
-    for item in items:
-        qty = item.get('quantity', 1)
-        name = item.get('name', '')
-        price = float(item.get('price', 0))
-        total = price * qty
-        out.append(encode(f"{qty} x {name}") + b'\n')
-        out.append(encode(_two_cols(f"   {int(price):,} so'm".replace(',', ' '), f"{int(total):,} so'm".replace(',', ' '), width)) + b'\n')
+    for line in _items_table_lines(items, width):
+        out.append(encode(line) + b'\n')
 
     out.append(encode('-' * width) + b'\n')
-    out.append(encode(_two_cols("Jami taomlar:", f"{int(total_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+    out.append(encode(_two_cols("Jami taomlar:", f"{_money(total_amount)} so'm", width)) + b'\n')
     if discount_amount > 0:
-        out.append(encode(_two_cols("Chegirma:", f"-{int(discount_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols("Chegirma:", f"-{_money(discount_amount)} so'm", width)) + b'\n')
     if service_charge > 0:
-        out.append(encode(_two_cols(_service_charge_label(service_charge_rate), f"+{int(service_charge):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols(_service_charge_label(service_charge_rate), f"+{_money(service_charge)} so'm", width)) + b'\n')
     if tax_amount > 0:
-        out.append(encode(_two_cols("Soliq:", f"+{int(tax_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+        out.append(encode(_two_cols("Soliq:", f"+{_money(tax_amount)} so'm", width)) + b'\n')
 
     out.append(encode('=' * width) + b'\n')
     out += [BOLD_ON]
-    out.append(encode(_two_cols("JAMI TO'LANDI:", f"{int(final_amount):,} so'm".replace(',', ' '), width)) + b'\n')
+    out.append(encode(_two_cols("JAMI TO'LANDI:", f"{_money(final_amount)} so'm", width)) + b'\n')
     out += [BOLD_OFF]
 
     if payments:
@@ -341,11 +423,15 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
         for p in payments:
             method_label = p.get('method_display') or p.get('method') or "To'lov"
             amt = float(p.get('amount', 0))
-            out.append(encode(_two_cols(f"  - {method_label}", f"{int(amt):,} so'm".replace(',', ' '), width)) + b'\n')
+            out.append(encode(_two_cols(f"  - {method_label}", f"{_money(amt)} so'm", width)) + b'\n')
 
     out += [ALIGN_CENTER]
     out.append(encode('=' * width) + b'\n')
+    if phone:
+        out.append(encode(f"Tel: {phone}") + b'\n')
     out.append(encode("Xaridingiz uchun rahmat!") + b'\n')
+    if website_url:
+        out.append(render_qr_code(website_url))
     out.append(encode(BRAND_FOOTER) + b'\n')
     out.append(FEED_AND_CUT)
     return b''.join(out)
