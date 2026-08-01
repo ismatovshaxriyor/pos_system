@@ -127,7 +127,6 @@ def print_job_to_printer(self, job_id):
                 order_created_at=snap.get('order_created_at') or job.order.created_at,
                 created_at=job.created_at,
                 phone=snap.get('phone', ''),
-                website_url=snap.get('website_url'),
                 width=printer.chars_per_line or escpos.DEFAULT_WIDTH,
             )
         else:

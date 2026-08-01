@@ -33,30 +33,12 @@ class ServiceError(Exception):
 def build_table_qr_url(table, request=None, domain_override=None):
     """
     Stol uchun ommaviy QR menu havolasini shakllantiradi.
-    Ustuvorlik tartibi (`_resolve_public_domain` orqali):
+    Ustuvorlik tartibi:
     1. domain_override (query parameter bo'yicha)
     2. RestaurantConfig.public_domain (lokal bazadagi sozlama)
     3. settings.PUBLIC_DOMAIN (.env faylidagi sozlama)
     4. request.get_host() (agar so'rov mavjud bo'lsa)
     5. '/table/<qr_code>/' (fallback)
-    """
-    domain = _resolve_public_domain(domain_override)
-
-    if domain:
-        scheme_host = _domain_to_scheme_host(domain)
-        return f"{scheme_host.rstrip('/')}/table/{table.qr_code}/"
-
-    path = f"/table/{table.qr_code}/"
-    if request:
-        return request.build_absolute_uri(path)
-    return path
-
-
-def _resolve_public_domain(domain_override=None):
-    """
-    `build_table_qr_url`/`build_restaurant_website_url` ikkalasi uchun ham
-    umumiy domen-aniqlash zanjiri: domain_override -> RestaurantConfig.public_domain
-    -> settings.PUBLIC_DOMAIN. Topilmasa None (chaqiruvchi o'z fallback'ini qiladi).
     """
     from django.conf import settings
 
@@ -74,28 +56,18 @@ def _resolve_public_domain(domain_override=None):
     if not domain and getattr(settings, 'PUBLIC_DOMAIN', ''):
         domain = settings.PUBLIC_DOMAIN.strip()
 
-    return domain
+    if domain:
+        if '://' in domain:
+            scheme_host = domain
+        else:
+            scheme = 'https' if 'hamrohpos.uz' in domain else 'http'
+            scheme_host = f"{scheme}://{domain}"
+        return f"{scheme_host.rstrip('/')}/table/{table.qr_code}/"
 
-
-def _domain_to_scheme_host(domain):
-    if '://' in domain:
-        return domain
-    scheme = 'https' if 'hamrohpos.uz' in domain else 'http'
-    return f"{scheme}://{domain}"
-
-
-def build_restaurant_website_url(request=None, domain_override=None):
-    """
-    To'lov chekidagi QR kod uchun - stolga bog'liq bo'lmagan, restoranning
-    umumiy rasmiy sayti (`RestaurantConfig.public_domain` asosida, xuddi
-    `build_table_qr_url` ishlatgan domen bilan bir xil, lekin `/table/<qr>/`
-    yo'lisiz). Domen sozlanmagan bo'lsa None qaytadi - chek shunchaki
-    QR kodsiz chiqadi, majburiy sozlama emas.
-    """
-    domain = _resolve_public_domain(domain_override)
-    if not domain:
-        return None
-    return _domain_to_scheme_host(domain).rstrip('/') + '/'
+    path = f"/table/{table.qr_code}/"
+    if request:
+        return request.build_absolute_uri(path)
+    return path
 
 
 
@@ -1211,7 +1183,6 @@ def send_payment_receipt_to_printer(order, cashier_user=None):
         'waiter_name': order.waiter.first_name if (order.waiter and order.waiter.first_name) else (order.waiter.username if order.waiter else ""),
         'cashier_name': cashier_name,
         'phone': get_restaurant_phone(),
-        'website_url': build_restaurant_website_url(),
     }
 
     with transaction.atomic():

@@ -227,12 +227,16 @@ class EscposTicketTests(SimpleTestCase):
         self.assertIn(b'Stol raqami:', payload)
         self.assertIn(b"2 (Ko'cha)", payload)
 
-    def test_payment_receipt_phone_and_qr_only_when_provided(self):
-        with_contact = escpos.render_payment_receipt(**self._receipt_kwargs(
-            cashier_name='Kamila', phone='+998901234567', website_url='https://example.uz/'))
-        self.assertIn(b'Tel: +998901234567', with_contact)
-        self.assertIn(b'https://example.uz/', with_contact)
+    def test_payment_receipt_phone_shown_only_when_provided(self):
+        with_phone = escpos.render_payment_receipt(**self._receipt_kwargs(
+            cashier_name='Kamila', phone='+998901234567'))
+        self.assertIn(b'Tel: +998901234567', with_phone)
 
-        without_contact = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila'))
-        self.assertNotIn(b'Tel:', without_contact)
-        self.assertNotIn(escpos.GS + b'(k', without_contact)
+        without_phone = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila'))
+        self.assertNotIn(b'Tel:', without_phone)
+
+    def test_payment_receipt_qr_always_points_to_hamrohpos(self):
+        # Restoranning o'z public_domain'i emas - QR doim hamrohpos.uz'ga
+        # o'tadi (BRAND_FOOTER bilan bir xil qattiq belgilangan brend havolasi).
+        payload = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila'))
+        self.assertIn(escpos.BRAND_WEBSITE_URL.encode(), payload)

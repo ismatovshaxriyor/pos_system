@@ -211,11 +211,10 @@ class CashierPrintingTests(TestCase):
         job = PrintJob.objects.filter(order=order, job_type='pre_bill').first()
         self.assertEqual(job.items_snapshot['table_name'], "5 (Ko'cha)")
 
-    def test_payment_receipt_snapshot_includes_order_created_at_and_contact_info(self):
+    def test_payment_receipt_snapshot_includes_order_created_at_and_phone(self):
         from core.models import RestaurantConfig
         config, _ = RestaurantConfig.objects.get_or_create(pk=1)
         config.phone = '+998901234567'
-        config.public_domain = 'filial1.hamrohpos.uz'
         config.save()
 
         order = Order.objects.create(table=self.table, waiter=self.manager, status='in_progress')
@@ -228,7 +227,6 @@ class CashierPrintingTests(TestCase):
         job = PrintJob.objects.filter(order=order, job_type='receipt').first()
         self.assertEqual(job.items_snapshot['order_created_at'], order.created_at.isoformat())
         self.assertEqual(job.items_snapshot['phone'], '+998901234567')
-        self.assertEqual(job.items_snapshot['website_url'], 'https://filial1.hamrohpos.uz/')
 
 
 

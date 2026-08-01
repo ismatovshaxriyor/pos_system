@@ -40,6 +40,7 @@ FEED_AND_CUT = ESC + b'd\x04' + GS + b'V\x42\x00'  # 4 qator surish + partial cu
 DEFAULT_WIDTH = 48  # 80mm qog'oz, Font A. 58mm printer bo'lsa - 32.
 
 BRAND_FOOTER = "Powered by hamrohpos.uz"  # mijozga chiqadigan har ikkala chekning oxirida (kitchen ticket/test chekda emas)
+BRAND_WEBSITE_URL = "https://hamrohpos.uz/"  # to'lov chekidagi QR kod - restoranning o'z sayti EMAS, doim shu (BRAND_FOOTER bilan bir xil qattiq belgilangan)
 
 _CHAR_FIXUPS = {
     # O'zbek lotin apostroflari va tipografik belgilar -> ASCII
@@ -370,7 +371,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
                            items, total_amount, discount_amount=0, tax_amount=0,
                            service_charge=0, service_charge_rate=0, final_amount, payments=None,
                            order_type='dine_in', order_created_at=None, created_at=None,
-                           phone='', website_url=None, width=DEFAULT_WIDTH):
+                           phone='', width=DEFAULT_WIDTH):
     """
     To'lov cheki (Final Receipt) generatori.
     Mijoz to'lov qilgandan so'ng kassa printeridan chiqariladi.
@@ -430,8 +431,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     if phone:
         out.append(encode(f"Tel: {phone}") + b'\n')
     out.append(encode("Xaridingiz uchun rahmat!") + b'\n')
-    if website_url:
-        out.append(render_qr_code(website_url))
+    out.append(render_qr_code(BRAND_WEBSITE_URL))
     out.append(encode(BRAND_FOOTER) + b'\n')
     out.append(FEED_AND_CUT)
     return b''.join(out)
