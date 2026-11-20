@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import time as dt_time, timedelta
 
 import requests
 from celery import shared_task
@@ -7,10 +7,11 @@ from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from . import appupdates
 from .client import OnaClient
 from .hardware import get_hardware_fingerprint
 from .metrics import collect_metrics
-from .models import ErrorLog, LicenseState
+from .models import ErrorLog, LicenseState, ScheduledUpdate
 from core.models import Order
 
 logger = logging.getLogger(__name__)
@@ -113,6 +114,13 @@ def send_heartbeat():
     furthest_expiry = state.furthest_expiry
     if furthest_expiry and furthest_expiry - timezone.now() < RENEWAL_LEAD_TIME:
         renew_license_token.delay()
+
+    if isinstance(data.get('app_releases'), list):
+        try:
+            for release_pk in appupdates.sync_releases(data['app_releases']):
+                download_app_release.delay(release_pk)
+        except Exception:  # noqa: BLE001 - ilova fayllari xatosi litsenziya/buyruq oqimini to'xtatmasin
+            logger.exception("Ilova versiyalarini sinxronlashda xato")
 
     for command in data.get('commands', []):
         # execute_remote_command is defined further down in this module.
@@ -319,6 +327,45 @@ def _handle_restart_services(payload):
     return 'failed', {"detail": "Qo'llab-quvvatlanmaydi (docker.sock ataylab berilmagan)."}
 
 
+def _parse_hhmm(value, default):
+    try:
+        hours, minutes = str(value).split(':')
+        return dt_time(int(hours), int(minutes))
+    except (ValueError, TypeError):
+        return default
+
+
+def in_update_window(now_time, start, end):
+    """
+    `start`..`end` oralig'ida (yarim tundan o'tishi mumkin: 23:00-05:00). `start == end` = kun bo'yi
+    ochiq (baribir ochiq buyurtma tekshiruvi ishlaydi).
+    """
+    if start == end:
+        return True
+    if start < end:
+        return start <= now_time < end
+    return now_time >= start or now_time < end
+
+
+def _active_orders_exist():
+    return Order.objects.filter(status__in=['new', 'in_progress']).exists()
+
+
+def _start_update(license_key, command_id):
+    """
+    Watchtower ushbu buyruqni bajarayotgan worker konteynerining o'zini qayta yaratadi - shuning
+    uchun natija AVVAL yuboriladi, muvaffaqiyat tasdig'i esa keyingi heartbeat'dagi app_version
+    orqali tekshiriladi (Ona tomonda).
+    """
+    OnaClient().post_command_result(
+        license_key, command_id, 'completed', {"detail": "Yangilanish boshlandi (Watchtower)."},
+    )
+    try:
+        _trigger_watchtower_update()
+    except requests.RequestException as exc:
+        logger.warning("Watchtower so'rovi muvaffaqiyatsiz: %s", exc)
+
+
 def _trigger_watchtower_update():
     return requests.post(
         f"{settings.WATCHTOWER_URL}/v1/update",
@@ -355,18 +402,25 @@ def execute_remote_command(self, command):
     client = OnaClient()
 
     if command_type == 'update_app':
-        # Watchtower ushbu buyruqni bajarayotgan worker konteynerining
-        # o'zini qayta yaratadi - shuning uchun natija AVVAL yuboriladi,
-        # muvaffaqiyat tasdig'i esa keyingi heartbeat'dagi app_version
-        # orqali tekshiriladi (Ona tomonda).
-        client.post_command_result(
-            state.license_key, command['id'], 'completed',
-            {"detail": "Yangilanish boshlandi (Watchtower)."},
-        )
-        try:
-            _trigger_watchtower_update()
-        except requests.RequestException as exc:
-            logger.warning("Watchtower so'rovi muvaffaqiyatsiz: %s", exc)
+        payload = command.get('payload') or {}
+        if payload.get('mode') == 'window':
+            # Xavfsiz rejim: darhol emas, yangilanish oynasida va ochiq buyurtma qolmaganda o'rnatiladi.
+            window = payload.get('window') or {}
+            sched, _ = ScheduledUpdate.objects.update_or_create(pk=1, defaults={
+                'command_id': command['id'],
+                'version': str(payload.get('version') or ''),
+                'window_start': str(window.get('start') or '02:00'),
+                'window_end': str(window.get('end') or '05:00'),
+            })
+            client.post_command_result(
+                state.license_key, command['id'], 'acknowledged',
+                {"detail": f"Yangilanish oynasini kutmoqda ({sched.window_start}-{sched.window_end})."},
+            )
+            _run_scheduled_update_if_due()
+            return
+        # Majburiy rejim (yoki eski, rejimsiz buyruq): oyna va xavfsiz-holat tekshiruvisiz, darhol.
+        ScheduledUpdate.objects.filter(pk=1).delete()
+        _start_update(state.license_key, command['id'])
         return
 
     handler = COMMAND_HANDLERS.get(command_type)
@@ -376,3 +430,39 @@ def execute_remote_command(self, command):
         result_status, result = handler(command.get('payload') or {})
 
     client.post_command_result(state.license_key, command['id'], result_status, result)
+
+
+def _run_scheduled_update_if_due():
+    sched = ScheduledUpdate.objects.filter(pk=1).first()
+    state = LicenseState.load()
+    if not sched or not state:
+        return False
+    start = _parse_hhmm(sched.window_start, dt_time(2, 0))
+    end = _parse_hhmm(sched.window_end, dt_time(5, 0))
+    if not in_update_window(timezone.localtime().time(), start, end):
+        return False
+    if _active_orders_exist():
+        return False
+    command_id = sched.command_id
+    sched.delete()  # Watchtower shu konteynerni qayta yaratadi - qayta ishga tushsa takrorlanmasin.
+    _start_update(state.license_key, command_id)
+    return True
+
+
+@shared_task
+def run_scheduled_update():
+    """
+    Har 5 daqiqada (beat): kutilayotgan yangilanish bo'lsa va hozir yangilanish oynasida,
+    ochiq buyurtma qolmagan bo'lsa - o'rnatishni boshlaydi.
+    """
+    return _run_scheduled_update_if_due()
+
+
+@shared_task(
+    autoretry_for=(requests.ConnectionError, requests.Timeout),
+    retry_backoff=True,
+    max_retries=5,
+)
+def download_app_release(release_pk):
+    """Ona'dagi ilova o'rnatuvchisini Bola'ga yuklaydi (LAN'dagi qurilmalar shu yerdan oladi)."""
+    return appupdates.download_release(release_pk)

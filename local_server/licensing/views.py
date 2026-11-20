@@ -3,6 +3,7 @@ from datetime import datetime, UTC
 
 import requests
 from django.conf import settings
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -15,7 +16,8 @@ from core.models import User
 from .client import OnaClient
 from .hardware import get_hardware_fingerprint
 from .jwt_utils import verify_token, LicenseTokenError
-from .models import LicenseState
+from .models import AppRelease, LicenseState
+from . import appupdates
 from .serializers import ActivateSerializer, ApplyOfflineTokenSerializer
 
 logger = logging.getLogger(__name__)
@@ -238,3 +240,55 @@ class DiscoveryView(APIView):
         })
 
 
+
+
+class AppUpdateCheckView(APIView):
+    """
+    Ilova ishga tushganda/vaqti-vaqti bilan so'raydi: "mening versiyamdan yangisi bormi?". Avtorizatsiyasiz
+    (login'dan oldin ham tekshirilishi kerak) va litsenziya blokidan tashqarida (`/api/license/*`) -
+    majburiy yangilanish bloklangan tizimda ham yetib borishi uchun.
+    Faqat Bola'ga to'liq yuklab olingan (`ready`) versiyalar e'lon qilinadi.
+    """
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        slugs = [s for s in (request.query_params.get('slugs') or '').split(',') if s]
+        platform = request.query_params.get('platform') or ''
+        current = request.query_params.get('current') or ''
+        qs = AppRelease.objects.filter(status='ready', platform=platform).exclude(file='')
+        if slugs:
+            qs = qs.filter(slug__in=slugs)
+        best = None
+        for release in qs:
+            if best is None or appupdates.is_newer(release.version, best.version):
+                best = release
+        if best is None or not appupdates.is_newer(best.version, current):
+            return Response({"available": False, "required": False, "latest": None})
+        return Response({
+            "available": True,
+            "required": best.is_required,
+            "latest": {
+                "slug": best.slug, "version": best.version, "size_mb": str(best.size_mb),
+                "sha256": best.sha256, "notes": best.notes,
+                "download_url": f"/api/license/app-updates/{best.pk}/download/",
+            },
+        })
+
+
+class AppUpdateDownloadView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(responses={200: bytes})
+    def get(self, request, pk):
+        release = AppRelease.objects.filter(pk=pk, status='ready').exclude(file='').first()
+        if release is None:
+            raise Http404
+        try:
+            handle = release.file.open('rb')
+        except OSError:
+            raise Http404
+        name = f"{release.slug}-{release.version}{release.file.name[release.file.name.rfind('.'):]}"
+        return FileResponse(handle, as_attachment=True, filename=name)

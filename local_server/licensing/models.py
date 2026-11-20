@@ -166,3 +166,63 @@ class ErrorLog(models.Model):
 
     def __str__(self):
         return f"[{self.level}] {self.occurred_at:%Y-%m-%d %H:%M} - {self.message[:60]}"
+
+
+class ScheduledUpdate(models.Model):
+    """
+    Ona'dan kelgan, lekin hali o'rnatilmagan `update_app` buyrug'i (rejim = "oyna"): Bola uni
+    yangilanish oynasi boshlanishini va ochiq buyurtma qolmasligini kutib o'rnatadi. Singleton
+    (pk=1): yangi buyruq eskisini almashtiradi. DB'da saqlanadi - konteyner qayta ishga tushsa ham yo'qolmaydi.
+    """
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    command_id = models.CharField(max_length=64)
+    version = models.CharField(max_length=50, blank=True, default='')
+    window_start = models.CharField(max_length=5, default='02:00', help_text="HH:MM, Bola mahalliy vaqti")
+    window_end = models.CharField(max_length=5, default='05:00', help_text="HH:MM, Bola mahalliy vaqti")
+    queued_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Kutilayotgan yangilanish"
+        verbose_name_plural = "Kutilayotgan yangilanish"
+
+    def __str__(self):
+        return f"v{self.version or '?'} ({self.window_start}-{self.window_end})"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+
+class AppRelease(models.Model):
+    """
+    Ona'dan kelgan xodim ilovasi (Kassir/Ofitsiant/Menejer) o'rnatuvchisi: Bola faylni o'ziga yuklab oladi
+    va restoran tarmog'idagi (LAN) qurilmalarga shu yerdan tarqatadi - har qurilma internetdan emas, mahalliy
+    serverdan yuklaydi. `(slug, platform)` bo'yicha bitta joriy versiya.
+    """
+    STATUS_CHOICES = (
+        ('pending', 'Yuklanishi kutilmoqda'),
+        ('downloading', 'Yuklanmoqda'),
+        ('ready', 'Tayyor'),
+        ('failed', 'Xato'),
+    )
+
+    slug = models.CharField(max_length=30)
+    platform = models.CharField(max_length=20)
+    version = models.CharField(max_length=30)
+    is_required = models.BooleanField(default=False)
+    size_mb = models.DecimalField(max_digits=8, decimal_places=1, default=0)
+    sha256 = models.CharField(max_length=64, blank=True, default='')
+    notes = models.JSONField(default=list, blank=True)
+    source_url = models.TextField(blank=True, default='')
+    file = models.FileField(upload_to='app_releases/', blank=True, default='')
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='pending')
+    error = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ilova versiyasi"
+        verbose_name_plural = "Ilova versiyalari"
+        constraints = [models.UniqueConstraint(fields=['slug', 'platform'], name='unique_apprelease_slug_platform')]
+
+    def __str__(self):
+        return f"{self.slug} ({self.platform}) v{self.version} [{self.status}]"

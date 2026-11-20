@@ -276,6 +276,12 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'licensing.tasks.cleanup_error_logs',
         'schedule': crontab(hour=4, minute=0),
     },
+    # Ona'dan "oyna" rejimida kelgan yangilanishni oynada va ochiq buyurtma qolmaganda o'rnatadi.
+    'run-scheduled-update': {
+        'task': 'licensing.tasks.run_scheduled_update',
+        'schedule': 300.0,
+        'options': {'expires': 280},
+    },
     'sync-completed-orders': {
         'task': 'licensing.tasks.sync_completed_orders',
         'schedule': 60.0,

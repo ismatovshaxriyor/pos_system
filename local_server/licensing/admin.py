@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import ErrorLog, LicenseState
+from .models import AppRelease, ScheduledUpdate, ErrorLog, LicenseState
 
 
 @admin.register(LicenseState)
@@ -30,4 +30,23 @@ class ErrorLogAdmin(SimpleHistoryAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ScheduledUpdate)
+class ScheduledUpdateAdmin(admin.ModelAdmin):
+    list_display = ('version', 'window_start', 'window_end', 'queued_at')
+    readonly_fields = ('command_id', 'version', 'window_start', 'window_end', 'queued_at')
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(AppRelease)
+class AppReleaseAdmin(admin.ModelAdmin):
+    list_display = ('slug', 'platform', 'version', 'is_required', 'status', 'updated_at')
+    readonly_fields = ('slug', 'platform', 'version', 'is_required', 'size_mb', 'sha256', 'notes',
+                       'source_url', 'file', 'status', 'error', 'updated_at')
+
+    def has_add_permission(self, request):
         return False
