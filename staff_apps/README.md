@@ -71,6 +71,10 @@ Token: mobil — `expo-secure-store` (Keychain/Keystore); kassa — Electron `sa
 
 `local_server/config/settings.py` ga `CORS_ALLOW_HEADERS = (*default_headers, 'x-device-id')` qo'shildi. Brauzer muhitidagi kassa ilovasi (Electron renderer) har so'rovda `X-Device-ID` yuboradi; `corsheaders` standart ro'yxatida u yo'q, preflight rad etilardi. Mobil ilovaga ta'sir qilmaydi.
 
+## Hisobotlar (mobil, faqat menejer)
+
+Bosh ekrandagi "Hisobotlar" kartochkasi (`/reports`). Bo'limlar: **Panel** (bir kun: tushum, oldingi kun bilan taqqoslash, to'lov turlari, soatlik grafik, top taomlar, zal, bekor qilinganlar), **Sotuv** (Bugun/Kecha/7 kun/Shu oy yoki ‹ › bilan surish; kunlar/ofitsiantlar/taomlar/toifalar kesimi, oldingi davr bilan taqqoslash), **Xodim** (ofitsiant tushumi va hozir ishdagilar), **Qarz** (qarzdorlar va ombor). Pastga tortib yangilash va "Hisobotni ulashish" (matn) bor; "bugun" har daqiqa jimgina yangilanadi. Davr hisoblari qurilmaning mahalliy sanasi bilan (`@pos/shared/reports.ts`), server chegarani `Asia/Tashkent` bo'yicha qo'llaydi. Kassir ilovasida hisobot ekrani hali yo'q.
+
 ## Ilovani yangilash
 
 Ilovalar yangilanishni **faqat Bola'dan** oladi (`GET /api/license/app-updates/`): Ona'dagi `MobileApp` (Ona admin → Mobil ilovalar) o'rnatuvchisi heartbeat orqali Bola'ga yetkaziladi, sha256 tekshiriladi va LAN'dan tarqatiladi. `slug`: kassir ilovasi `kassir`, mobil ilova `ofitsiant`/`manager` (admin shu nom bilan yuklashi kerak). `is_required` belgilangan bo'lsa eski versiya bloklanadi (to'liq ekran), aks holda pastda "Yangilash / Keyinroq" eslatmasi chiqadi.

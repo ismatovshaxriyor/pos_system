@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -101,12 +102,30 @@ export function Txt({ children, size = 16, family = 'body', weight = 400, tone =
 /**
  * Ekran. `footer` - scroll'dan tashqarida, pastga mahkamlangan (savat paneli, asosiy tugma).
  */
-export function Screen({ children, scroll = true, footer }: { children: ReactNode; scroll?: boolean; footer?: ReactNode }) {
+export function Screen({
+  children,
+  scroll = true,
+  footer,
+  onRefresh,
+  refreshing = false,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  footer?: ReactNode;
+  /** Berilsa, ro'yxatni pastga tortib yangilash yoqiladi. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const pad = { paddingTop: insets.top + 16, paddingBottom: footer ? 16 : insets.bottom + 24 };
   const body = scroll ? (
-    <ScrollView contentContainerStyle={[contentStyle, pad]} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
+    <ScrollView
+      contentContainerStyle={[contentStyle, pad]}
+      keyboardShouldPersistTaps="handled"
+      style={{ flex: 1 }}
+      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink60} /> : undefined}
+    >
       {children}
     </ScrollView>
   ) : (

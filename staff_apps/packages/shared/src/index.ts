@@ -16,3 +16,4 @@ export * from './time';
 export * from './credit';
 export * from './devices';
 export * from './appupdate';
+export * from './reports';

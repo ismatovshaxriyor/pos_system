@@ -1,6 +1,15 @@
 import type { AppUpdateInfo, AppUpdatePlatform } from './appupdate';
 import type { ApiClient } from './client';
 import type {
+  DashboardReport,
+  DateRange,
+  DebtsReport,
+  InventoryReport,
+  SalesGroupBy,
+  SalesReport,
+  StaffReport,
+} from './reports';
+import type {
   AppNotification,
   AuthResponse,
   Bootstrap,
@@ -123,6 +132,16 @@ export function createApi(client: ApiClient) {
       /** To'lov summasi joriy qarzdan oshsa 400. */
       repay: (id: number, p: { amount: Decimal; method?: PaymentMethod; note?: string }) =>
         client.post<Customer>(`/customers/${id}/repay/`, p),
+    },
+
+    // ---- Hisobotlar (faqat menejer; `date` = 'today' yoki YYYY-MM-DD) -----
+    reports: {
+      dashboard: (date?: string) => client.get<DashboardReport>('/reports/dashboard/', { query: { date } }),
+      sales: (range: DateRange, groupBy: SalesGroupBy) =>
+        client.get<SalesReport>('/reports/sales/', { query: { from: range.from, to: range.to, group_by: groupBy } }),
+      staff: (range: DateRange) => client.get<StaffReport>('/reports/staff/', { query: { from: range.from, to: range.to } }),
+      debts: () => client.get<DebtsReport>('/reports/debts/'),
+      inventory: () => client.get<InventoryReport>('/reports/inventory/'),
     },
 
     // ---- Xodim qurilmalari (faqat menejer) ------------------------------
