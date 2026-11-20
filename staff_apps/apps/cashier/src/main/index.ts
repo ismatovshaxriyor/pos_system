@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain, session, type IpcMainInvokeEvent } from 'electron';
+import { Bonjour } from 'bonjour-service';
+import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 
 import { IPC, SECURE_KEY_PREFIX } from '../shared/ipc';
@@ -59,6 +61,35 @@ function registerIpc(): void {
     } finally {
       installing = false;
     }
+  });
+  ipcMain.handle(IPC.localAddresses, (e) => {
+    if (!isTrusted(e)) return [];
+    // Ichki (loopback) bo'lmagan IPv4 manzillar; xususiy tarmoqlarni renderer filtrlaydi.
+    return Object.values(networkInterfaces())
+      .flat()
+      .filter((i): i is NonNullable<typeof i> => !!i && i.family === 'IPv4' && !i.internal)
+      .map((i) => i.address);
+  });
+  ipcMain.handle(IPC.browseMdns, (e) => {
+    if (!isTrusted(e)) return [];
+    return new Promise<{ host?: string; port: number; addresses: string[] }[]>((resolve) => {
+      const found: { host?: string; port: number; addresses: string[] }[] = [];
+      let bonjour: Bonjour | null = null;
+      try {
+        bonjour = new Bonjour();
+        bonjour.find({ type: 'pos-bola' }, (s) => found.push({ host: s.host, port: s.port, addresses: s.addresses ?? [] }));
+      } catch {
+        // mDNS ishlamasa (tarmoq/OT cheklovi) - skaner baribir topadi.
+      }
+      setTimeout(() => {
+        try {
+          bonjour?.destroy();
+        } catch {
+          /* ignore */
+        }
+        resolve(found);
+      }, 2000);
+    });
   });
   ipcMain.handle(IPC.quit, (e) => {
     if (isTrusted(e)) app.quit();

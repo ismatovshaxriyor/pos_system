@@ -1,3 +1,5 @@
+import type { MdnsService } from '@pos/shared';
+
 /**
  * Main ↔ preload ↔ renderer o'rtasidagi IPC shartnomasi (yagona manba).
  * Renderer `window.posNative` orqali faqat shu kanallarga chiqa oladi.
@@ -9,6 +11,8 @@ export const IPC = {
   toggleFullscreen: 'window:toggle-fullscreen',
   quit: 'app:quit',
   appVersion: 'app:version',
+  localAddresses: 'network:local-addresses',
+  browseMdns: 'network:browse-mdns',
   installUpdate: 'update:install',
   updateProgress: 'update:progress',
 } as const;
@@ -34,6 +38,12 @@ export interface PosNativeApi {
     currentVersion(): Promise<string>;
     install(downloadUrl: string, sha256: string): Promise<InstallUpdateResult>;
     onProgress(cb: (percent: number) => void): () => void;
+  };
+  /** Kompyuterning o'z tarmoq manzillari: restoran serverini /24 tarmoqdan qidirish uchun. */
+  network: {
+    localAddresses(): Promise<string[]>;
+    /** mDNS (`_pos-bola._tcp`) orqali tarmoqdagi Bola serverlarni qidiradi (~2 soniya). */
+    browseMdns(): Promise<MdnsService[]>;
   };
   platform: string;
 }

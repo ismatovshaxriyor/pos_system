@@ -15,7 +15,7 @@ type Mode = 'pin' | 'register' | 'manager';
  *  - `manager`  - menejer telefon + parol bilan (qurilmaga bog'lanmaydi), masalan kod yaratish uchun.
  */
 export function LoginScreen() {
-  const { notice, serverUrl } = useSession();
+  const { notice } = useSession();
   const [mode, setMode] = useState<Mode>('pin');
   const [error, setError] = useState<string | null>(null);
 
@@ -40,13 +40,6 @@ export function LoginScreen() {
     register: "Qurilmani ro'yxatdan o'tkazish",
     manager: 'Menejer kirishi',
   };
-  let host = serverUrl ?? '';
-  try {
-    host = new URL(serverUrl ?? '').host || host;
-  } catch {
-    // Manzil URL emas - xomligicha ko'rsatamiz.
-  }
-
   return (
     <div className="login">
       <section className="login-brand">
@@ -58,9 +51,9 @@ export function LoginScreen() {
             POS
           </div>
           <div className="rule" />
-          <p className="muted">Offline ishlaydi. Internet uzilsa ham buyurtma va to'lovlar saqlanadi.</p>
+          <p className="muted">Internet uzilsa ham ishlaydi. Buyurtma va to'lovlar saqlanadi.</p>
         </div>
-        <span className="lbl">Server: {host}</span>
+        <span className="lbl">&nbsp;</span>
       </section>
 
       <section className="login-panel">
@@ -92,7 +85,7 @@ export function LoginScreen() {
         {mode === 'manager' && <ManagerForm />}
 
         <button className="linkbtn" onClick={() => void pos.session.clearServer()}>
-          Serverni o'zgartirish
+          Boshqa restoranga ulanish
         </button>
       </section>
     </div>

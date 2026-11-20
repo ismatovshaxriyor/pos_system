@@ -72,7 +72,7 @@ export default function LoginScreen() {
         error && <ErrorText>{error}</ErrorText>
       )}
       <Button title="Kirish" onPress={submit} loading={busy} disabled={!password} />
-      <LinkButton title="Serverni o'zgartirish" onPress={() => void pos.session.clearServer()} />
+      <LinkButton title="Boshqa restoranga ulanish" onPress={() => void pos.session.clearServer()} />
     </Screen>
   );
 }

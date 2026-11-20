@@ -13,7 +13,7 @@ import { View } from 'react-native';
 
 import { useBootstrap } from '@/lib/hooks';
 import { newUuid, pos } from '@/lib/pos';
-import { Button, ErrorText, Eyebrow, Muted, Screen, Title } from '@/ui/kit';
+import { Button, Card, ErrorText, Eyebrow, Field, Muted, Screen, Title } from '@/ui/kit';
 import { CartSheet, MenuPicker } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
@@ -31,6 +31,8 @@ export default function NewOrderScreen() {
   // sync_uuid qoralama ochilganda bir marta yaratiladi: tarmoq uzilib qayta urinilsa dublikat buyurtma ochilmaydi.
   const [syncUuid] = useState(() => newUuid());
   const progress = useRef<SubmitProgress>({});
+  const [guests, setGuests] = useState('');
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,7 @@ export default function NewOrderScreen() {
     setBusy(true);
     setError(null);
     try {
-      const id = await submitDraft(pos.api, { syncUuid, tableId: Number(tableId), lines: cart }, progress.current);
+      const id = await submitDraft(pos.api, { syncUuid, tableId: Number(tableId), lines: cart, guestCount: Number(guests) > 0 ? Number(guests) : undefined, note: note.trim() || undefined }, progress.current);
       await refresh();
       router.replace({ pathname: '/order/[id]', params: { id: String(id) } });
     } catch (e) {
@@ -77,6 +79,13 @@ export default function NewOrderScreen() {
       </View>
       {registerClosed && <ErrorText>Kassa yopiq — buyurtma ochib bo'lmaydi.</ErrorText>}
       {!data && <Muted>Yuklanmoqda...</Muted>}
+
+      {data && (
+        <Card>
+          <Field label="Mehmonlar soni (ixtiyoriy)" value={guests} onChangeText={(v) => setGuests(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" />
+          <Field label="Buyurtmaga izoh (ixtiyoriy)" value={note} onChangeText={setNote} autoCapitalize="sentences" />
+        </Card>
+      )}
 
       {data && (
         <MenuPicker

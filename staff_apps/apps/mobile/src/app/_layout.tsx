@@ -52,6 +52,11 @@ function Shell() {
     if (session.status !== 'loading' && fontsReady) SplashScreen.hide();
   }, [session.status, fontsReady]);
 
+  // Ilova qayta ochilganda saqlangan server hali faollashtirilmagan bo'lishi mumkin (yoki endi faollashtirilgan).
+  useEffect(() => {
+    if (session.serverUrl && session.status === 'signed_out') void pos.refreshServerState().catch(() => undefined);
+  }, [session.serverUrl, session.status]);
+
   // Real-time faqat kirgan holatda. Bloklanganda yoki chiqqanda yopiladi.
   useEffect(() => {
     if (session.status !== 'signed_in') return;
@@ -80,6 +85,9 @@ function Shell() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.paper } }}>
         <Stack.Protected guard={!hasServer}>
           <Stack.Screen name="connect" />
+        </Stack.Protected>
+        <Stack.Protected guard={hasServer && session.status === 'needs_activation'}>
+          <Stack.Screen name="setup" />
         </Stack.Protected>
         <Stack.Protected guard={hasServer && session.status === 'license_blocked'}>
           <Stack.Screen name="blocked" />

@@ -8,7 +8,13 @@
     "scheme": "posstaff",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Restoran tizimini WiFi tarmog'ida topish uchun kerak.",
+        "NSBonjourServices": [
+          "_pos-bola._tcp"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +23,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "uz.hamrohpos.staff"
     },
     "plugins": [
       "expo-router",
@@ -30,11 +37,43 @@
         }
       ],
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Menyu va restoran rasmlarini tanlash uchun galereyaga ruxsat kerak."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Restoran joylashuvini belgilash va davomat uchun joylashuv kerak."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "dfbac59a-5e00-4d83-93fd-8c0689fdccca"
+      }
+    },
+    "owner": "shaxa000"
   }
 }

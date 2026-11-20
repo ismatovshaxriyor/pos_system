@@ -88,6 +88,21 @@ export default function TablesScreen() {
         </View>
 
         {user?.role === 'manager' && (
+          <Pressable accessibilityRole="button" onPress={() => router.push('/manage')}>
+            <Card style={{ minHeight: 64, justifyContent: 'center', gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <Txt size={17} weight={600}>
+                  Boshqaruv
+                </Txt>
+                <Txt size={14} tone="muted">
+                  Menyu, ombor, xodimlar...
+                </Txt>
+              </View>
+            </Card>
+          </Pressable>
+        )}
+
+        {user?.role === 'manager' && (
           <Pressable accessibilityRole="button" onPress={() => router.push('/reports')}>
             <Card style={{ minHeight: 64, justifyContent: 'center', gap: 2 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>

@@ -1,52 +1,130 @@
-import { describeError } from '@pos/shared';
-import { useState } from 'react';
+import { describeError, findServers, mdnsToUrls, type FoundServer, type ScanProgress } from '@pos/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { pos } from '../lib/pos';
 
+/** Server shu kompyuterning o'zida bo'lishi ham mumkin (kassa = server), avval shu manzillar tekshiriladi. */
+// 8010/8020 - dev compose portlari (bir mashinada bir nechta stack).
+const QUICK_URLS = ['localhost:8000', 'localhost:8010', 'localhost:8020', 'pos-bola.local:8000'];
+
 /**
- * Birinchi ishga tushirish: restoran serveri (Bola) manzili. Odatda kassa shu
- * serverning o'zi turgan tarmoqda (yoki bir mashinada: `localhost:8000`).
+ * Birinchi ishga tushirish: restoran serveri (Bola) tarmoqdan o'zi topiladi. Bitta server topilsa darhol
+ * ulanadi; bir nechta bo'lsa tanlash ro'yxati chiqadi. Topilmasa manzilni qo'lda kiritish mumkin.
  */
 export function ConnectScreen() {
+  const [servers, setServers] = useState<FoundServer[]>([]);
+  const [searching, setSearching] = useState(true);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
+  const [manual, setManual] = useState(false);
   const [url, setUrl] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  async function connect() {
-    if (!url.trim()) return;
-    setBusy(true);
+  const connect = useCallback(async (target: string) => {
+    if (!target.trim()) return;
+    setBusy(target);
     setError(null);
     try {
-      await pos.connectToServer(url);
+      await pos.connectToServer(target);
       // Muvaffaqiyatli bo'lsa App keyingi ekranga o'zi o'tadi.
     } catch (e) {
       setError(describeError(e));
-    } finally {
-      setBusy(false);
+      setBusy(null);
     }
-  }
+  }, []);
+
+  const search = useCallback(async () => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setSearching(true);
+    setServers([]);
+    setProgress(null);
+    setError(null);
+    let localIps: string[] = [];
+    try {
+      localIps = await window.posNative.network.localAddresses();
+    } catch {
+      /* manzillarsiz ham localhost tekshiriladi */
+    }
+    let mdnsUrls: string[] = [];
+    try {
+      mdnsUrls = mdnsToUrls(await window.posNative.network.browseMdns());
+    } catch {
+      /* mDNS bo'lmasa - skaner ishlaydi */
+    }
+    const found = await findServers({
+      localIps,
+      extraUrls: [...mdnsUrls, ...QUICK_URLS],
+      signal: ctrl.signal,
+      onProgress: setProgress,
+      onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
+    });
+    if (ctrl.signal.aborted) return;
+    setSearching(false);
+    if (found.length === 1) void connect(found[0]!.url);
+  }, [connect]);
+
+  useEffect(() => {
+    void search();
+    return () => abortRef.current?.abort();
+  }, [search]);
+
+  const showManual = manual || (!searching && servers.length === 0);
 
   return (
     <div className="center">
-      <form
-        className="panel"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void connect();
-        }}
-      >
+      <div className="panel">
         <span className="lbl">HamrohPOS · Kassir</span>
-        <h1>Serverga ulanish</h1>
-        <p className="muted">Restoran serveri manzilini kiriting (masalan 192.168.1.50:8000).</p>
-        <div className="field">
-          <label htmlFor="url">Server manzili</label>
-          <input id="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="192.168.1.50:8000" inputMode="url" autoFocus />
-        </div>
+        <h1>Restoranga ulanish</h1>
+
+        {searching && (
+          <p className="muted">
+            Restoran tizimi qidirilmoqda…
+            {progress && progress.total > 0 ? ` ${Math.round((progress.done / progress.total) * 100)}%` : ''}
+          </p>
+        )}
+        {!searching && servers.length === 0 && (
+          <p className="muted">Restoran tizimi topilmadi. Kompyuter restoran WiFi/tarmog'iga ulanganini tekshiring.</p>
+        )}
+
+        {servers.length > 0 && (
+          <div className="found-list">
+            {servers.map((s) => (
+              <button key={s.url} className="found" onClick={() => void connect(s.url)} disabled={busy !== null}>
+                <span className="found-name">{s.info.activated ? s.info.restaurant_name : 'Yangi restoran'}</span>
+                {!s.info.activated && <span className="lbl">Hali sozlanmagan</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
         {error && <div className="error">{error}</div>}
-        <button className="btn" type="submit" disabled={busy || !url.trim()}>
-          {busy ? 'Tekshirilmoqda...' : 'Ulanish'}
-        </button>
-      </form>
+
+        {showManual ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void connect(url);
+            }}
+          >
+            <div className="field">
+              <label htmlFor="url">Tizim manzili (menejerdan oling)</label>
+              <input id="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="192.168.1.50:8000" inputMode="url" />
+            </div>
+            <button className="btn" type="submit" disabled={busy !== null || !url.trim()}>
+              {busy === url ? 'Tekshirilmoqda...' : 'Ulanish'}
+            </button>
+          </form>
+        ) : (
+          <button className="linkbtn" onClick={() => setManual(true)}>Topilmadimi? Manzilni qo'lda kiriting</button>
+        )}
+
+        {!searching && (
+          <button className="btn ghost" onClick={() => void search()} disabled={busy !== null}>Qayta qidirish</button>
+        )}
+      </div>
     </div>
   );
 }

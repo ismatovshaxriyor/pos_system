@@ -21,6 +21,10 @@ const api: PosNativeApi = {
       return () => ipcRenderer.removeListener(IPC.updateProgress, handler);
     },
   },
+  network: {
+    localAddresses: () => ipcRenderer.invoke(IPC.localAddresses),
+    browseMdns: () => ipcRenderer.invoke(IPC.browseMdns),
+  },
   platform: process.platform,
 };
 

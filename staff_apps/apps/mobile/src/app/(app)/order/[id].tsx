@@ -1,11 +1,11 @@
-import { describeError, elapsedLabel, formatMoney, toTiyin, type Order, type OrderStatus } from '@pos/shared';
+import { describeError, elapsedLabel, formatMoney, parseDecimalInput, toTiyin, type Order, type OrderStatus } from '@pos/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useBootstrap, useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
-import { Button, Card, ErrorText, Eyebrow, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
 import { MenuPicker, TotalRow } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
@@ -29,6 +29,9 @@ export default function OrderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [discount, setDiscount] = useState<{ amount: string; reason: string } | null>(null);
+  const [saving, setSaving] = useState(false);
   // Tez-tez bosishlar ketma-ket ketsin (parallel `add_item` serverda qator qulfi bilan baribir
   // ketma-ket bajariladi, lekin UI'da tartib va xatoni aniq ushlash uchun zanjirlaymiz).
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -68,6 +71,34 @@ export default function OrderScreen() {
     }
   }
 
+  async function printBill(kind: 'printPreBill' | 'printReceipt') {
+    setInfo(null);
+    setError(null);
+    try {
+      await pos.api.orders[kind](orderId);
+      setInfo(kind === 'printPreBill' ? 'Hisob-chek printerga yuborildi.' : "To'lov cheki printerga yuborildi.");
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
+  async function saveDiscount() {
+    if (!discount) return;
+    const amount = parseDecimalInput(discount.amount || '0');
+    if (amount === null) return setError("Chegirma summasini to'g'ri kiriting.");
+    setSaving(true);
+    setError(null);
+    try {
+      await pos.api.orders.setDiscount(orderId, { discount_amount: amount, discount_reason: discount.reason.trim() });
+      setDiscount(null);
+      await load();
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function confirmCancel() {
     Alert.alert('Buyurtmani bekor qilish', "Haqiqatan ham bekor qilasizmi? Bu amalni qaytarib bo'lmaydi.", [
       { text: "Yo'q", style: 'cancel' },
@@ -103,6 +134,10 @@ export default function OrderScreen() {
       </View>
       {order && <Pill label={STATUS_LABEL[order.status]} kind={order.status === 'completed' ? 'ok' : 'neutral'} />}
       {error && <ErrorText>{error}</ErrorText>}
+      {info && <Muted>{info}</Muted>}
+      {order && (order.guest_count > 0 || order.note) && (
+        <Muted>{[order.guest_count > 0 ? `${order.guest_count} mehmon` : '', order.note].filter(Boolean).join(' · ')}</Muted>
+      )}
 
       {order && (
         <Card>
@@ -139,6 +174,30 @@ export default function OrderScreen() {
         <>
           {adding && <Muted>Qo'shilmoqda...</Muted>}
           <MenuPicker categories={boot.categories} products={boot.products} onPick={(p) => addItem(p.id)} />
+        </>
+      )}
+
+      {order && order.status !== 'new' && order.status !== 'cancelled' && (
+        <Button title={finished ? "To'lov chekini chiqarish" : 'Hisob-chekni chiqarish'} variant="ghost" onPress={() => void printBill(finished ? 'printReceipt' : 'printPreBill')} />
+      )}
+
+      {order && !finished && user?.role === 'manager' && (
+        <>
+          {!discount && (
+            <Button
+              title={toTiyin(order.discount_amount) > 0 ? "Chegirmani o'zgartirish" : 'Chegirma qo\u2018yish'}
+              variant="ghost"
+              onPress={() => setDiscount({ amount: toTiyin(order.discount_amount) > 0 ? String(Number(order.discount_amount)) : '', reason: order.discount_reason })}
+            />
+          )}
+          {discount && (
+            <Card>
+              <Field label="Chegirma summasi (so'm; 0 - olib tashlash)" value={discount.amount} onChangeText={(amount) => setDiscount({ ...discount, amount })} keyboardType="decimal-pad" />
+              <Field label="Sababi" value={discount.reason} onChangeText={(reason) => setDiscount({ ...discount, reason })} autoCapitalize="sentences" />
+              <Button title="Saqlash" loading={saving} onPress={() => void saveDiscount()} />
+              <Button title="Bekor qilish" variant="ghost" disabled={saving} onPress={() => setDiscount(null)} />
+            </Card>
+          )}
         </>
       )}
 
