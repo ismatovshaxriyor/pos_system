@@ -17,15 +17,22 @@ RUN pip install --default-timeout=100 --retries 10 -r requirements.txt \
 
 COPY . /app/
 
-# licensing/ ning eng muhim (litsenziya/kill-switch) modullarini .so ga
+# licensing/ ning kill-switch mantig'ini va core/ dagi deyarli butun POS
+# biznes mantig'ini (PROTECTED_MODULES ro'yxati licensing/setup.py da) .so ga
 # kompilyatsiya qiladi, keyin manba .py fayllarini o'chiradi - shu orqali
 # yakuniy image'da bu mantiq ochiq matn ko'rinishida qolmaydi (docs/2).
-# models.py, migrations/, urls.py/apps.py/admin.py/serializers.py ataylab
-# tegilmaydi - Django ular ustida runtime introspeksiya qiladi.
+# models.py, migrations/, urls.py/apps.py/admin.py/serializers.py/routing.py
+# ataylab tegilmaydi - Django/DRF/Channels ular ustida runtime introspeksiya
+# qiladi (admin registratsiyasi, serializer metaklassi, migratsiya grafigi).
 RUN python licensing/setup.py build_ext --inplace \
     && rm -f licensing/middleware.py licensing/jwt_utils.py licensing/hardware.py \
-             licensing/client.py licensing/tasks.py licensing/views.py core/services.py core/views.py \
-    && rm -rf build licensing/*.c licensing/setup.py \
+             licensing/client.py licensing/tasks.py licensing/views.py \
+             core/services.py core/views.py core/auth_views.py core/reports.py \
+             core/inventory.py core/customers.py core/escpos.py core/tasks.py \
+             core/consumers.py core/realtime.py core/permissions.py \
+             core/authentication.py core/exceptions.py core/middleware.py \
+             core/middleware_ws.py \
+    && rm -rf build licensing/*.c core/*.c licensing/setup.py \
     && rm -rf licensing/tests
 
 
