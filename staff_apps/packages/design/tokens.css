@@ -1,0 +1,64 @@
+/*
+ * HamrohPOS ilovalari tokenlari (veb: kassir). Mavzu `<html data-theme="light|night">` bilan almashadi.
+ * Qiymatlar `src/tokens.ts` bilan bir xil bo'lishi shart (tokens.test.ts tekshiradi).
+ */
+:root,
+:root[data-theme='light'] {
+  --paper: #F1F0EB;
+  --panel: #E7E6E0;
+  --card: #FFFFFF;
+  --sel: #E9E8E1;
+  --ink: #1F1F1E;
+  --ink-60: #66665F;
+  --grid: #DAD9D2;
+  --edge: #B3B2AB;
+  --signal: #D4261F;
+  --on-signal: #FFFFFF;
+  --ok: #2E7D5B;
+  --ok-soft: rgba(46, 125, 91, 0.14);
+  --warn: #C98A1D;
+  --warn-soft: rgba(201, 138, 29, 0.18);
+  --warn-ink: #80530A;
+  --dim: rgba(31, 31, 30, 0.45);
+  --banner: #2B2B29;
+  --on-banner: #F1F0EB;
+  --lift: 0 1px 2px rgba(31, 31, 30, 0.06), 0 3px 10px rgba(31, 31, 30, 0.05);
+  --lift-sig: 0 4px 14px rgba(212, 38, 31, 0.24);
+  --lift-pop: 0 20px 60px rgba(0, 0, 0, 0.25);
+  color-scheme: light;
+}
+
+:root[data-theme='night'] {
+  --paper: #171716;
+  --panel: #1F1F1E;
+  --card: #222221;
+  --sel: #2D2D2B;
+  --ink: #E6E6E0;
+  --ink-60: #9B9B93;
+  --grid: #33332F;
+  --edge: #4D4D48;
+  --signal: #FF5249;
+  --on-signal: #171716;
+  --ok: #58C795;
+  --ok-soft: rgba(88, 199, 149, 0.16);
+  --warn: #E5AE44;
+  --warn-soft: rgba(229, 174, 68, 0.16);
+  --warn-ink: #E5AE44;
+  --dim: rgba(0, 0, 0, 0.6);
+  --banner: #2B2B29;
+  --on-banner: #F1F0EB;
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --lift-sig: none;
+  --lift-pop: 0 20px 60px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+:root {
+  --font-body: 'Archivo', 'Segoe UI', system-ui, sans-serif;
+  --font-disp: 'Big Shoulders Display', 'Archivo', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --r-sm: 9px;
+  --r-md: 12px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+}

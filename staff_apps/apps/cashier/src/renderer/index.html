@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!--
+      Server manzili restoran LAN'idagi ixtiyoriy IP bo'lgani uchun connect-src ochiq (http:/ws:),
+      qolgan hamma narsa faqat o'z fayllarimizdan. Rasmlar server /media/ dan keladi.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; connect-src 'self' http: https: ws: wss:; font-src 'self' data:"
+    />
+    <title>POS Kassa</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

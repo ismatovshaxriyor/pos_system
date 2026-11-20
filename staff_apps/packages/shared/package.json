@@ -1,0 +1,24 @@
+{
+  "name": "@pos/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ikkala ilova (mobil va kassir) uchun umumiy: API client, tiplar, auth, WebSocket, pul formatlash",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "@types/react": "~19.3.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.tsx"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

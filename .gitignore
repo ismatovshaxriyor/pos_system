@@ -35,3 +35,10 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# staff_apps (Expo / Electron)
+.expo/
+expo-env.d.ts
+out/
+release/
+*.tsbuildinfo
