@@ -272,3 +272,15 @@ Yangilanish bo'lmasa: `{"available": false, "required": false, "latest": null}`.
 ### 2. O'rnatuvchini yuklab olish
 - **Endpoint:** `GET /api/license/app-updates/<id>/download/` (`download_url` ni server manziliga qo'shing)
 - **Javob:** fayl (`attachment`); tayyor bo'lmasa `404`. Yuklangach `sha256` ni solishtiring.
+
+## Hisobotlar (Reports API)
+
+Barchasi `GET`, **faqat menejer** (boshqalarga `403`), pul qiymatlari `"50000.00"` ko'rinishidagi satr. Tushum doim `Payment.amount` yig'indisi (bekor qilingan to'lovlarsiz). Kun chegarasi `Asia/Tashkent` bo'yicha. Sana: `YYYY-MM-DD` yoki `today`.
+
+- `GET /api/reports/dashboard/?date=` — bir kunlik bosh panel:
+  `revenue{total, by_method{cash,card,other}, order_count, avg_check, discount_total, cancelled_orders}`, `voids{voided_items, voided_payments, voided_payments_total}`, `floor{occupied_tables, open_orders, active_staff}`, `debts{total_outstanding, debtor_count}`, `inventory{low_stock_count, total_value}`, `top_products[{name, quantity, revenue}]` (10 tagacha), `hourly_revenue[{hour:"HH:00", revenue}]`.
+- `GET /api/reports/sales/?from=&to=&group_by=day|waiter|product|category` — davr tahlili (`from`/`to` berilmasa bugun): `from`, `to`, `total_revenue`, `by_method`, `order_count`, `avg_check`, `discount_total`, `cancelled_orders`, `rows[{key, revenue, quantity?, payment_count?, waiter_id?}]`. Noto'g'ri `group_by` → `400`.
+- `GET /api/reports/staff/?date=` yoki `?from=&to=` — `waiters[{waiter_id, waiter_name, revenue, payment_count, completed_orders}]`, `clocked_in[{user_id, name, role, check_in}]`, `from`, `to`.
+- `GET /api/reports/debts/` — `total_outstanding`, `debtor_count`, `top_debtors[{id, name, phone, balance}]` (50 tagacha), `credit_sales_today`, `repayments_today`.
+- `GET /api/reports/inventory/` — `ingredient_count`, `total_value`, `low_stock_count`, `low_stock[{id, name, unit, current_stock, min_stock}]`, `consumed_units_today`, `purchased_cost_today`.
+- `GET /api/reports/my-summary/?date=&waiter=` — har qanday xodim o'zining kunlik jamlanmasi; `waiter` (boshqa xodim) faqat menejer uchun.
