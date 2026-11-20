@@ -29,6 +29,19 @@
       <input type="text" name="version" id="id_version" value="{{ latest_version|default:'' }}" placeholder="masalan: 0.3.0" required autofocus>
     </p>
 
+    <fieldset style="border:1px solid #888; border-radius:6px; padding:8px 12px; margin:12px 0;">
+      <legend><b>Qachon o'rnatilsin?</b></legend>
+      <p>
+        <label><input type="radio" name="mode" value="window" checked>
+          <b>Yangilanish oynasida</b> — har restoran o'z oynasida (restoran sozlamasidagi
+          <code>update_window_start/end</code>) va ochiq buyurtma bo'lmaganda.</label>
+      </p>
+      <p>
+        <label><input type="radio" name="mode" value="force">
+          <b>Majburiy (darhol)</b> — oynani va ochiq buyurtma tekshiruvini chetlab o'tadi;
+          xizmat bir necha daqiqaga uziladi. Faqat shoshilinch tuzatish uchun.</label>
+      </p>
+    </fieldset>
 
     {% for pk in selected %}
       <input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">

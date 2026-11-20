@@ -238,6 +238,8 @@ class HeartbeatView(APIView):
             "status": "ok",
             "restaurant": restaurant.name,
             "license_active": license_active,
+            # Xodim ilovalarining joriy versiyalari: Bola fayllarni o'ziga yuklab oladi va xodimlarga o'zi tarqatadi.
+            "app_releases": _app_releases(request),
             "desired_version": restaurant.desired_version,
             "telegram_bot_token": restaurant.telegram_bot_token,
             "telegram_chat_id": restaurant.telegram_chat_id,
@@ -247,6 +249,19 @@ class HeartbeatView(APIView):
             ],
             "message": "Heartbeat received successfully.",
         }, status=status.HTTP_200_OK)
+
+
+def _app_releases(request):
+    from tenants.models import MobileApp
+    return [
+        {
+            "id": app.id, "slug": app.slug, "platform": app.platform, "version": app.version,
+            "is_required": app.is_required, "size_mb": str(app.size_mb), "sha256": app.sha256,
+            "notes": app.notes,
+            "download_url": request.build_absolute_uri(app.apk_file.url),
+        }
+        for app in MobileApp.objects.filter(is_active=True).exclude(apk_file='')
+    ]
 
 
 class CommandResultView(APIView):
@@ -269,7 +284,9 @@ class CommandResultView(APIView):
 
         command.status = serializer.validated_data['status']
         command.result = serializer.validated_data.get('result', {})
-        command.completed_at = timezone.now()
+        # `acknowledged` = Bola buyruqni qabul qildi, lekin hali bajarmadi (masalan, yangilanish oynasini kutmoqda).
+        if command.status != 'acknowledged':
+            command.completed_at = timezone.now()
         command.save(update_fields=['status', 'result', 'completed_at'])
 
         return Response({"detail": "Natija qabul qilindi."}, status=status.HTTP_200_OK)

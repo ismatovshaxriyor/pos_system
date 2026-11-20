@@ -61,6 +61,7 @@ class RestaurantAdminMandatoryAccountTests(TestCase):
             'name': "Yangi Restoran",
             'address': '', 'contact_info': '', 'is_active': 'on',
             'desired_version': '',
+            'update_window_start': '02:00', 'update_window_end': '05:00',
             'admin_account-0-phone': '', 'admin_account-0-full_name': '',
             'admin_account-0-password': '', 'admin_account-0-id': '',
             **self._inline_management_data(),
@@ -75,6 +76,7 @@ class RestaurantAdminMandatoryAccountTests(TestCase):
             'name': "Yangi Restoran",
             'address': '', 'contact_info': '', 'is_active': 'on',
             'desired_version': '',
+            'update_window_start': '02:00', 'update_window_end': '05:00',
             'admin_account-0-phone': '+998911112233',
             'admin_account-0-full_name': 'Aziz Aliyev',
             'admin_account-0-password': 'Kuchli-Parol-1',
@@ -229,12 +231,37 @@ class ReleaseVersionActionTests(TestCase):
             r.refresh_from_db()
             self.assertEqual(r.desired_version, '0.1.2')
             cmd = RemoteCommand.objects.get(restaurant=r, command_type='update_app')
-            self.assertEqual(cmd.payload, {'version': '0.1.2'})
+            self.assertEqual(cmd.payload, {
+                'version': '0.1.2', 'mode': 'window', 'window': {'start': '02:00', 'end': '05:00'},
+            })
 
         # Faol emas restoranга tegilmaydi.
         self.inactive.refresh_from_db()
         self.assertEqual(self.inactive.desired_version, '')
         self.assertFalse(RemoteCommand.objects.filter(restaurant=self.inactive).exists())
+
+    def test_force_mode_has_no_window(self):
+        self._post([self.r1.pk], {'apply': '1', 'version': '0.1.2', 'mode': 'force'})
+        cmd = RemoteCommand.objects.get(restaurant=self.r1, command_type='update_app')
+        self.assertEqual(cmd.payload, {'version': '0.1.2', 'mode': 'force'})
+
+    def test_window_uses_each_restaurants_own_window(self):
+        import datetime
+        self.r1.update_window_start = datetime.time(23, 30)
+        self.r1.update_window_end = datetime.time(4, 0)
+        self.r1.save()
+        self._post([self.r1.pk], {'apply': '1', 'version': '0.1.2', 'mode': 'window'})
+        cmd = RemoteCommand.objects.get(restaurant=self.r1, command_type='update_app')
+        self.assertEqual(cmd.payload['window'], {'start': '23:30', 'end': '04:00'})
+
+    def test_unknown_mode_falls_back_to_window(self):
+        self._post([self.r1.pk], {'apply': '1', 'version': '0.1.2', 'mode': 'whenever'})
+        cmd = RemoteCommand.objects.get(restaurant=self.r1, command_type='update_app')
+        self.assertEqual(cmd.payload['mode'], 'window')
+
+    def test_intermediate_page_offers_mode_choice(self):
+        response = self._post([self.r1.pk])
+        self.assertContains(response, 'name="mode"')
 
     def test_apply_without_version_sends_nothing(self):
         response = self._post([self.r1.pk], {'apply': '1', 'version': '   '})

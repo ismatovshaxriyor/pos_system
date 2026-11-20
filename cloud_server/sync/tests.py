@@ -1,3 +1,4 @@
+import tempfile
 import uuid
 from datetime import timedelta
 
@@ -248,6 +249,34 @@ class HeartbeatTests(TestCase):
         self.assertEqual(status_row.cpu_percent, 12.5)
         self.assertEqual(status_row.unsynced_count, 3)
 
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix='ona-test-media-'))
+    def test_heartbeat_lists_active_app_releases_with_sha256(self):
+        from django.core.files.base import ContentFile
+        from tenants.models import MobileApp
+        app = MobileApp(
+            slug='kassir', name='Kassir', role='Kassa', version='1.2.0', platform='windows',
+            size_mb='1.0', is_required=True, released_at=timezone.now(),
+        )
+        app.apk_file.save('kassir.exe', ContentFile(b'installer-bytes'), save=False)
+        app.save()
+        hidden = MobileApp(
+            slug='old', name='Old', role='x', version='0.1', platform='android', size_mb='1.0',
+            is_active=False, released_at=timezone.now(),
+        )
+        hidden.apk_file.save('old.apk', ContentFile(b'old'), save=False)
+        hidden.save()
+
+        response = self.client.post(self.url, {}, content_type='application/json', **self._auth())
+
+        releases = response.data['app_releases']
+        self.assertEqual(len(releases), 1)
+        r = releases[0]
+        import hashlib
+        self.assertEqual((r['slug'], r['platform'], r['version'], r['is_required']), ('kassir', 'windows', '1.2.0', True))
+        self.assertEqual(r['sha256'], hashlib.sha256(b'installer-bytes').hexdigest())
+        self.assertTrue(r['download_url'].startswith('http'))
+        self.assertIn('/media/mobile_apps/', r['download_url'])
+
     def test_heartbeat_accepted_for_inactive_license_but_reports_inactive(self):
         # Lenient auth: an inactive license can still heartbeat, but the
         # response tells the Bola to block itself.
@@ -364,6 +393,20 @@ class RemoteCommandLifecycleTests(TestCase):
         self.assertEqual(command.status, 'completed')
         self.assertEqual(command.result, {"detail": "ok"})
         self.assertIsNotNone(command.completed_at)
+
+    def test_acknowledged_result_keeps_command_open(self):
+        command = RemoteCommand.objects.create(
+            restaurant=self.restaurant, command_type='update_app', status='sent',
+        )
+        url = reverse('sync-command-result', kwargs={'command_id': command.id})
+        response = self.client.post(
+            url, {"status": "acknowledged", "result": {"detail": "Oynani kutmoqda"}},
+            content_type='application/json', **self._auth(self.license),
+        )
+        self.assertEqual(response.status_code, 200)
+        command.refresh_from_db()
+        self.assertEqual(command.status, 'acknowledged')
+        self.assertIsNone(command.completed_at)
 
     def test_command_result_cross_tenant_rejected(self):
         command = RemoteCommand.objects.create(

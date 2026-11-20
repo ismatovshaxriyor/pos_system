@@ -1,5 +1,6 @@
 import re
 import secrets
+import datetime
 import uuid
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -43,6 +44,10 @@ class Restaurant(models.Model):
     last_seen = models.DateTimeField(null=True, blank=True)
     is_online = models.BooleanField(default=False)
     desired_version = models.CharField(max_length=50, blank=True, default='')
+    # Yangilanish oynasi: "oyna" rejimidagi update faqat shu vaqt oralig'ida (Bola'ning mahalliy
+    # soati bilan) va ochiq buyurtma bo'lmaganda o'rnatiladi. Yarim tundan o'tishi mumkin (23:00-05:00).
+    update_window_start = models.TimeField(default=datetime.time(2, 0), help_text="Yangilanish oynasi boshlanishi (restoran mahalliy vaqti)")
+    update_window_end = models.TimeField(default=datetime.time(5, 0), help_text="Yangilanish oynasi tugashi (restoran mahalliy vaqti)")
     telegram_bot_token = models.CharField(max_length=200, blank=True, default='', help_text="Fail-safe Telegram bot tokeni")
     telegram_chat_id = models.CharField(max_length=100, blank=True, default='', help_text="Fail-safe Telegram admin/group chat_id")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -296,6 +301,7 @@ class MobileApp(models.Model):
     min_os = models.CharField(max_length=50, blank=True, default='', help_text="masalan 'Android 8.0' yoki 'Windows 10 64-bit'")
     is_required = models.BooleanField(default=False, help_text="Majburiy yangilanish sifatida belgilansinmi")
     apk_file = models.FileField(upload_to='mobile_apps/', help_text="Admin shu yerdan o'rnatuvchi faylni (APK yoki Windows uchun EXE/MSI) yuklaydi - havola emas, fayl o'zi bizning serverda saqlanadi.")
+    sha256 = models.CharField(max_length=64, blank=True, default='', editable=False, help_text="Fayl nazorat yig'indisi - Bola yuklab olgach tekshiradi (fayl yuklanganda avtomatik hisoblanadi)")
     notes = models.JSONField(default=list, blank=True, help_text="O'zgarishlar ro'yxati (matn qatorlari)")
     is_active = models.BooleanField(default=True, help_text="O'chirilsa ro'yxatda ko'rinmaydi")
     released_at = models.DateTimeField()
@@ -307,6 +313,28 @@ class MobileApp(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['slug', 'platform'], name='unique_mobileapp_slug_platform'),
         ]
+
+    def compute_sha256(self):
+        import hashlib
+        digest = hashlib.sha256()
+        f = self.apk_file
+        was_open = not f.closed if hasattr(f, 'closed') else False
+        f.open('rb')
+        try:
+            f.seek(0)
+            for chunk in f.chunks():
+                digest.update(chunk)
+            f.seek(0)
+        finally:
+            if not was_open and f._committed:
+                f.close()
+        return digest.hexdigest()
+
+    def save(self, *args, **kwargs):
+        # Yangi/almashtirilgan fayl: nazorat yig'indisini qayta hisoblaymiz (Bola yuklangan faylni shu bilan tekshiradi).
+        if self.apk_file and (not self.apk_file._committed or not self.sha256):
+            self.sha256 = self.compute_sha256()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.get_platform_display()}) v{self.version}"

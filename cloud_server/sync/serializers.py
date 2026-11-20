@@ -24,7 +24,7 @@ class HeartbeatSerializer(serializers.Serializer):
 
 
 class CommandResultSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=("completed", "failed"))
+    status = serializers.ChoiceField(choices=("acknowledged", "completed", "failed"))
     result = serializers.JSONField(required=False, default=dict)
 
 

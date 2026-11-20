@@ -13,6 +13,7 @@ from .models import (
     SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest, MobileApp, PricingPlan, PricingFeature,
 )
 from .signals import compute_default_license_expiry
+from .updates import UPDATE_MODE_FORCE, UPDATE_MODE_WINDOW, UPDATE_MODES, update_payload
 from sync.jwt_utils import issue_license_token
 
 LICENSE_WARNING_DAYS = 7
@@ -220,12 +221,12 @@ class RestaurantAdmin(admin.ModelAdmin):
             RemoteCommand.objects.create(
                 restaurant=restaurant,
                 command_type='update_app',
-                payload={"version": restaurant.desired_version},
+                payload=update_payload(restaurant, restaurant.desired_version, UPDATE_MODE_WINDOW),
             )
             count += 1
         self.message_user(
             request,
-            f"{count} ta restoranga yangilanish yuborildi "
+            f"{count} ta restoranga yangilanish yuborildi: har biri o'z yangilanish oynasida o'rnatiladi "
             "(desired_version maydoni bo'sh bo'lganlar o'tkazib yuborildi).",
         )
 
@@ -248,17 +249,22 @@ class RestaurantAdmin(admin.ModelAdmin):
                     request, "Versiya kiritilmadi - hech narsa yuborilmadi.", level=messages.ERROR,
                 )
                 return
+            mode = request.POST.get('mode')
+            if mode not in UPDATE_MODES:
+                mode = UPDATE_MODE_WINDOW
             count = 0
             for restaurant in active:
                 restaurant.desired_version = version
                 restaurant.save(update_fields=['desired_version'])
                 RemoteCommand.objects.create(
-                    restaurant=restaurant, command_type='update_app', payload={"version": version},
+                    restaurant=restaurant, command_type='update_app',
+                    payload=update_payload(restaurant, version, mode),
                 )
                 count += 1
+            when = "darhol (majburiy)" if mode == UPDATE_MODE_FORCE else "o'z yangilanish oynasida"
             self.message_user(
                 request,
-                f"{count} ta faol Bolaga '{version}' versiyasi yuborildi. "
+                f"{count} ta faol Bolaga '{version}' versiyasi yuborildi: {when} o'rnatiladi. "
                 "Rollout app_version shu versiyaga tenglashganda tasdiqlanadi.",
             )
             return
@@ -545,6 +551,18 @@ class MobileAppAdmin(admin.ModelAdmin):
     search_fields = ('name', 'slug', 'role')
     prepopulated_fields = {'slug': ('name',)}
     ordering = ('name',)
+    readonly_fields = ('sha256',)
+    actions = ['action_recompute_sha256']
+
+    @admin.action(description="Fayl nazorat yig'indisini (sha256) qayta hisoblash")
+    def action_recompute_sha256(self, request, queryset):
+        count = 0
+        for app in queryset:
+            if app.apk_file:
+                app.sha256 = app.compute_sha256()
+                app.save(update_fields=['sha256'])
+                count += 1
+        self.message_user(request, f"{count} ta fayl uchun sha256 qayta hisoblandi.")
 
 
 class PricingFeatureInline(admin.TabularInline):
