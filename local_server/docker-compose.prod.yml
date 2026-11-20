@@ -153,7 +153,11 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.docker/config.json:/config.json:ro
+      # REGISTRY_AUTH_FILE'ni scripts/install.sh|ps1 .env'ga yozadi: Docker Desktop
+      # (macOS/Windows) da ~/.docker/config.json'da parol OS keychain'da turadi
+      # (credsStore) va konteyner uni o'qiy olmaydi - Watchtower private ghcr image'ni
+      # tortolmay qolardi. O'rnatuvchi alohida, ichida to'g'ridan-to'g'ri auth bor fayl yaratadi.
+      - ${REGISTRY_AUTH_FILE:-~/.docker/config.json}:/config.json:ro
     environment:
       - WATCHTOWER_HTTP_API_UPDATE=true
       - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN}

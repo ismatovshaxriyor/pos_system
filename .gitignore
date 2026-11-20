@@ -42,3 +42,7 @@ expo-env.d.ts
 out/
 release/
 *.tsbuildinfo
+
+# o'rnatuvchi yaratadigan registry auth (token ichida)
+.registry-auth.json
+install.log

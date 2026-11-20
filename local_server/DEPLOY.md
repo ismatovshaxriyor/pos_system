@@ -15,7 +15,22 @@ Ushbu hujjat **Bola server** (lokal POS serveri) ni restoranda birinchi marta o'
 
 ---
 
-## 2. Birinchi Marta Ishga Tushirish (Quick Start)
+## 2. Tez o'rnatish (tavsiya): bitta skript
+
+Loyiha papkasini (zip yoki git) yangi kompyuterga ko'chirib, shu skriptni ishga tushiring - u hamma narsani bir marta so'raydi, yetishmayotgan dasturlarni (Docker va h.k.) o'zi o'rnatadi, ruxsatlarni sozlaydi va serverni ko'taradi:
+
+```bash
+# Linux / macOS
+./scripts/install.sh
+```
+```powershell
+# Windows (Administrator huquqini o'zi so'raydi)
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+```
+
+Parametrlar: `--yes` (savolsiz), `--build` (image'ni shu yerda qurish), `--config-only` (faqat `.env`/fayllarni tayyorlash). Windows'da WSL2 birinchi marta yoqilsa kompyuterni qayta yoqib, skriptni yana ishga tushirish kerak bo'ladi. Quyidagi 2-bo'lim qadamlari shu skript nima qilishining qo'lda varianti.
+
+## 2a. Birinchi Marta Ishga Tushirish (Quick Start)
 
 ### 1-qadam: Konteynerlarni ko'tarish
 `local_server` katalogida turib:
