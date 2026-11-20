@@ -3,6 +3,7 @@ import type { ApiClient } from './client';
 import type {
   DashboardReport,
   DateRange,
+  DayEndReport,
   DebtsReport,
   InventoryReport,
   SalesGroupBy,
@@ -136,6 +137,8 @@ export function createApi(client: ApiClient) {
 
     // ---- Hisobotlar (faqat menejer; `date` = 'today' yoki YYYY-MM-DD) -----
     reports: {
+      /** Kassir yoki menejer; faqat bugun. */
+      dayEnd: () => client.get<DayEndReport>('/reports/day-end/'),
       dashboard: (date?: string) => client.get<DashboardReport>('/reports/dashboard/', { query: { date } }),
       sales: (range: DateRange, groupBy: SalesGroupBy) =>
         client.get<SalesReport>('/reports/sales/', { query: { from: range.from, to: range.to, group_by: groupBy } }),

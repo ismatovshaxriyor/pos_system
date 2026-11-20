@@ -1565,3 +1565,59 @@ html[data-motion='reduced'] *::after {
   background: var(--ink-60);
   transition: width 0.2s linear;
 }
+
+/* ===== Kun yakuni ===== */
+.de-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--grid);
+  border-radius: var(--r-lg);
+  box-shadow: var(--lift);
+}
+
+.de-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 1.0625rem;
+}
+
+.de-row.strong {
+  font-weight: 600;
+}
+
+.de-row .mono {
+  font-weight: 500;
+}
+
+.de-card.cash {
+  border-color: var(--ink-60);
+}
+
+.de-cash {
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 2px 0 6px;
+}
+
+.de-warn {
+  padding: 12px 16px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  border-radius: var(--r-lg);
+  border-left: 6px solid var(--warn);
+}
+
+.de-open {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+  font-size: 0.9375rem;
+}

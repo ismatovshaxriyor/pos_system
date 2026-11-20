@@ -22,9 +22,9 @@ from rest_framework.views import APIView
 
 from .models import (
     Order, OrderItem, Payment, User, Attendance,
-    Customer, DebtTransaction, Ingredient, StockMovement, Purchase,
+    Customer, DebtTransaction, Ingredient, StockMovement, Purchase, RegisterSession,
 )
-from .permissions import IsAdminStaff
+from .permissions import IsAdminStaff, IsCashierOrManager
 from .views import RESTAURANT_TZ
 
 # price*quantity yig'indilari uchun output_field (aks holda Sum turi noaniq).
@@ -162,6 +162,73 @@ class MySalesSummaryView(APIView):
             'total_revenue': _money(total_revenue),
             'avg_order_value': _money(avg),
             'by_method': {k: _money(v) for k, v in by_method.items()},
+        })
+
+
+class DayEndReportView(APIView):
+    """
+    Kassir uchun KUN YAKUNI hisoboti - faqat BUGUN (sana parametri yo'q, ataylab:
+    o'tgan kunlar menejerning `/reports/*` hisobotlari). `GET /api/reports/day-end/`.
+    Kassir yoki menejer; afitsiant ko'rmaydi.
+
+    Tushum `Payment.amount`dan (bekor qilinmagan). `cash_expected` - kassa tortmasida
+    bo'lishi kerak naqd pul: bugungi naqd to'lovlar + bugun naqd qaytarilgan qarzlar
+    (`DebtTransaction.method='cash'`; qarz qaytarish `Payment` emas, alohida ledger).
+    `open_orders` - hali yopilmagan buyurtmalar: kassani yopishdan oldin ogohlantirish.
+    """
+    permission_classes = [IsCashierOrManager]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        target, start, end = day_bounds('today')
+
+        payments = Payment.objects.filter(is_voided=False, created_at__gte=start, created_at__lt=end)
+        by_method, total_revenue = _revenue_by_method(payments)
+
+        completed = Order.objects.filter(status='completed', created_at__gte=start, created_at__lt=end)
+        order_count = completed.count()
+        discount_total = completed.aggregate(t=Sum('discount_amount'))['t'] or Decimal('0')
+
+        debt_txns = DebtTransaction.objects.filter(created_at__gte=start, created_at__lt=end)
+        credit_sales = debt_txns.filter(txn_type='credit_sale').aggregate(t=Sum('amount'))['t'] or Decimal('0')
+        repayments = -(debt_txns.filter(txn_type='repayment').aggregate(t=Sum('amount'))['t'] or Decimal('0'))
+        repaid_cash = -(debt_txns.filter(txn_type='repayment', method='cash').aggregate(t=Sum('amount'))['t'] or Decimal('0'))
+
+        open_orders = Order.objects.filter(status__in=('new', 'in_progress')).select_related('table', 'waiter').order_by('created_at')
+        session = RegisterSession.objects.filter(pk=1).first()
+
+        return Response({
+            'date': str(target),
+            'generated_at': timezone.now().isoformat(),
+            'register': {
+                'is_open': session.is_open if session else True,
+                'opened_at': session.opened_at.isoformat() if session and session.opened_at else None,
+                'closed_at': session.closed_at.isoformat() if session and session.closed_at else None,
+            },
+            'revenue': {
+                'total': _money(total_revenue),
+                'by_method': {k: _money(v) for k, v in by_method.items()},
+                'payment_count': payments.count(),
+                'order_count': order_count,
+                'avg_check': _money(total_revenue / order_count if order_count else Decimal('0')),
+                'discount_total': _money(discount_total),
+            },
+            'cash': {
+                'sales': _money(by_method['cash']),
+                'debt_repayments': _money(repaid_cash),
+                'expected': _money(by_method['cash'] + repaid_cash),
+            },
+            'debts': {'credit_sales': _money(credit_sales), 'repayments': _money(repayments)},
+            'voids': _voids_summary(start, end),
+            'open_orders': {
+                'count': open_orders.count(),
+                'items': [
+                    {'id': o.id, 'table': o.table.name if o.table else None,
+                     'waiter': o.waiter.first_name if o.waiter else None,
+                     'total': _money(o.total_amount), 'created_at': o.created_at.isoformat()}
+                    for o in open_orders[:20]
+                ],
+            },
         })
 
 

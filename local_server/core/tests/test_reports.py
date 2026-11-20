@@ -160,3 +160,56 @@ class ReportsPeriodAndVoidsTests(TestCase):
         past = self.client.get(
             reverse('reports-staff') + '?from=2020-01-01&to=2020-01-02', **_auth_header(self.manager)).json()
         self.assertEqual(past['waiters'], [])
+
+
+class DayEndReportTests(TestCase):
+    """Kassir uchun kun yakuni (`/reports/day-end/`): faqat bugun, kassir/menejer."""
+    setUp = ReportsTests.setUp
+
+    def _get(self, user):
+        return self.client.get(reverse('reports-day-end'), **_auth_header(user))
+
+    def test_cashier_sees_today_totals(self):
+        resp = self._get(self.cashier)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(Decimal(data['revenue']['total']), Decimal('50000'))
+        self.assertEqual(Decimal(data['revenue']['by_method']['cash']), Decimal('30000'))
+        self.assertEqual(Decimal(data['revenue']['by_method']['card']), Decimal('20000'))
+        self.assertEqual(data['revenue']['order_count'], 1)
+        self.assertEqual(Decimal(data['revenue']['avg_check']), Decimal('50000'))
+        self.assertTrue(data['register']['is_open'])  # RegisterSession yo'q = ochiq
+
+    def test_manager_allowed_waiter_forbidden(self):
+        self.assertEqual(self._get(self.manager).status_code, 200)
+        self.assertEqual(self._get(self.waiter).status_code, 403)
+
+    def test_cash_expected_includes_cash_repayments_only(self):
+        from core.models import DebtTransaction
+        customer = Customer.objects.create(first_name='Bobur', phone='+998901112233')
+        DebtTransaction.objects.create(customer=customer, amount=Decimal('-7000'), txn_type='repayment', method='cash')
+        DebtTransaction.objects.create(customer=customer, amount=Decimal('-9000'), txn_type='repayment', method='card')
+        DebtTransaction.objects.create(customer=customer, amount=Decimal('4000'), txn_type='credit_sale')
+        data = self._get(self.cashier).json()
+        self.assertEqual(Decimal(data['cash']['sales']), Decimal('30000'))
+        self.assertEqual(Decimal(data['cash']['debt_repayments']), Decimal('7000'))
+        self.assertEqual(Decimal(data['cash']['expected']), Decimal('37000'))
+        self.assertEqual(Decimal(data['debts']['repayments']), Decimal('16000'))
+        self.assertEqual(Decimal(data['debts']['credit_sales']), Decimal('4000'))
+
+    def test_open_orders_listed_and_voids_excluded_from_revenue(self):
+        open_order = Order.objects.create(table=self.table, waiter=self.waiter, status='new')
+        OrderItem.objects.create(order=open_order, product=self.product, quantity=1, price=self.product.price)
+        Payment.objects.create(order=self.order, amount=Decimal('99000'), method='cash',
+                               received_by=self.waiter, is_voided=True)
+        data = self._get(self.cashier).json()
+        self.assertEqual(data['open_orders']['count'], 1)
+        self.assertEqual(data['open_orders']['items'][0]['table'], 'Stol 1')
+        self.assertEqual(Decimal(data['open_orders']['items'][0]['total']), Decimal(open_order.total_amount))
+        self.assertEqual(Decimal(data['revenue']['total']), Decimal('50000'))
+        self.assertEqual(data['voids']['voided_payments'], 1)
+
+    def test_closed_register_reflected(self):
+        from core.models import RegisterSession
+        RegisterSession.objects.create(pk=1, is_open=False)
+        self.assertFalse(self._get(self.cashier).json()['register']['is_open'])

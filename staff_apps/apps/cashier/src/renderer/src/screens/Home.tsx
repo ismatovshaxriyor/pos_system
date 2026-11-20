@@ -1,6 +1,7 @@
 import { describeError, formatMoney, fullName, tiyinToDecimal, toTiyin } from '@pos/shared';
 import { useCallback, useEffect, useState } from 'react';
 
+import { DayEndSheet } from '../components/DayEndSheet';
 import { DebtSheet } from '../components/DebtSheet';
 import { Flap } from '../components/Flap';
 import { MenuSheet } from '../components/MenuSheet';
@@ -26,6 +27,7 @@ export function HomeScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
+  const [dayEndOpen, setDayEndOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const roleLabel = user?.role === 'manager' ? 'Menejer' : 'Kassir';
@@ -109,10 +111,15 @@ export function HomeScreen() {
             setMenuOpen(false);
             setDebtsOpen(true);
           }}
+          onOpenDayEnd={() => {
+            setMenuOpen(false);
+            setDayEndOpen(true);
+          }}
           onClose={() => setMenuOpen(false)}
         />
       )}
       {debtsOpen && <DebtSheet onClose={() => setDebtsOpen(false)} />}
+      {dayEndOpen && <DayEndSheet onClose={() => setDayEndOpen(false)} />}
     </div>
   );
 }

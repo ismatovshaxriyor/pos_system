@@ -29,6 +29,7 @@ export function MenuSheet({
   onSignOut,
   onToggleFullscreen,
   onOpenDebts,
+  onOpenDayEnd,
   onClose,
 }: {
   registerOpen: boolean;
@@ -37,6 +38,7 @@ export function MenuSheet({
   onSignOut: () => void;
   onToggleFullscreen?: () => void;
   onOpenDebts: () => void;
+  onOpenDayEnd: () => void;
   onClose: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -140,6 +142,10 @@ export function MenuSheet({
             <div className="msec">
               <span className="lbl">Kassa</span>
               <div className="menu-actions">
+                <button className="btn ghost" onClick={onOpenDayEnd}>
+                  <span>Kun yakuni hisoboti</span>
+                  <span className="lbl">bugungi savdo</span>
+                </button>
                 <button className="btn ghost" onClick={onOpenDebts}>
                   <span>Qarzdorlar</span>
                   <span className="lbl">nasiyani qaytarish</span>

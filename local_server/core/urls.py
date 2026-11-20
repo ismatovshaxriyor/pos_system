@@ -9,7 +9,7 @@ from .views import (
 )
 from .reports import (
     MySalesSummaryView, DashboardView, SalesReportView,
-    StaffReportView, InventoryReportView, DebtsReportView,
+    StaffReportView, InventoryReportView, DebtsReportView, DayEndReportView,
 )
 from .customers import CustomerViewSet
 from .inventory import (
@@ -44,6 +44,7 @@ urlpatterns = [
     path('public/table/<str:qr_code>/call-waiter/', PublicCallWaiterView.as_view(), name='public-call-waiter'),
     path('bootstrap/', BootstrapView.as_view(), name='bootstrap'),
     path('reports/my-summary/', MySalesSummaryView.as_view(), name='reports-my-summary'),
+    path('reports/day-end/', DayEndReportView.as_view(), name='reports-day-end'),
     path('reports/dashboard/', DashboardView.as_view(), name='reports-dashboard'),
     path('reports/sales/', SalesReportView.as_view(), name='reports-sales'),
     path('reports/staff/', StaffReportView.as_view(), name='reports-staff'),

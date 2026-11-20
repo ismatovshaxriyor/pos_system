@@ -3,7 +3,7 @@
  * Pul qiymatlari server tomondan `"50000.00"` ko'rinishidagi satr (qolgani `money.ts`).
  */
 import type { Decimal } from './types';
-import { toTiyin } from './money';
+import { formatMoney, toTiyin } from './money';
 
 export interface PaymentMethodTotals {
   cash: Decimal;
@@ -242,4 +242,52 @@ export function fillHours(rows: { hour: string; revenue: Decimal }[], from = 8, 
     out.push({ hour: key, revenue: byHour.get(key) ?? '0.00' });
   }
   return out;
+}
+
+/** Kassir uchun kun yakuni (`GET /api/reports/day-end/`): faqat bugun. */
+export interface DayEndReport {
+  date: string;
+  generated_at: string;
+  register: { is_open: boolean; opened_at: string | null; closed_at: string | null };
+  revenue: {
+    total: Decimal;
+    by_method: PaymentMethodTotals;
+    payment_count: number;
+    order_count: number;
+    avg_check: Decimal;
+    discount_total: Decimal;
+  };
+  /** `expected` = bugungi naqd tushum + bugun naqd qaytarilgan qarzlar: kassa tortmasida bo'lishi kerak. */
+  cash: { sales: Decimal; debt_repayments: Decimal; expected: Decimal };
+  debts: { credit_sales: Decimal; repayments: Decimal };
+  voids: { cancelled_orders: number; voided_items: number; voided_payments: number; voided_payments_total: Decimal };
+  open_orders: {
+    count: number;
+    items: { id: number; table: string | null; waiter: string | null; total: Decimal; created_at: string }[];
+  };
+}
+
+/** Kun yakuni hisobotining matni (xabar sifatida yuborish/nusxalash uchun). */
+export function dayEndText(r: DayEndReport): string {
+  const lines = [
+    `Kun yakuni · ${dayLabelWithWeekday(r.date)}`,
+    '',
+    `Tushum: ${formatMoney(r.revenue.total)}`,
+    `  Naqd: ${formatMoney(r.revenue.by_method.cash)}`,
+    `  Karta: ${formatMoney(r.revenue.by_method.card)}`,
+    `  Boshqa: ${formatMoney(r.revenue.by_method.other)}`,
+    `Buyurtmalar: ${r.revenue.order_count} ta · o'rtacha chek ${formatMoney(r.revenue.avg_check)}`,
+  ];
+  if (toTiyin(r.revenue.discount_total) > 0) lines.push(`Chegirmalar: ${formatMoney(r.revenue.discount_total)}`);
+  lines.push('', `Kassadagi naqd (kutilgan): ${formatMoney(r.cash.expected)}`);
+  if (toTiyin(r.cash.debt_repayments) > 0) lines.push(`  shundan qaytarilgan qarz: ${formatMoney(r.cash.debt_repayments)}`);
+  if (toTiyin(r.debts.credit_sales) > 0 || toTiyin(r.debts.repayments) > 0) {
+    lines.push(`Nasiyaga: ${formatMoney(r.debts.credit_sales)} · qaytarildi: ${formatMoney(r.debts.repayments)}`);
+  }
+  const v = r.voids;
+  if (v.cancelled_orders || v.voided_items || v.voided_payments) {
+    lines.push(`Bekor: ${v.cancelled_orders} buyurtma, ${v.voided_items} taom, ${v.voided_payments} to'lov (${formatMoney(v.voided_payments_total)})`);
+  }
+  if (r.open_orders.count > 0) lines.push(`Yopilmagan buyurtmalar: ${r.open_orders.count} ta`);
+  return lines.join('\n');
 }

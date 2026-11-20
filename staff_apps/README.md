@@ -73,7 +73,7 @@ Token: mobil — `expo-secure-store` (Keychain/Keystore); kassa — Electron `sa
 
 ## Hisobotlar (mobil, faqat menejer)
 
-Bosh ekrandagi "Hisobotlar" kartochkasi (`/reports`). Bo'limlar: **Panel** (bir kun: tushum, oldingi kun bilan taqqoslash, to'lov turlari, soatlik grafik, top taomlar, zal, bekor qilinganlar), **Sotuv** (Bugun/Kecha/7 kun/Shu oy yoki ‹ › bilan surish; kunlar/ofitsiantlar/taomlar/toifalar kesimi, oldingi davr bilan taqqoslash), **Xodim** (ofitsiant tushumi va hozir ishdagilar), **Qarz** (qarzdorlar va ombor). Pastga tortib yangilash va "Hisobotni ulashish" (matn) bor; "bugun" har daqiqa jimgina yangilanadi. Davr hisoblari qurilmaning mahalliy sanasi bilan (`@pos/shared/reports.ts`), server chegarani `Asia/Tashkent` bo'yicha qo'llaydi. Kassir ilovasida hisobot ekrani hali yo'q.
+Bosh ekrandagi "Hisobotlar" kartochkasi (`/reports`). Bo'limlar: **Panel** (bir kun: tushum, oldingi kun bilan taqqoslash, to'lov turlari, soatlik grafik, top taomlar, zal, bekor qilinganlar), **Sotuv** (Bugun/Kecha/7 kun/Shu oy yoki ‹ › bilan surish; kunlar/ofitsiantlar/taomlar/toifalar kesimi, oldingi davr bilan taqqoslash), **Xodim** (ofitsiant tushumi va hozir ishdagilar), **Qarz** (qarzdorlar va ombor). Pastga tortib yangilash va "Hisobotni ulashish" (matn) bor; "bugun" har daqiqa jimgina yangilanadi. Davr hisoblari qurilmaning mahalliy sanasi bilan (`@pos/shared/reports.ts`), server chegarani `Asia/Tashkent` bo'yicha qo'llaydi. Kassir ilovasida (☰ menyu → "Kun yakuni hisoboti") faqat bugungi kun yakuni bor: tushum, usullar, kassadagi kutilgan naqd pul, nasiya, bekorlar va hali yopilmagan buyurtmalar; "Nusxa olish" matnni xabar sifatida yuborish uchun (`GET /api/reports/day-end/`, kassir yoki menejer).
 
 ## Ilovani yangilash
 
