@@ -241,3 +241,34 @@ Har bir restoranning o'z Bola'si endi restoranning ochiq domenida (`https://<res
 - **WebSocket:** `wss://<subdomen>.hamrohpos.uz/ws/events/?token=...&device_id=...` - xuddi mahalliy `ws://.../ws/events/...` bilan bir xil protokol/eventlar, faqat manzil.
 - **Muhim:** bu cheklov ilova darajasida, backend darajasida emas - qaysi ilova shu domenga murojaat qilsa (admin, kassir, ofitsiant ilovasi), o'shanga ishlaydi. Agar faqat ma'lum bir ilova (masalan admin) WiFi'dan tashqarida ham ishlashi kerak bo'lsa, buni o'sha ilovaning tarmoq qatlamida hal qilish kerak (masalan: avval mahalliy manzilni sinab ko'rish, muvaffaqiyatsiz bo'lsa shu domenga fallback qilish).
 - Bu funksiya faqat restoranning `website` konteyneri ishga tushirilgan va Cloudflare Tunnel ingress qoidasi (`<subdomen>.hamrohpos.uz` → `http://website:80`) shu restoran uchun sozlangan bo'lsa ishlaydi - har bir restoran uchun alohida, avtomatlashtirilmagan.
+
+## Ilova yangilanishi (App Update API)
+
+Xodim ilovalari (Kassir/Ofitsiant/Menejer) o'zining yangi versiyasini **faqat Bola'dan** oladi. Ikkala endpoint ham avtorizatsiyasiz (login'dan oldin ham ishlaydi) va litsenziya blokidan tashqarida, shuning uchun majburiy yangilanish bloklangan tizimda ham yetib boradi.
+
+### 1. Yangi versiya bormi?
+- **Endpoint:** `GET /api/license/app-updates/?slugs=kassir&platform=windows&current=1.0.0`
+- **Query:**
+  - `slugs`: vergul bilan ajratilgan ilova nomlari (Ona'dagi `MobileApp.slug`): kassir ilovasi `kassir`, mobil ilova `ofitsiant,manager`
+  - `platform`: `android` yoki `windows`
+  - `current`: ilovaning hozirgi versiyasi (masalan `1.0.0`)
+- **Javob (200 OK):**
+```json
+{
+  "available": true,
+  "required": false,
+  "latest": {
+    "slug": "kassir",
+    "version": "1.2.0",
+    "size_mb": "84.3",
+    "sha256": "4bb547ff...",
+    "notes": ["Chegirma tuzatildi"],
+    "download_url": "/api/license/app-updates/1/download/"
+  }
+}
+```
+Yangilanish bo'lmasa: `{"available": false, "required": false, "latest": null}`. Faqat Bola'ga to'liq yuklab olingan versiyalar e'lon qilinadi. `required: true` — eski versiya ishlashi mumkin emas (bloklovchi ekran), aks holda ixtiyoriy eslatma.
+
+### 2. O'rnatuvchini yuklab olish
+- **Endpoint:** `GET /api/license/app-updates/<id>/download/` (`download_url` ni server manziliga qo'shing)
+- **Javob:** fayl (`attachment`); tayyor bo'lmasa `404`. Yuklangach `sha256` ni solishtiring.
