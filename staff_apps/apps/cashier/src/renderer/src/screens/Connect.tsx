@@ -54,13 +54,21 @@ export function ConnectScreen() {
     } catch {
       /* mDNS bo'lmasa - skaner ishlaydi */
     }
-    const found = await findServers({
-      localIps,
-      extraUrls: [...mdnsUrls, ...QUICK_URLS],
-      signal: ctrl.signal,
-      onProgress: setProgress,
-      onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
-    });
+    // Sekin tarmoq/yuklangan server bitta urinishda ulgurmasligi mumkin: topilmasa timeout'ni oshirib qayta urinamiz.
+    let found: FoundServer[] = [];
+    for (const timeoutMs of [800, 2000, 4000]) {
+      if (ctrl.signal.aborted) return;
+      found = await findServers({
+        localIps,
+        extraUrls: [...mdnsUrls, ...QUICK_URLS],
+        timeoutMs,
+        extraTimeoutMs: Math.max(2500, timeoutMs),
+        signal: ctrl.signal,
+        onProgress: setProgress,
+        onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
+      });
+      if (found.length > 0) break;
+    }
     if (ctrl.signal.aborted) return;
     setSearching(false);
     if (found.length === 1) void connect(found[0]!.url);

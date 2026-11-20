@@ -51,15 +51,24 @@ export default function ConnectScreen() {
     }
     // mDNS (native build'da) tezkor yo'l; Expo Go'da bo'sh qaytadi va skaner topadi.
     const mdnsUrls = mdnsToUrls(await browseMdns());
-    const found = await findServers({
-      localIps,
-      // Haqiqiy o'rnatishda Bola doim 8000'da. Ishlab chiqishda (Expo Go) dev compose portlari ham tekshiriladi.
-      ports: __DEV__ ? [8000, 8010, 8020] : [8000],
-      extraUrls: [...mdnsUrls, 'pos-bola.local:8000'],
-      signal: ctrl.signal,
-      onProgress: setProgress,
-      onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
-    });
+    // Sekin router/yuklangan server bitta urinishda ulgurmasligi mumkin: topilmasa, timeout'ni
+    // oshirib (tezkor -> sekin) yana ikki marta urinamiz. Birinchi topilganda to'xtaydi.
+    let found: FoundServer[] = [];
+    for (const timeoutMs of [800, 2000, 4000]) {
+      if (ctrl.signal.aborted) return;
+      found = await findServers({
+        localIps,
+        // Haqiqiy o'rnatishda Bola doim 8000'da. Ishlab chiqishda (Expo Go) dev compose portlari ham tekshiriladi.
+        ports: __DEV__ ? [8000, 8010, 8020] : [8000],
+        extraUrls: [...mdnsUrls, 'pos-bola.local:8000'],
+        timeoutMs,
+        extraTimeoutMs: Math.max(2500, timeoutMs),
+        signal: ctrl.signal,
+        onProgress: setProgress,
+        onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
+      });
+      if (found.length > 0) break;
+    }
     if (ctrl.signal.aborted) return;
     setSearching(false);
     if (found.length === 1) void connect(found[0]!.url);
