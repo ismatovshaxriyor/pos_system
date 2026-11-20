@@ -109,3 +109,54 @@ class ReportsTests(TestCase):
         data = resp.json()
         self.assertEqual(Decimal(data['total_outstanding']), Decimal('50000'))
         self.assertEqual(data['debtor_count'], 2)
+
+
+class ReportsPeriodAndVoidsTests(TestCase):
+    """Davr KPI'lari, bekor qilinganlar va xodimlar uchun sana oralig'i (mobil hisobot ekrani uchun)."""
+    setUp = ReportsTests.setUp  # bir xil ma'lumot, lekin ota sinf testlari qayta ishlamaydi
+
+    def _today(self):
+        from django.utils import timezone
+        from core.views import RESTAURANT_TZ
+        return timezone.now().astimezone(RESTAURANT_TZ).date().isoformat()
+
+    def test_dashboard_reports_cancelled_and_voids(self):
+        cancelled = Order.objects.create(table=self.table, waiter=self.waiter, status='cancelled')
+        OrderItem.objects.create(order=cancelled, product=self.product, quantity=1, price=self.product.price, is_voided=True)
+        Payment.objects.create(order=self.order, amount=Decimal('7000'), method='cash', is_voided=True)
+
+        data = self.client.get(reverse('reports-dashboard'), **_auth_header(self.manager)).json()
+
+        self.assertEqual(data['revenue']['cancelled_orders'], 1)
+        self.assertEqual(data['voids']['voided_items'], 1)
+        self.assertEqual(data['voids']['voided_payments'], 1)
+        self.assertEqual(Decimal(data['voids']['voided_payments_total']), Decimal('7000'))
+        # Bekor qilingan to'lov tushumga kirmaydi.
+        self.assertEqual(Decimal(data['revenue']['total']), Decimal('50000'))
+
+    def test_sales_report_has_period_kpis(self):
+        day = self._today()
+        Order.objects.filter(pk=self.order.pk).update(discount_amount=Decimal('5000'))
+        data = self.client.get(
+            reverse('reports-sales') + f'?from={day}&to={day}&group_by=day', **_auth_header(self.manager)).json()
+
+        self.assertEqual((data['from'], data['to']), (day, day))
+        self.assertEqual(data['order_count'], 1)
+        self.assertEqual(Decimal(data['avg_check']), Decimal('50000'))
+        self.assertEqual(Decimal(data['discount_total']), Decimal('5000'))
+        self.assertEqual(data['cancelled_orders'], 0)
+
+    def test_sales_report_empty_period_has_zero_avg(self):
+        data = self.client.get(
+            reverse('reports-sales') + '?from=2020-01-01&to=2020-01-31', **_auth_header(self.manager)).json()
+        self.assertEqual((data['order_count'], Decimal(data['avg_check'])), (0, Decimal('0')))
+
+    def test_staff_report_accepts_range(self):
+        day = self._today()
+        data = self.client.get(
+            reverse('reports-staff') + f'?from={day}&to={day}', **_auth_header(self.manager)).json()
+        self.assertEqual((data['from'], data['to']), (day, day))
+        self.assertTrue(any(Decimal(w['revenue']) == Decimal('50000') for w in data['waiters']))
+        past = self.client.get(
+            reverse('reports-staff') + '?from=2020-01-01&to=2020-01-02', **_auth_header(self.manager)).json()
+        self.assertEqual(past['waiters'], [])

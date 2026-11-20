@@ -84,6 +84,19 @@ def _money(value):
     return str((value or Decimal('0')).quantize(Decimal('0.01')))
 
 
+def _voids_summary(start, end):
+    """Bekor qilingan buyurtma/taom/to'lovlar - tushumga kirmaydi, lekin menejer ko'rishi kerak."""
+    voided_payments = Payment.objects.filter(is_voided=True, created_at__gte=start, created_at__lt=end)
+    return {
+        'cancelled_orders': Order.objects.filter(
+            status='cancelled', created_at__gte=start, created_at__lt=end).count(),
+        'voided_items': OrderItem.objects.filter(
+            is_voided=True, order__created_at__gte=start, order__created_at__lt=end).count(),
+        'voided_payments': voided_payments.count(),
+        'voided_payments_total': _money(voided_payments.aggregate(t=Sum('amount'))['t']),
+    }
+
+
 class MySalesSummaryView(APIView):
     """
     Afitsiant/kassirning KUNLIK jamlangan sotuvi (bir so'rovda).
@@ -178,6 +191,7 @@ class DashboardView(APIView):
         order_count = completed.count()
         avg_check = total_revenue / order_count if order_count else Decimal('0')
         discount_total = completed.aggregate(t=Sum('discount_amount'))['t'] or Decimal('0')
+        voids = _voids_summary(start, end)
 
         open_orders = Order.objects.filter(status__in=('new', 'in_progress'))
         occupied_tables = open_orders.filter(table__isnull=False).values('table').distinct().count()
@@ -216,7 +230,10 @@ class DashboardView(APIView):
                 'order_count': order_count,
                 'avg_check': _money(avg_check),
                 'discount_total': _money(discount_total),
+                'cancelled_orders': voids['cancelled_orders'],
             },
+            # Nazorat uchun: bekor qilingan taom/to'lovlar (menejer shubhali holatlarni ko'rishi uchun).
+            'voids': {k: v for k, v in voids.items() if k != 'cancelled_orders'},
             'floor': {
                 'occupied_tables': occupied_tables,
                 'open_orders': open_orders.count(),
@@ -255,6 +272,10 @@ class SalesReportView(APIView):
         payments = Payment.objects.filter(is_voided=False, created_at__gte=start, created_at__lt=end)
         by_method, total_revenue = _revenue_by_method(payments)
 
+        completed = Order.objects.filter(status='completed', created_at__gte=start, created_at__lt=end)
+        order_count = completed.count()
+        discount_total = completed.aggregate(t=Sum('discount_amount'))['t'] or Decimal('0')
+
         if group_by == 'day':
             rows = [
                 {'key': r['day'].astimezone(RESTAURANT_TZ).strftime('%Y-%m-%d'),
@@ -285,22 +306,36 @@ class SalesReportView(APIView):
 
         return Response({
             'group_by': group_by,
+            'from': str(start.astimezone(RESTAURANT_TZ).date()),
+            'to': str((end - timedelta(days=1)).astimezone(RESTAURANT_TZ).date()),
             'total_revenue': _money(total_revenue),
             'by_method': {k: _money(v) for k, v in by_method.items()},
+            'order_count': order_count,
+            'avg_check': _money(total_revenue / order_count if order_count else Decimal('0')),
+            'discount_total': _money(discount_total),
+            'cancelled_orders': _voids_summary(start, end)['cancelled_orders'],
             'rows': rows,
         })
 
 
 class StaffReportView(APIView):
     """
-    Xodimlar samaradorligi (kunlik). `GET /api/reports/staff/?date=today`.
+    Xodimlar samaradorligi. `GET /api/reports/staff/?date=today` yoki `?from=&to=` (davr).
     Har afitsiant bo'yicha tushum + yopilgan buyurtma soni, hozir ishdagilar.
     """
     permission_classes = [IsAdminStaff]
 
-    @extend_schema(parameters=[OpenApiParameter('date', str, description="'today' yoki YYYY-MM-DD")])
+    @extend_schema(parameters=[
+        OpenApiParameter('date', str, description="'today' yoki YYYY-MM-DD"),
+        OpenApiParameter('from', str, description='YYYY-MM-DD (date o\'rniga davr uchun)'),
+        OpenApiParameter('to', str, description='YYYY-MM-DD'),
+    ])
     def get(self, request):
-        target, start, end = day_bounds(request.query_params.get('date'))
+        if request.query_params.get('from') or request.query_params.get('to'):
+            start, end = _range_bounds(request)
+            target = start.astimezone(RESTAURANT_TZ).date()
+        else:
+            target, start, end = day_bounds(request.query_params.get('date'))
 
         revenue_rows = Payment.objects.filter(
             is_voided=False, created_at__gte=start, created_at__lt=end,
@@ -330,7 +365,13 @@ class StaffReportView(APIView):
             for a in Attendance.objects.filter(check_out__isnull=True).select_related('user')
         ]
 
-        return Response({'date': str(target), 'waiters': waiters, 'clocked_in': clocked_in})
+        return Response({
+            'date': str(target),
+            'from': str(start.astimezone(RESTAURANT_TZ).date()),
+            'to': str((end - timedelta(days=1)).astimezone(RESTAURANT_TZ).date()),
+            'waiters': waiters,
+            'clocked_in': clocked_in,
+        })
 
 
 class InventoryReportView(APIView):
