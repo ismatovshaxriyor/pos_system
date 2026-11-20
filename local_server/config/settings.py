@@ -440,3 +440,12 @@ JAZZMIN_UI_TWEAKS = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+# Brauzer muhitidagi mijozlar (Windows kassir ilovasi = Electron renderer) har bir
+# so'rovda `X-Device-ID` yuboradi (DeviceTokenAuthentication). corsheaders'ning
+# standart ro'yxatida bu sarlavha yo'q - preflight (OPTIONS) uni rad etib, login'dan
+# keyingi barcha so'rovlarni brauzer darajasida bloklardi. React Native mijozlar
+# CORS ishlatmaydi, ularga ta'sir qilmaydi.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = (*default_headers, 'x-device-id')
+
