@@ -28,10 +28,18 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
  * qarash uchun: tushum, usullar bo'yicha, kassadagi naqd (sanash uchun), nasiya, bekorlar va hali
  * yopilmagan buyurtmalar. "Nusxa olish" - matnni xabar sifatida yuborish uchun.
  */
-export function DayEndSheet({ onClose }: { onClose: () => void }) {
+export function DayEndSheet({
+  onClose,
+  onCloseRegister,
+}: {
+  onClose: () => void;
+  /** Berilsa - "kassani yopish" rejimi: hisobot ko'rilgach shu tugma bilan kassa yopiladi (xato bo'lsa throw). */
+  onCloseRegister?: () => Promise<void>;
+}) {
   const [report, setReport] = useState<DayEndReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -57,17 +65,34 @@ export function DayEndSheet({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function confirmClose() {
+    if (!onCloseRegister || closing) return;
+    setClosing(true);
+    setError(null);
+    try {
+      await onCloseRegister();
+    } catch (e) {
+      setError(describeError(e));
+      setClosing(false);
+    }
+  }
+
   const r = report;
   const has = (v: string) => toTiyin(v) > 0;
   const v = r?.voids;
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay" onClick={closing ? undefined : onClose}>
       <div className="sheet wide" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-bar plain">
-          <h2>Kun yakuni</h2>
+          <h2>{onCloseRegister ? 'Kassani yopish' : 'Kun yakuni'}</h2>
         </div>
         <div className="sheet-body">
+          {onCloseRegister && (
+            <p className="muted">
+              Hisobotni tekshiring. Yopilgach yangi buyurtma ochib bo'lmaydi va barcha xodimlarning smenasi tugatiladi.
+            </p>
+          )}
           {error && <div className="error">{error}</div>}
           {!r && !error && <div className="muted">Yuklanmoqda...</div>}
 
@@ -144,7 +169,18 @@ export function DayEndSheet({ onClose }: { onClose: () => void }) {
               {copied ? 'Nusxalandi' : 'Nusxa olish'}
             </button>
           </div>
-          <button className="btn ink" onClick={onClose}>Yopish</button>
+          <div className="de-foot">
+            {onCloseRegister ? (
+              <div className="confirm-row">
+                <button className="btn ghost" onClick={onClose} disabled={closing}>Bekor</button>
+                <button className="btn ink" onClick={() => void confirmClose()} disabled={!r || closing}>
+                  {closing ? 'Yopilmoqda...' : r && r.open_orders.count > 0 ? 'Baribir yopish' : 'Kassani yopish'}
+                </button>
+              </div>
+            ) : (
+              <button className="btn ink" onClick={onClose}>Yopish</button>
+            )}
+          </div>
         </div>
       </div>
     </div>

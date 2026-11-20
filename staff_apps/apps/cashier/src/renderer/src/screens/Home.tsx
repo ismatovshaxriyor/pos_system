@@ -27,7 +27,8 @@ export function HomeScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
-  const [dayEndOpen, setDayEndOpen] = useState(false);
+  /** 'view' - oddiy hisobot; 'close' - kassani yopish (hisobot ichida tasdiq). */
+  const [dayEnd, setDayEnd] = useState<null | 'view' | 'close'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const roleLabel = user?.role === 'manager' ? 'Menejer' : 'Kassir';
@@ -40,8 +41,7 @@ export function HomeScreen() {
     setActionError(null);
     setMenuOpen(false);
     try {
-      if (data?.register_open) await pos.api.register.close();
-      else await pos.api.register.open();
+      await pos.api.register.open();
       await refresh();
     } catch (e) {
       setActionError(describeError(e));
@@ -105,6 +105,10 @@ export function HomeScreen() {
           registerOpen={data.register_open}
           who={`${fullName(user)} · ${roleLabel}`}
           onToggleRegister={() => void toggleRegister()}
+          onCloseRegister={() => {
+            setMenuOpen(false);
+            setDayEnd('close');
+          }}
           onSignOut={() => void pos.session.signOut()}
           onToggleFullscreen={window.posNative.platform === 'win32' ? () => void window.posNative.window.toggleFullscreen() : undefined}
           onOpenDebts={() => {
@@ -113,13 +117,27 @@ export function HomeScreen() {
           }}
           onOpenDayEnd={() => {
             setMenuOpen(false);
-            setDayEndOpen(true);
+            setDayEnd('view');
           }}
           onClose={() => setMenuOpen(false)}
         />
       )}
       {debtsOpen && <DebtSheet onClose={() => setDebtsOpen(false)} />}
-      {dayEndOpen && <DayEndSheet onClose={() => setDayEndOpen(false)} />}
+      {dayEnd && (
+        <DayEndSheet
+          onClose={() => setDayEnd(null)}
+          onCloseRegister={
+            dayEnd === 'close'
+              ? async () => {
+                  setActionError(null);
+                  await pos.api.register.close();
+                  setDayEnd(null);
+                  await refresh();
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

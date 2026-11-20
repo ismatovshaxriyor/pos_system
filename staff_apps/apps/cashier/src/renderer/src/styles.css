@@ -1621,3 +1621,17 @@ html[data-motion='reduced'] *::after {
   margin-top: 4px;
   font-size: 0.9375rem;
 }
+
+/* Asosiy tugmalar pastga mahkam: uzun hisobotda ham doim ko'rinadi. */
+.de-foot {
+  position: sticky;
+  bottom: -24px;
+  margin: 6px -28px -24px;
+  padding: 12px 28px 24px;
+  background: var(--card);
+  border-top: 1px solid var(--grid);
+}
+
+.sheet-body .de-foot .btn {
+  margin-top: 0;
+}
