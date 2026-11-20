@@ -164,7 +164,7 @@ class StatusMessageSerializer(serializers.Serializer):
 class PrinterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Printer
-        fields = ('id', 'name', 'ip_address', 'port', 'chars_per_line', 'is_active', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'ip_address', 'port', 'chars_per_line', 'is_active', 'is_cashier', 'created_at', 'updated_at')
 
     def validate_ip_address(self, value):
         """
@@ -426,6 +426,17 @@ class RestaurantConfigSerializer(serializers.ModelSerializer):
         model = RestaurantConfig
         fields = ('id', 'name', 'logo', 'public_domain', 'phone', 'latitude', 'longitude', 'attendance_radius', 'service_charge_rate', 'telegram_bot_token', 'telegram_chat_id', 'created_at', 'updated_at')
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Konfiguratsiyani har qanday xodim o'qiy oladi (davomat koordinatalari, chek ma'lumotlari uchun),
+        # lekin Telegram bot tokeni maxfiy: botni boshqarish imkonini beradi - faqat menejerga ko'rinadi.
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not (user and user.is_authenticated and (user.role == 'manager' or user.is_staff)):
+            data['telegram_bot_token'] = ''
+            data['telegram_chat_id'] = ''
+        return data
+
 
 class RegisterSessionSerializer(serializers.ModelSerializer):
     opened_by_name = serializers.CharField(source='opened_by.first_name', read_only=True, default=None)
@@ -592,7 +603,7 @@ class PrintJobSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PrintJob
-        fields = ('id', 'printer', 'printer_name', 'order', 'table_name', 'waiter_name', 'items_snapshot', 'status', 'created_at', 'updated_at')
+        fields = ('id', 'printer', 'printer_name', 'order', 'table_name', 'waiter_name', 'job_type', 'items_snapshot', 'status', 'created_at', 'updated_at')
         read_only_fields = ('id', 'items_snapshot', 'created_at', 'updated_at')
 
 

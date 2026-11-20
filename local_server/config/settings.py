@@ -16,6 +16,8 @@ import sys
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
+from config.hosts import PrivateLANHost
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -34,6 +36,9 @@ DEBUG = os.environ.get('DEBUG', '0') == '1'
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 if '*' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.extend(['.hamrohpos.uz', '.ismatov.uz', '.example.uz', 'localhost', '127.0.0.1'])
+    # Restoran tarmog'idagi ilovalar Bola'ga IP (192.168.x.x, 10.x.x.x, 172.16-31.x.x) yoki mDNS nomi
+    # (`*.local`) orqali ulanadi - `.env`ga har restoran IP'sini yozish shart emas (config/hosts.py).
+    ALLOWED_HOSTS.extend(['.local', PrivateLANHost()])
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if origin.strip()

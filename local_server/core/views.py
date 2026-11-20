@@ -4,6 +4,7 @@ from datetime import date as date_cls, datetime, time, timedelta
 from decimal import Decimal
 
 from django.conf import settings
+from django.utils.dateparse import parse_date
 from django.db import IntegrityError, transaction
 from django.db.models import F, Q
 from django.http import Http404
@@ -888,8 +889,18 @@ class AttendanceViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.role == 'manager':
-            return Attendance.objects.select_related('user').all()
-        return Attendance.objects.filter(user=user)
+            qs = Attendance.objects.select_related('user').order_by('-check_in')
+            # ?user=<id> - bitta xodim tarixi (faqat menejer, o'zgalarni ko'ra oladi).
+            user_id = self.request.query_params.get('user')
+            if user_id and user_id.isdigit():
+                qs = qs.filter(user_id=int(user_id))
+        else:
+            qs = Attendance.objects.filter(user=user).order_by('-check_in')
+        # ?date=YYYY-MM-DD - shu kuni kelganlar (restoran vaqt mintaqasida).
+        day = parse_date(self.request.query_params.get('date') or '')
+        if day:
+            qs = qs.filter(check_in__date=day)
+        return qs
 
     @extend_schema(
         request=CheckInSerializer,

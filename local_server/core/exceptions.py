@@ -1,6 +1,19 @@
+from django.db.models import ProtectedError
+from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
+PROTECTED_MESSAGE = "Bu yozuv boshqa joylarda ishlatilgan (retsept, kirim, buyurtma), shuning uchun o'chirib bo'lmaydi. Uni faolsizlantiring."
+
+
 def custom_exception_handler(exc, context):
+    # `on_delete=PROTECT` (masalan retseptda/kirimda ishlatilgan ingredient, buyurtmali stol) DRF'da 500 bo'lardi.
+    if isinstance(exc, ProtectedError):
+        return Response(
+            {'detail': PROTECTED_MESSAGE, 'code': 'protected', 'fields': {}},
+            status=status.HTTP_409_CONFLICT,
+        )
+
     response = exception_handler(exc, context)
 
     if response is not None:

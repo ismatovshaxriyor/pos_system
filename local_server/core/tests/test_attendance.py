@@ -146,3 +146,37 @@ class AttendanceTestCase(APITestCase):
 
         response2 = self.client.delete('/api/restaurant-config/1/')
         self.assertEqual(response2.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class AttendanceListFilterTests(APITestCase):
+    """`GET /api/attendance/?date=&user=` - tarix filtrlari (faqat menejer boshqalarni ko'radi)."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(username='+998901110001', password='x', first_name='M', role='manager')
+        self.w1 = User.objects.create_user(username='+998901110002', password='x', first_name='W1', role='waiter')
+        self.w2 = User.objects.create_user(username='+998901110003', password='x', first_name='W2', role='waiter')
+        self.a1 = Attendance.objects.create(user=self.w1)
+        self.a2 = Attendance.objects.create(user=self.w2)
+        # check_in auto_now_add - kechagi sanaga qo'lda suramiz
+        yesterday = timezone.now() - timezone.timedelta(days=1)
+        Attendance.objects.filter(pk=self.a2.pk).update(check_in=yesterday)
+
+    def _ids(self, **params):
+        res = self.client.get('/api/attendance/', params)
+        self.assertEqual(res.status_code, 200)
+        return [r['id'] for r in res.data['results']]
+
+    def test_manager_filters_by_date_and_user(self):
+        self.client.force_authenticate(self.manager)
+        today = timezone.localdate().isoformat()
+        self.assertEqual(self._ids(date=today), [self.a1.id])
+        self.assertEqual(self._ids(user=self.w2.id), [self.a2.id])
+        self.assertEqual(self._ids(), [self.a1.id, self.a2.id])  # eng yangisi birinchi
+
+    def test_waiter_sees_only_own_even_with_user_param(self):
+        self.client.force_authenticate(self.w1)
+        self.assertEqual(self._ids(user=self.w2.id), [self.a1.id])
+
+    def test_bad_date_is_ignored(self):
+        self.client.force_authenticate(self.manager)
+        self.assertEqual(len(self._ids(date='nonsense')), 2)
