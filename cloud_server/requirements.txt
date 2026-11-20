@@ -3,6 +3,7 @@ djangorestframework
 drf-spectacular
 psycopg2-binary
 celery
+packaging
 redis
 python-dotenv
 gunicorn

@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --default-timeout=100 --retries 10 --upgrade pip && pip install --default-timeout=100 --retries 10 -r requirements.txt
 
 COPY . /app/
 RUN chmod +x /app/entrypoint.sh
