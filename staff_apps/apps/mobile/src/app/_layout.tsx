@@ -9,7 +9,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
+import { useAppUpdate } from '@/lib/update';
 import { FONT, ThemeProvider, useTheme } from '@/ui/theme';
+import { UpdateBanner, UpdateRequired } from '@/ui/update';
 
 // Saqlangan sessiya o'qilguncha splash ushlab turiladi (login ekrani "yaltillab" ketmasin).
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +38,7 @@ export default function RootLayout() {
 
 function Shell() {
   const session = useSession();
+  const update = useAppUpdate(session.serverUrl);
   const { c, name } = useTheme();
   // Xato bo'lsa ham (masalan, shrift fayli ochilmasa) ilova tizim shrifti bilan ishlayveradi.
   const [fontsLoaded, fontError] = useFonts(FONT_MAP);
@@ -60,6 +63,16 @@ function Shell() {
 
   const hasServer = !!session.serverUrl;
 
+  // Majburiy yangilanish hamma narsadan oldin (bloklangan tizimda ham yetib boradi).
+  if (hasServer && update.required) {
+    return (
+      <>
+        <StatusBar style={name === 'night' ? 'light' : 'dark'} />
+        <UpdateRequired state={update} />
+      </>
+    );
+  }
+
   // Himoya faqat klient tomonda (UX). Haqiqiy huquq tekshiruvi serverda.
   return (
     <>
@@ -78,6 +91,7 @@ function Shell() {
           <Stack.Screen name="(app)" />
         </Stack.Protected>
       </Stack>
+      {hasServer && update.optional && <UpdateBanner state={update} />}
     </>
   );
 }

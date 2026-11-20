@@ -8,10 +8,15 @@ export const IPC = {
   secureRemove: 'secure:remove',
   toggleFullscreen: 'window:toggle-fullscreen',
   quit: 'app:quit',
+  appVersion: 'app:version',
+  installUpdate: 'update:install',
+  updateProgress: 'update:progress',
 } as const;
 
 /** Maxfiy saqlashga faqat shu prefiksli kalitlar ruxsat etiladi (main tomonda tekshiriladi). */
 export const SECURE_KEY_PREFIX = 'pos.';
+
+export type InstallUpdateResult = { ok: true } | { ok: false; error: string };
 
 export interface PosNativeApi {
   /** Token kabi maxfiy qiymatlar - Windows DPAPI (Electron `safeStorage`) bilan shifrlangan. */
@@ -23,6 +28,12 @@ export interface PosNativeApi {
   window: {
     toggleFullscreen(): Promise<boolean>;
     quit(): Promise<void>;
+  };
+  /** Ilovaning o'z yangilanishi (faqat Windows): Bola'dan yuklab, sha256 tekshirib, o'rnatib, qayta ochadi. */
+  updates: {
+    currentVersion(): Promise<string>;
+    install(downloadUrl: string, sha256: string): Promise<InstallUpdateResult>;
+    onProgress(cb: (percent: number) => void): () => void;
   };
   platform: string;
 }

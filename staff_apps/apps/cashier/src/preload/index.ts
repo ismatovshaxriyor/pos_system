@@ -12,6 +12,15 @@ const api: PosNativeApi = {
     toggleFullscreen: () => ipcRenderer.invoke(IPC.toggleFullscreen),
     quit: () => ipcRenderer.invoke(IPC.quit),
   },
+  updates: {
+    currentVersion: () => ipcRenderer.invoke(IPC.appVersion),
+    install: (downloadUrl, sha256) => ipcRenderer.invoke(IPC.installUpdate, downloadUrl, sha256),
+    onProgress: (cb) => {
+      const handler = (_e: unknown, percent: number) => cb(percent);
+      ipcRenderer.on(IPC.updateProgress, handler);
+      return () => ipcRenderer.removeListener(IPC.updateProgress, handler);
+    },
+  },
   platform: process.platform,
 };
 

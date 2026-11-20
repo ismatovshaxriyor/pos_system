@@ -15,3 +15,4 @@ export * from './payment';
 export * from './time';
 export * from './credit';
 export * from './devices';
+export * from './appupdate';

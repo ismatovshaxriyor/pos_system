@@ -1,14 +1,27 @@
 import { useEffect } from 'react';
 
 import { BootstrapProvider, useSession } from './lib/hooks';
+import { useAppUpdate } from './lib/update';
 import { pos } from './lib/pos';
 import { BlockedScreen } from './screens/Blocked';
 import { ConnectScreen } from './screens/Connect';
 import { HomeScreen } from './screens/Home';
 import { LoginScreen } from './screens/Login';
+import { UpdateBanner, UpdateScreen } from './screens/Update';
+
+/** Yangilanish eslatmasi ilova ustiga tushmasin: u alohida qator, ilova qolgan joyni egallaydi. */
+function Shell({ banner, children }: { banner: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="shell">
+      <div className="shell-main">{children}</div>
+      {banner}
+    </div>
+  );
+}
 
 export function App() {
   const session = useSession();
+  const update = useAppUpdate(session.serverUrl);
 
   useEffect(() => {
     void pos.session.load();
@@ -23,13 +36,23 @@ export function App() {
 
   if (session.status === 'loading') return null;
   if (!session.serverUrl) return <ConnectScreen />;
+  // Majburiy yangilanish hamma narsadan oldin (bloklangan tizimda ham yetib boradi).
+  if (update.required) return <UpdateScreen serverUrl={session.serverUrl} state={update} />;
   if (session.status === 'license_blocked') return <BlockedScreen />;
-  if (session.status === 'signed_out') return <LoginScreen />;
+  if (session.status === 'signed_out') {
+    return (
+      <Shell banner={update.optional && <UpdateBanner serverUrl={session.serverUrl} state={update} />}>
+        <LoginScreen />
+      </Shell>
+    );
+  }
 
   // `key` - kassir almashganda (smena) bootstrap holati tozadan boshlansin.
   return (
     <BootstrapProvider key={session.user?.id}>
-      <HomeScreen />
+      <Shell banner={update.optional && <UpdateBanner serverUrl={session.serverUrl} state={update} />}>
+        <HomeScreen />
+      </Shell>
     </BootstrapProvider>
   );
 }

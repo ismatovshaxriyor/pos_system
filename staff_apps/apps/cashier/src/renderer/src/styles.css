@@ -1521,3 +1521,47 @@ html[data-motion='reduced'] *::after {
     transition: none !important;
   }
 }
+
+/* ---- Ilova yangilanishi ---- */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.shell-main {
+  flex: 1;
+  min-height: 0;
+}
+.update-banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--card);
+  border-top: 1px solid var(--grid);
+}
+.update-banner .btn {
+  min-height: 64px;
+  width: auto;
+  padding-inline: 24px;
+}
+.update-notes {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  color: var(--ink-60);
+}
+.update-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.update-bar > div {
+  height: 100%;
+  background: var(--ink-60);
+  transition: width 0.2s linear;
+}

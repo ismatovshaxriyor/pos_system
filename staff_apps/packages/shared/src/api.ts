@@ -1,3 +1,4 @@
+import type { AppUpdateInfo, AppUpdatePlatform } from './appupdate';
 import type { ApiClient } from './client';
 import type {
   AppNotification,
@@ -57,6 +58,16 @@ export function createApi(client: ApiClient) {
     },
 
     discovery: () => client.get<DiscoveryInfo>('/discovery/', { anonymous: true }),
+
+    /**
+     * "Yangi versiya bormi?" - avtorizatsiyasiz va litsenziya blokidan tashqarida (majburiy yangilanish
+     * bloklangan tizimda ham, login'dan oldin ham yetib borishi uchun).
+     */
+    appUpdate: (q: { slugs: string[]; platform: AppUpdatePlatform; current: string }) =>
+      client.get<AppUpdateInfo>('/license/app-updates/', {
+        anonymous: true,
+        query: { slugs: q.slugs.join(','), platform: q.platform, current: q.current },
+      }),
 
     bootstrap: () => client.get<Bootstrap>('/bootstrap/'),
 

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { IPC, SECURE_KEY_PREFIX } from '../shared/ipc';
 import { secureGet, secureRemove, secureSet } from './secure-store';
+import { installUpdate } from './updater';
 
 const isDev = !app.isPackaged;
 /** Monoblokda to'liq ekran (kiosk). Ishlab chiqishda yoki `POS_KIOSK=0` bilan o'chiriladi. */
@@ -40,6 +41,24 @@ function registerIpc(): void {
     if (!isTrusted(e) || !mainWindow) return false;
     mainWindow.setFullScreen(!mainWindow.isFullScreen());
     return mainWindow.isFullScreen();
+  });
+  ipcMain.handle(IPC.appVersion, (e) => {
+    if (!isTrusted(e)) throw new Error('Ruxsat yoʼq.');
+    return app.getVersion();
+  });
+  let installing = false;
+  ipcMain.handle(IPC.installUpdate, async (e, url: unknown, sha256: unknown) => {
+    if (!isTrusted(e)) throw new Error('Ruxsat yoʼq.');
+    if (installing) return { ok: false, error: 'Yangilanish allaqachon boshlangan.' };
+    installing = true;
+    try {
+      const result = await installUpdate(url, sha256, (p) => {
+        if (!e.sender.isDestroyed()) e.sender.send(IPC.updateProgress, p);
+      });
+      return result;
+    } finally {
+      installing = false;
+    }
   });
   ipcMain.handle(IPC.quit, (e) => {
     if (isTrusted(e)) app.quit();
