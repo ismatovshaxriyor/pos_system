@@ -24,6 +24,18 @@ function fakeFetch(servers: Record<string, unknown>): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+/** Berilgan manzillarga HTTP javob keladi-yu, lekin rad etiladi (masalan ALLOWED_HOSTS 400); qolganlari osilib turadi. */
+function fakeFetchRejecting(rejecting: Record<string, number>): typeof fetch {
+  return ((input: string, init?: { signal?: AbortSignal }) => {
+    const url = String(input);
+    const hit = Object.keys(rejecting).find((k) => url.startsWith(k));
+    if (hit) return Promise.resolve({ ok: false, status: rejecting[hit] } as Response);
+    return new Promise((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+    });
+  }) as unknown as typeof fetch;
+}
+
 describe('isPrivateIPv4', () => {
   it('faqat xususiy tarmoqlarni qabul qiladi', () => {
     expect(isPrivateIPv4('192.168.1.50')).toBe(true);
@@ -68,6 +80,16 @@ describe('probeServer', () => {
   it('javob bermasa timeout bilan null (throw qilmaydi)', async () => {
     const r = await probeServer('http://10.0.0.9:8000', { fetchImpl: fakeFetch({}), timeoutMs: 20 });
     expect(r).toBeNull();
+  });
+
+  it("server javob berib rad etsa (masalan 400) onReject chaqiriladi, natija baribir null", async () => {
+    let rejected: number | null = null;
+    const r = await probeServer('http://192.168.1.188:8000', {
+      fetchImpl: fakeFetchRejecting({ 'http://192.168.1.188:8000/api/discovery/': 400 }),
+      onReject: (status) => (rejected = status),
+    });
+    expect(r).toBeNull();
+    expect(rejected).toBe(400);
   });
 });
 
@@ -127,6 +149,19 @@ describe('findServers', () => {
       concurrency: 100,
     });
     expect(res.map((s) => s.url).sort()).toEqual(['http://10.0.0.20:8000', 'http://10.0.0.21:8000']);
+  });
+
+  it("hech narsa topilmasa-yu, biror manzil rad etsa, onRejected chaqiriladi", async () => {
+    let rejected: { url: string; status: number } | null = null;
+    const res = await findServers({
+      localIps: ['192.168.1.50'],
+      fetchImpl: fakeFetchRejecting({ 'http://192.168.1.188:8000/api/discovery/': 400 }),
+      timeoutMs: 15, extraTimeoutMs: 15,
+      concurrency: 100,
+      onRejected: (url, status) => (rejected = { url, status }),
+    });
+    expect(res).toEqual([]);
+    expect(rejected).toEqual({ url: 'http://192.168.1.188:8000', status: 400 });
   });
 
   it("signal bilan to'xtatilganda tez qaytadi", async () => {

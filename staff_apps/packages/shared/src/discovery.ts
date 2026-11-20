@@ -39,6 +39,13 @@ export interface FindServersOptions {
   onProgress?: (p: ScanProgress) => void;
   /** Har topilgan server darhol (skaner tugamasidan) xabar qilinadi. */
   onFound?: (s: FoundServer) => void;
+  /**
+   * Manzil HTTP bilan javob berdi-yu, lekin rad etildi (`res.ok === false`, masalan 400/403/502) -
+   * "u yerda hech narsa yo'q" (timeout/connection refused, `null`) dan farqli holat: aslida
+   * o'sha manzilda server bor, lekin noto'g'ri sozlangan (masalan ALLOWED_HOSTS'da LAN IP yo'q)
+   * yoki eski/mos kelmaydigan versiya. UI buni ko'rsatib, "topilmadi" emas, aniqroq xabar berishi mumkin.
+   */
+  onRejected?: (url: string, status: number) => void;
 }
 
 export const DEFAULT_PORTS = [8000];
@@ -98,7 +105,7 @@ export function hostsToScan(localIps: string[]): string[] {
 /** Bitta manzilni tekshiradi: haqiqiy Bola bo'lsa `FoundServer`, aks holda `null` (hech qachon throw qilmaydi). */
 export async function probeServer(
   url: string,
-  opts: { fetchImpl?: typeof fetch; timeoutMs?: number; signal?: AbortSignal } = {},
+  opts: { fetchImpl?: typeof fetch; timeoutMs?: number; signal?: AbortSignal; onReject?: (status: number) => void } = {},
 ): Promise<FoundServer | null> {
   const doFetch = opts.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const base = normalizeBaseUrl(url);
@@ -108,7 +115,11 @@ export async function probeServer(
   opts.signal?.addEventListener('abort', onOuterAbort);
   try {
     const res = await doFetch(`${base}/api/discovery/`, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Javob keldi (timeout/connection refused emas) - demak shu manzilda SERVER bor, faqat rad etdi.
+      opts.onReject?.(res.status);
+      return null;
+    }
     const info = (await res.json()) as Partial<DiscoveryInfo>;
     if (info?.service !== 'pos-bola') return null;
     return { url: base, info: info as DiscoveryInfo };
@@ -146,7 +157,15 @@ export async function findServers(opts: FindServersOptions): Promise<FoundServer
   // 1-bosqich: tayyor nomzodlar (hammasi bir vaqtda, uzunroq timeout bilan).
   await Promise.all(
     extra.map(async (u) => {
-      add(await probeServer(u, { fetchImpl: opts.fetchImpl, timeoutMs: opts.extraTimeoutMs ?? 2500, signal: opts.signal }));
+      const base = normalizeBaseUrl(u);
+      add(
+        await probeServer(u, {
+          fetchImpl: opts.fetchImpl,
+          timeoutMs: opts.extraTimeoutMs ?? 2500,
+          signal: opts.signal,
+          onReject: (status) => opts.onRejected?.(base, status),
+        }),
+      );
       tick();
     }),
   );
@@ -162,7 +181,15 @@ export async function findServers(opts: FindServersOptions): Promise<FoundServer
     while (!opts.signal?.aborted) {
       const i = next++;
       if (i >= lan.length) return;
-      add(await probeServer(lan[i]!, { fetchImpl: opts.fetchImpl, timeoutMs: opts.timeoutMs, signal: opts.signal }));
+      const u = lan[i]!;
+      add(
+        await probeServer(u, {
+          fetchImpl: opts.fetchImpl,
+          timeoutMs: opts.timeoutMs,
+          signal: opts.signal,
+          onReject: (status) => opts.onRejected?.(u, status),
+        }),
+      );
       tick();
     }
   }

@@ -19,6 +19,9 @@ export function ConnectScreen() {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Qidiruvda hech narsa topilmadi, lekin kamida bitta manzil javob berib rad etdi (masalan 400) - demak
+      tarmoqda server bor, lekin noto'g'ri sozlangan. */
+  const [rejected, setRejected] = useState<{ url: string; status: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const connect = useCallback(async (target: string) => {
@@ -42,6 +45,7 @@ export function ConnectScreen() {
     setServers([]);
     setProgress(null);
     setError(null);
+    setRejected(null);
     let localIps: string[] = [];
     try {
       localIps = await window.posNative.network.localAddresses();
@@ -66,6 +70,7 @@ export function ConnectScreen() {
         signal: ctrl.signal,
         onProgress: setProgress,
         onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
+        onRejected: (url, status) => setRejected({ url, status }),
       });
       if (found.length > 0) break;
     }
@@ -93,7 +98,13 @@ export function ConnectScreen() {
             {progress && progress.total > 0 ? ` ${Math.round((progress.done / progress.total) * 100)}%` : ''}
           </p>
         )}
-        {!searching && servers.length === 0 && (
+        {!searching && servers.length === 0 && rejected && (
+          <div className="error">
+            Tarmoqda server topildi ({rejected.url}), lekin u javobni rad etdi (xato {rejected.status}). Server
+            noto'g'ri sozlangan bo'lishi mumkin - administratorga murojaat qiling.
+          </div>
+        )}
+        {!searching && servers.length === 0 && !rejected && (
           <p className="muted">Restoran tizimi topilmadi. Kompyuter restoran WiFi/tarmog'iga ulanganini tekshiring.</p>
         )}
 

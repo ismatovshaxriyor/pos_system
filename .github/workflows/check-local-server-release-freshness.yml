@@ -1,0 +1,56 @@
+name: Check local_server release freshness
+
+# Nima uchun: local_server image faqat `v*` tegi push qilinganda quriladi va ghcr'ga
+# chiqariladi (release-local-server.yml) - oddiy `main`ga push esa image'ni YANGILAMAYDI.
+# Shuning uchun kod bilan ghcr'dagi `:stable` image orasida bilinmas farq paydo bo'lishi
+# mumkin (masalan ALLOWED_HOSTS'ga LAN IP qo'llab-quvvatlashi qo'shilgan-u, hali reliz
+# qilinmagan - aynan shu holat Bola'ni real restoran tarmog'ida "topilmaydigan" qilib qo'ygan
+# edi). Bu ish oqimi hech narsani bloklamaydi - faqat Action natijasida ogohlantirish
+# ko'rsatadi, reliz chiqarish kerak-kerakmasligini odam hal qiladi (`cut-local-server-release`).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "local_server/**"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Oxirgi reliz tegidan beri qolgan o'zgarishlarni tekshirish
+        run: |
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "Hali hech qanday \`v*\` tegi yo'q - tekshiruv o'tkazib yuborildi." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$LATEST_TAG"..HEAD -- local_server/ || true)
+          if [ -z "$CHANGED" ]; then
+            echo "✅ \`local_server/\` oxirgi reliz (\`$LATEST_TAG\`)dan beri o'zgarmagan - ghcr image yangi." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          COUNT=$(git log --oneline "$LATEST_TAG"..HEAD -- local_server/ | wc -l | tr -d ' ')
+          {
+            echo "## ⚠️ Reliz qilinmagan o'zgarishlar bor"
+            echo ""
+            echo "Oxirgi reliz tegi: \`$LATEST_TAG\`. Shu tegdan beri \`local_server/\` ichida **$COUNT ta commit** bor, lekin yangi versiya hali chiqarilmagan - ghcr'dagi \`:stable\` image shu o'zgarishlarni o'z ichiga olmaydi."
+            echo ""
+            echo "O'zgargan fayllar:"
+            echo '```'
+            echo "$CHANGED"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          SENSITIVE=$(echo "$CHANGED" | grep -E '^local_server/(config/|licensing/|core/)' || true)
+          if [ -n "$SENSITIVE" ]; then
+            {
+              echo ""
+              echo "🔴 **Diqqat:** o'zgargan fayllar orasida kill-switch/litsenziya yoki POS biznes mantig'i (\`config/\`, \`licensing/\`, \`core/\`) bor. Agar bu o'zgarish restoranlarga yetib borishi kerak bo'lsa, \`cut-local-server-release\` skill orqali yangi versiya tegini chiqaring."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

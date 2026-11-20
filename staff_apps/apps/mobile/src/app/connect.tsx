@@ -20,6 +20,9 @@ export default function ConnectScreen() {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Qidiruv davomida hech narsa topilmadi, lekin kamida bitta manzil javob berib rad etdi (masalan 400) - demak
+      tarmoqda server bor, lekin noto'g'ri sozlangan. Bu holatda "topilmadi" emas, aniqroq xabar ko'rsatiladi. */
+  const [rejected, setRejected] = useState<{ url: string; status: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const connect = useCallback(async (target: string) => {
@@ -43,6 +46,7 @@ export default function ConnectScreen() {
     setServers([]);
     setProgress(null);
     setError(null);
+    setRejected(null);
     let localIps: string[] = [];
     try {
       localIps = [await getIpAddressAsync()];
@@ -66,6 +70,7 @@ export default function ConnectScreen() {
         signal: ctrl.signal,
         onProgress: setProgress,
         onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
+        onRejected: (url, status) => setRejected({ url, status }),
       });
       if (found.length > 0) break;
     }
@@ -91,6 +96,11 @@ export default function ConnectScreen() {
 
       {searching ? (
         <Muted>Telefon restoran WiFi tarmog'ida bo'lishi kerak. Restoran tizimi qidirilmoqda… {pct}%</Muted>
+      ) : servers.length === 0 && rejected ? (
+        <ErrorText>
+          Tarmoqda server topildi ({rejected.url}), lekin u javobni rad etdi (xato {rejected.status}). Server noto'g'ri
+          sozlangan bo'lishi mumkin - administratorga murojaat qiling.
+        </ErrorText>
       ) : servers.length === 0 ? (
         <Muted>Restoran tizimi topilmadi. Telefon restoran WiFi tarmog'iga ulanganini tekshiring.</Muted>
       ) : null}
