@@ -14,6 +14,7 @@ import type {
   AppNotification,
   AuthResponse,
   Bootstrap,
+  Category,
   Customer,
   DebtTransaction,
   Decimal,
@@ -23,10 +24,39 @@ import type {
   Paginated,
   PaymentMethod,
   Payment,
+  Printer,
+  Product,
   RegisterSession,
   StaffDevice,
+  Table,
+  TableZone,
   User,
 } from './types';
+import {
+  buildBody,
+  type AttendanceRecord,
+  type CategoryInput,
+  type CustomerInput,
+  type ImageUpload,
+  type Ingredient,
+  type IngredientInput,
+  type PrintJob,
+  type PrinterCategoryOption,
+  type PrinterInput,
+  type ProductInput,
+  type Purchase,
+  type PurchaseInput,
+  type RecipeItem,
+  type RegistrationCode,
+  type RestaurantSettings,
+  type RestaurantSettingsInput,
+  type StaffInput,
+  type StockMovement,
+  type StockMovementType,
+  type Supplier,
+  type SupplierInput,
+  type TableInput,
+} from './manage';
 
 export interface ActionStatus {
   status: string;
@@ -45,6 +75,26 @@ export interface OrderItemInput {
  * ustidan ishlata oladi.
  */
 export function createApi(client: ApiClient) {
+  /** DRF sahifalangan ro'yxatning barcha sahifalarini yig'adi (sahifa hajmi 50, xavfsizlik uchun 40 sahifagacha). */
+  async function listAll<T>(path: string, query?: Record<string, string | number | boolean | undefined>): Promise<T[]> {
+    const all: T[] = [];
+    for (let page = 1; page <= 40; page++) {
+      const res = await client.get<Paginated<T>>(path, { query: { ...query, page } });
+      all.push(...res.results);
+      if (!res.next) break;
+    }
+    return all;
+  }
+
+  /** Logo faqat rasm bilan multipart, aks holda oddiy JSON. Koordinata `null` bo'lsa multipart'da bo'sh qator ketadi. */
+  const buildLogoBody = (p: RestaurantSettingsInput, logo?: ImageUpload | null): unknown => {
+    if (!logo) return p;
+    const data = new FormData();
+    for (const [k, v] of Object.entries(p)) if (v !== undefined) data.append(k, v === null ? '' : String(v));
+    data.append('logo', logo as unknown as Blob);
+    return data;
+  };
+
   return {
     // ---- Auth (hammasi anonim) -------------------------------------------
     auth: {
@@ -68,6 +118,12 @@ export function createApi(client: ApiClient) {
     },
 
     discovery: () => client.get<DiscoveryInfo>('/discovery/', { anonymous: true }),
+
+    license: {
+      /** Yangi serverni litsenziya kaliti bilan faollashtirish (Bola Ona bilan gaplashadi - sekinroq bo'lishi mumkin). */
+      activate: (licenseKey: string) =>
+        client.post<{ restaurant: { id: string; name: string } }>('/license/activate/', { license_key: licenseKey }, { anonymous: true }),
+    },
 
     /**
      * "Yangi versiya bormi?" - avtorizatsiyasiz va litsenziya blokidan tashqarida (majburiy yangilanish
@@ -127,8 +183,9 @@ export function createApi(client: ApiClient) {
         client.get<Paginated<Customer>>('/customers/', {
           query: { search: query?.search || undefined, has_debt: query?.has_debt ? 'true' : undefined, page: query?.page },
         }),
-      create: (p: { first_name: string; last_name?: string; phone?: string; note?: string }) =>
-        client.post<Customer>('/customers/', p),
+      create: (p: CustomerInput) => client.post<Customer>('/customers/', p),
+      /** Ism, telefon, izoh; qarzi bor mijozni faolsizlantirish serverda tekshiriladi. */
+      update: (id: number, p: Partial<CustomerInput>) => client.patch<Customer>(`/customers/${id}/`, p),
       transactions: (id: number) => client.get<DebtTransaction[]>(`/customers/${id}/transactions/`),
       /** To'lov summasi joriy qarzdan oshsa 400. */
       repay: (id: number, p: { amount: Decimal; method?: PaymentMethod; note?: string }) =>
@@ -154,6 +211,104 @@ export function createApi(client: ApiClient) {
       approve: (id: number) => client.post<StaffDevice>(`/devices/${id}/approve/`),
       /** Token o'chadi va ochiq WS darhol uziladi; qurilma qayta kirsa yana tasdiq so'raydi. */
       revoke: (id: number) => client.post<{ detail: string }>(`/devices/${id}/revoke/`),
+    },
+
+    // ---- Menyu: mahsulot, bo'lim, retsept (yozish: menejer) -------------
+    menu: {
+      products: () => listAll<Product>('/products/'),
+      /** `image` berilsa multipart (backend `ImageField`) yuboriladi. */
+      createProduct: (p: ProductInput, image?: ImageUpload | null) => client.post<Product>('/products/', buildBody({ ...p }, image)),
+      updateProduct: (id: number, p: Partial<ProductInput>, image?: ImageUpload | null) =>
+        client.patch<Product>(`/products/${id}/`, buildBody({ ...p }, image)),
+      /** Soft-delete: menyudan yo'qoladi, eski buyurtmalar saqlanadi. */
+      deleteProduct: (id: number) => client.delete(`/products/${id}/`),
+      createCategory: (p: CategoryInput, image?: ImageUpload | null) => client.post<Category>('/categories/', buildBody({ ...p }, image)),
+      updateCategory: (id: number, p: Partial<CategoryInput>, image?: ImageUpload | null) =>
+        client.patch<Category>(`/categories/${id}/`, buildBody({ ...p }, image)),
+      /** DIQQAT: bo'lim o'chsa mahsulotlari ham o'chadi (sotilgan bo'lsa server xato beradi). */
+      deleteCategory: (id: number) => client.delete(`/categories/${id}/`),
+      /** Bitta mahsulot retsepti (1 porsiyaga ketadigan ingredientlar). */
+      recipe: (productId: number) => listAll<RecipeItem>('/recipe-items/', { product: productId }),
+      addRecipeItem: (p: { product_id: number; ingredient_id: number; quantity: Decimal }) => client.post<RecipeItem>('/recipe-items/', p),
+      updateRecipeItem: (id: number, p: { quantity: Decimal }) => client.patch<RecipeItem>(`/recipe-items/${id}/`, p),
+      deleteRecipeItem: (id: number) => client.delete(`/recipe-items/${id}/`),
+    },
+
+    // ---- Ombor (yozish: kassir yoki menejer; o'qish: hamma xodim) --------
+    inventory: {
+      ingredients: () => listAll<Ingredient>('/ingredients/'),
+      createIngredient: (p: IngredientInput) => client.post<Ingredient>('/ingredients/', p),
+      updateIngredient: (id: number, p: Partial<IngredientInput>) => client.patch<Ingredient>(`/ingredients/${id}/`, p),
+      deleteIngredient: (id: number) => client.delete(`/ingredients/${id}/`),
+      /** Inventarizatsiya/yo'qotish: `new_quantity` (absolyut) YOKI `delta` (nisbiy) - bittasi. */
+      adjust: (id: number, p: { new_quantity?: Decimal; delta?: Decimal; note?: string }) =>
+        client.post<Ingredient>(`/ingredients/${id}/adjust/`, p),
+      suppliers: () => listAll<Supplier>('/suppliers/'),
+      createSupplier: (p: SupplierInput) => client.post<Supplier>('/suppliers/', p),
+      updateSupplier: (id: number, p: Partial<SupplierInput>) => client.patch<Supplier>(`/suppliers/${id}/`, p),
+      deleteSupplier: (id: number) => client.delete(`/suppliers/${id}/`),
+      purchases: (query?: { page?: number }) => client.get<Paginated<Purchase>>('/purchases/', { query }),
+      /** Kirim: zaxira va tannarx (birlik narxi) darhol yangilanadi. Bir hujjatda bir nechta ingredient. */
+      purchase: (p: PurchaseInput) => client.post<Purchase>('/purchases/', p),
+      /** Ombor harakati daftari (faqat menejer). */
+      movements: (query?: { ingredient?: number; movement_type?: StockMovementType; page?: number }) =>
+        client.get<Paginated<StockMovement>>('/stock-movements/', { query }),
+    },
+
+    // ---- Zal: stol va zonalar (faqat menejer) ----------------------------
+    floor: {
+      /** Faolsizlari ham keladi (bootstrap faqat ishlatiladiganlarni beradi). */
+      tables: () => listAll<Table>('/tables/'),
+      createTable: (p: TableInput) => client.post<Table>('/tables/', p),
+      updateTable: (id: number, p: Partial<TableInput>) => client.patch<Table>(`/tables/${id}/`, p),
+      /** DIQQAT: buyurtma tarixi bor stolni o'chirib bo'lmaydi - `is_active=false` ishlating. */
+      deleteTable: (id: number) => client.delete(`/tables/${id}/`),
+      /** Stol QR kodi (PNG) manzili; rasm so'rovida `Authorization` sarlavhasi kerak. */
+      qrCodeUrl: (id: number) => `/tables/${id}/qr-code/`,
+      createZone: (p: { name: string }) => client.post<TableZone>('/table-zones/', p),
+      updateZone: (id: number, p: { name: string }) => client.patch<TableZone>(`/table-zones/${id}/`, p),
+      /** Zona o'chsa stollari zonasiz qoladi (o'chmaydi). */
+      deleteZone: (id: number) => client.delete(`/table-zones/${id}/`),
+    },
+
+    // ---- Restoran sozlamalari (o'qish: hamma, yozish: menejer) -----------
+    settings: {
+      get: () => client.get<RestaurantSettings>('/restaurant-config/1/'),
+      update: (p: RestaurantSettingsInput, logo?: ImageUpload | null) =>
+        client.patch<RestaurantSettings>('/restaurant-config/1/', buildLogoBody(p, logo)),
+      /** Token/chat bo'sh bo'lsa saqlangani ishlatiladi. */
+      testTelegram: (p?: { telegram_bot_token?: string; telegram_chat_id?: string }) =>
+        client.post<{ status?: string; detail?: string }>('/restaurant-config/test-telegram/', p ?? {}),
+    },
+
+    // ---- Printerlar (oshxona cheklari) -----------------------------------
+    printers: {
+      list: () => listAll<Printer>('/printers/'),
+      create: (p: PrinterInput) => client.post<Printer>('/printers/', p),
+      update: (id: number, p: Partial<PrinterInput>) => client.patch<Printer>(`/printers/${id}/`, p),
+      delete: (id: number) => client.delete(`/printers/${id}/`),
+      categoryOptions: () => client.get<PrinterCategoryOption[]>('/printers/category-options/'),
+      /** Printerga aynan shu bo'limlar bog'lanadi (qolganlari bo'shatiladi). */
+      setCategories: (id: number, categoryIds: number[]) =>
+        client.post<{ status: string }>(`/printers/${id}/set-categories/`, { category_ids: categoryIds }),
+      /** Jismoniy printerga test chek yuboradi; IP yo'q (virtual) bo'lsa 400, ulanmasa 502. */
+      testPrint: (id: number) => client.post<{ status: string }>(`/printers/${id}/test-print/`),
+      /** Chop etish navbati (eng yangilari birinchi). */
+      jobs: (query?: { printer?: number; page?: number }) => client.get<Paginated<PrintJob>>('/print-jobs/', { query }),
+    },
+
+    // ---- Xodimlar va davomat (faqat menejer) -----------------------------
+    staff: {
+      list: () => listAll<User>('/users/'),
+      create: (p: StaffInput) => client.post<User>('/users/', p),
+      /** Ism, familiya, lavozim yoki parolni o'zgartirish (kassirga parol berilmaydi). */
+      update: (id: number, p: Partial<Omit<StaffInput, 'username'>>) => client.patch<User>(`/users/${id}/`, p),
+      delete: (id: number) => client.delete(`/users/${id}/`),
+      /** Kassir uchun: kod bilan u o'z qurilmasida PIN o'rnatadi. */
+      registrationCode: (id: number) => client.post<RegistrationCode>(`/users/${id}/generate-registration-code/`),
+      /** Eng yangilari birinchi. `date` = YYYY-MM-DD, `user` = xodim id. */
+      attendance: (query?: { date?: string; user?: number; page?: number }) =>
+        client.get<Paginated<AttendanceRecord>>('/attendance/', { query }),
     },
 
     notifications: {

@@ -51,7 +51,7 @@ describe('createPos.connectToServer', () => {
       fetchImpl: (async () => ok({ service: 'nginx' })) as unknown as typeof fetch,
     });
     await pos.session.load();
-    await expect(pos.connectToServer('10.0.0.1')).rejects.toThrow('POS tizimi emas');
+    await expect(pos.connectToServer('10.0.0.1')).rejects.toThrow('restoran tizimi topilmadi');
     expect(pos.session.getState().serverUrl).toBeNull();
   });
 
@@ -101,5 +101,72 @@ describe('createPos.connectToServer', () => {
     await expect(pos.api.bootstrap()).rejects.toMatchObject({ kind: 'unauthorized' });
     await vi.waitFor(() => expect(pos.session.getState().status).toBe('signed_out'));
     expect(pos.session.getState().notice).toContain('Qayta kiring');
+  });
+});
+
+describe('createPos: yangi (faollashtirilmagan) server', () => {
+  it('faollashtirilmagan serverga ulanilganda "needs_activation" holatiga o\'tadi (login emas)', async () => {
+    const pos = createPos({
+      app: 'mobile',
+      storage: memoryStorage(),
+      generateId: () => 'd',
+      fetchImpl: (async () => ok(discovery({ activated: false, restaurant_id: null }))) as unknown as typeof fetch,
+    });
+    await pos.session.load();
+    const res = await pos.connectToServer('192.168.1.5:8000');
+    expect(res.activated).toBe(false);
+    expect(pos.session.getState().status).toBe('needs_activation');
+    expect(pos.session.getState().serverUrl).toBe('http://192.168.1.5:8000');
+  });
+
+  it('faol server - login ekrani, "needs_activation" EMAS', async () => {
+    const pos = createPos({
+      app: 'mobile',
+      storage: memoryStorage(),
+      generateId: () => 'd',
+      fetchImpl: (async () => ok(discovery())) as unknown as typeof fetch,
+    });
+    await pos.session.load();
+    await pos.connectToServer('192.168.1.5:8000');
+    expect(pos.session.getState().status).toBe('signed_out');
+  });
+
+  it('activateLicense kalitni yuboradi va login ekraniga o\'tkazadi', async () => {
+    const calls: { url: string; body: unknown }[] = [];
+    const pos = createPos({
+      app: 'mobile',
+      storage: memoryStorage(),
+      generateId: () => 'd',
+      fetchImpl: (async (input: string, init?: { body?: string }) => {
+        const url = String(input);
+        calls.push({ url, body: init?.body ? JSON.parse(init.body) : undefined });
+        if (url.endsWith('/api/license/activate/')) return ok({ restaurant: { id: 'r1', name: 'Yangi Restoran' } });
+        return ok(discovery({ activated: false, restaurant_id: null }));
+      }) as unknown as typeof fetch,
+    });
+    await pos.session.load();
+    await pos.connectToServer('10.0.0.2:8000');
+    expect(pos.session.getState().status).toBe('needs_activation');
+    const res = await pos.activateLicense('  4D3H-BAK6-7DDR ');
+    expect(res.restaurantName).toBe('Yangi Restoran');
+    expect(pos.session.getState().status).toBe('signed_out');
+    expect(calls.at(-1)).toMatchObject({ url: 'http://10.0.0.2:8000/api/license/activate/', body: { license_key: '4D3H-BAK6-7DDR' } });
+  });
+
+  it('refreshServerState: ilova qayta ochilganda faollashtirilmagan server aniqlanadi', async () => {
+    let activated = false;
+    const pos = createPos({
+      app: 'mobile',
+      storage: memoryStorage(),
+      generateId: () => 'd',
+      fetchImpl: (async () => ok(discovery({ activated }))) as unknown as typeof fetch,
+    });
+    await pos.session.load();
+    await pos.connectToServer('10.0.0.2:8000');
+    await pos.refreshServerState();
+    expect(pos.session.getState().status).toBe('needs_activation');
+    activated = true; // operator boshqa qurilmadan faollashtirdi
+    await pos.refreshServerState();
+    expect(pos.session.getState().status).toBe('signed_out');
   });
 });

@@ -48,6 +48,8 @@ export interface Printer {
   port: number;
   chars_per_line: number;
   is_active: boolean;
+  /** Kassa printeri: hisob-chek (shot) va to'lov cheklari shundan chiqadi. */
+  is_cashier: boolean;
 }
 
 export interface Category {

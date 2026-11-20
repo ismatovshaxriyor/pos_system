@@ -15,7 +15,9 @@ export type SessionStatus =
   | 'signed_out'
   | 'signed_in'
   /** Litsenziya bloklangan - login ekrani emas, "to'lov qiling" ekrani ko'rsatiladi. */
-  | 'license_blocked';
+  | 'license_blocked'
+  /** Server topildi, lekin hali litsenziya bilan faollashtirilmagan (yangi o'rnatish) - "Restoranni sozlash" ekrani. */
+  | 'needs_activation';
 
 export interface SessionState {
   status: SessionStatus;
@@ -167,6 +169,15 @@ export class SessionManager {
 
   markLicenseBlocked(): void {
     this.set({ status: 'license_blocked' });
+  }
+
+  markNeedsActivation(): void {
+    this.set({ status: 'needs_activation', token: null, user: null });
+  }
+
+  /** Faollashtirilgach (yoki server allaqachon faol ekani aniqlangach) login ekraniga o'tish. */
+  clearNeedsActivation(): void {
+    if (this.state.status === 'needs_activation') this.set({ status: 'signed_out' });
   }
 
   /** Litsenziya tiklangach (masalan status qayta tekshirilganda) login ekraniga qaytish. */

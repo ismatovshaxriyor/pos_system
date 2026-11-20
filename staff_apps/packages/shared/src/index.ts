@@ -1,4 +1,6 @@
 export * from './types';
+export * from './manage';
+export * from './decimalInput';
 export * from './errors';
 export * from './client';
 export * from './api';
@@ -16,4 +18,6 @@ export * from './time';
 export * from './credit';
 export * from './devices';
 export * from './appupdate';
+export * from './discovery';
+export * from './licenseKey';
 export * from './reports';

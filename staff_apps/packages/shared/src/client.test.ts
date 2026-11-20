@@ -116,3 +116,19 @@ describe('createApiClient', () => {
     expect(client.absoluteUrl(null)).toBeNull();
   });
 });
+
+describe('createApiClient: FormData', () => {
+  it("FormData tanasi JSON'ga aylantirilmaydi va Content-Type qo'yilmaydi", async () => {
+    let seen: { headers: Record<string, string>; body: unknown } | null = null;
+    const { client } = setup((async (_url: string, init: { headers: Record<string, string>; body: unknown }) => {
+      seen = { headers: init.headers, body: init.body };
+      return new Response('{}', { status: 200 });
+    }) as unknown as typeof fetch);
+    const form = new FormData();
+    form.append('name', 'Osh');
+    await client.patch('/products/1/', form);
+    expect(seen!.body).toBe(form);
+    expect(seen!.headers['Content-Type']).toBeUndefined();
+    expect(seen!.headers.Authorization).toBe('Token tok123');
+  });
+});

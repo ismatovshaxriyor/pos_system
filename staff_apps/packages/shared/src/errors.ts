@@ -85,7 +85,7 @@ export function apiErrorFromResponse(status: number, body: unknown): ApiError {
   const detail =
     typeof parsed.detail === 'string' && parsed.detail
       ? parsed.detail
-      : `Server xatosi (${status}).`;
+      : status >= 500 ? 'Tizimda nosozlik yuz berdi. Birozdan keyin qayta urinib ko\'ring.' : 'Amalni bajarib bo\'lmadi.';
   return new ApiError({ kind: kindForStatus(status), status, message: detail, code: parsed.code, fields });
 }
 
@@ -95,8 +95,8 @@ export function networkError(cause?: unknown): ApiError {
     kind: 'network',
     status: 0,
     message: timedOut
-      ? "Server javob bermadi (vaqt tugadi). WiFi'ni tekshiring."
-      : "Serverga ulanib bo'lmadi. WiFi'ni tekshiring.",
+      ? "Restoran tizimi javob bermadi. WiFi'ni tekshiring."
+      : "Restoran tizimiga ulanib bo'lmadi. WiFi'ni tekshiring.",
   });
 }
 
@@ -104,7 +104,8 @@ export function networkError(cause?: unknown): ApiError {
 export function describeError(err: unknown): string {
   if (err instanceof ApiError) {
     const firstField = Object.entries(err.fields)[0];
-    if (firstField && firstField[1][0]) return `${err.message} ${firstField[0]}: ${firstField[1][0]}`;
+    // Maydonning ichki nomi (`customer`, `sync_uuid`...) foydalanuvchiga ko'rsatilmaydi - faqat xabar matni.
+    if (firstField && firstField[1][0]) return `${err.message} ${firstField[1][0]}`;
     return err.message;
   }
   if (err instanceof Error) return err.message;

@@ -67,7 +67,9 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
     const url = `${base}/api${cleanPath}${buildQuery(opts.query)}`;
 
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+    // FormData (rasm yuklash): Content-Type'ni qo'ymaymiz - fetch o'zi `multipart/form-data; boundary=...` qo'yadi.
+    const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
     if (!opts.anonymous) {
       const token = config.getToken();
       if (token) headers.Authorization = `Token ${token}`;
@@ -85,7 +87,7 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
       response = await doFetch(url, {
         method,
         headers,
-        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
         signal: controller.signal,
       });
     } catch (cause) {
