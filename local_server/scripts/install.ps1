@@ -395,6 +395,41 @@ try {
     if ($osType -ne 'linux') { Fail "Docker Windows-konteyner rejimida. Docker Desktop tray belgisi -> 'Switch to Linux containers' ni tanlab, qayta ishga tushiring." }
     Ok 'Docker Desktop ishlayapti (Linux konteynerlar)'
 
+    # --- Docker qo'riqchisi: Docker Desktop yopilib qolsa (yoki kirishdan keyin o'zi yonmasa - Rohat'da
+    # reboot'dan keyin shunday bo'ldi, POS 40 daqiqa ishlamadi) - 5 daqiqa ichida qayta ishga tushiradi.
+    # Docker Desktop foydalanuvchi seansida ishlaydi, shuning uchun vazifa SYSTEM emas, konsolga kirgan
+    # foydalanuvchi nomidan; wscript orqali - ekranda PowerShell oynasi miltillamasligi uchun.
+    try {
+        $pbDir = Join-Path $env:ProgramData 'PosBola'
+        New-Item -ItemType Directory -Path $pbDir -Force | Out-Null
+        $wdPs1 = Join-Path $pbDir 'docker_watchdog.ps1'
+        $wdVbs = Join-Path $pbDir 'docker_watchdog.vbs'
+        @'
+$exe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+if (-not (Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue) -and (Test-Path $exe)) {
+    Start-Process $exe
+    $log = Join-Path $env:ProgramData 'PosBola\docker_watchdog.log'
+    if ((Test-Path $log) -and (Get-Item $log).Length -gt 512KB) { Move-Item $log "$log.old" -Force }
+    Add-Content $log ("{0}  Docker Desktop yopiq edi - ishga tushirildi" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+}
+'@ | Set-Content -Path $wdPs1 -Encoding ASCII
+        ('CreateObject("WScript.Shell").Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""' + $wdPs1 + '""", 0, False') |
+            Set-Content -Path $wdVbs -Encoding ASCII
+        $wdUser = (Get-CimInstance Win32_ComputerSystem).UserName
+        if (-not $wdUser) { $wdUser = "$env:USERDOMAIN\$env:USERNAME" }
+        $wdAction = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('//B "' + $wdVbs + '"')
+        $wdTriggers = @(
+            (New-ScheduledTaskTrigger -AtLogOn -User $wdUser),
+            (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2) -RepetitionInterval (New-TimeSpan -Minutes 5))
+        )
+        $wdPrincipal = New-ScheduledTaskPrincipal -UserId $wdUser -LogonType Interactive
+        $wdSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
+        Register-ScheduledTask -TaskName 'POS Bola Docker' -Action $wdAction -Trigger $wdTriggers -Principal $wdPrincipal -Settings $wdSettings -Force | Out-Null
+        Ok "Docker qo'riqchisi o'rnatildi ('POS Bola Docker': Docker Desktop yopilsa 5 daqiqada qayta ochiladi, foydalanuvchi: $wdUser)"
+    } catch {
+        Warn "Docker qo'riqchisini o'rnatib bo'lmadi: $($_.Exception.Message)"
+    }
+
     # --- firewall
     if ($doMdns) {
         foreach ($r in @(@{ N = 'POS Bola Server (HTTP 8000)'; P = 'TCP'; Port = 8000 }, @{ N = 'POS Bola mDNS (UDP 5353)'; P = 'UDP'; Port = 5353 })) {
