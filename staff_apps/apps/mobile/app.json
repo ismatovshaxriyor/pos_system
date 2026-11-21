@@ -54,6 +54,13 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Litsenziya QR kodini skanerlash uchun kamera kerak.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Restoran joylashuvini belgilash va davomat uchun joylashuv kerak."

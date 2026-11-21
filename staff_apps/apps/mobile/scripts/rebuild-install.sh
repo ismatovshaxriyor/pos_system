@@ -51,6 +51,8 @@ if [[ $FULL -eq 1 || ! -d "$ANDROID_DIR" ]]; then
   # Faqat arm64-v8a: haqiqiy telefonlarning aksariyati shu, build vaqtini ~4x qisqartiradi.
   if ! grep -q '^reactNativeArchitectures=arm64-v8a$' "$ANDROID_DIR/gradle.properties" 2>/dev/null; then
     sed -i '' '/^reactNativeArchitectures=/d' "$ANDROID_DIR/gradle.properties" 2>/dev/null || true
+    # prebuild yaratgan fayl oxirida yangi qator bo'lmasligi mumkin - aks holda oxirgi sozlama bilan yopishib ketadi.
+    [[ -n "$(tail -c1 "$ANDROID_DIR/gradle.properties")" ]] && echo >> "$ANDROID_DIR/gradle.properties"
     echo 'reactNativeArchitectures=arm64-v8a' >> "$ANDROID_DIR/gradle.properties"
   fi
 else

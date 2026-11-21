@@ -14,3 +14,19 @@ export function isCompleteLicenseKey(input: string): boolean {
   const cleaned = input.replace(/[^A-Za-z0-9]/g, '');
   return cleaned.length >= 12;
 }
+
+/**
+ * QR koddan o'qilgan matndan litsenziya kalitini ajratadi (Ona admin paneli QR'ida kalitning o'zi bor).
+ * Qabul qilinadi: `XXXX-XXXX-XXXX` (matn ichida ham, masalan havola/izoh bilan), chiziqsiz 12 belgi yoki eski
+ * 40 belgili hex kalit. Kalitga o'xshamagan QR (boshqa narsa skanerlangan) - `null`.
+ */
+export function extractLicenseKey(raw: string): string | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const dashed = text.match(/(?<![A-Za-z0-9])[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}(?![A-Za-z0-9])/);
+  if (dashed) return dashed[0].toUpperCase();
+  const compact = text.replace(/\s+/g, '');
+  if (/^[A-Za-z0-9]{12}$/.test(compact)) return formatLicenseKey(compact);
+  if (/^[0-9a-fA-F]{40}$/.test(compact)) return compact;
+  return null;
+}
