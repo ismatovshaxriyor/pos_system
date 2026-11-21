@@ -337,7 +337,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             # oldin buyurtma o'zgarib qolishi mumkin (TOCTOU).
             order = Order.objects.select_for_update().get(pk=order.pk)
             if order.status in ORDER_FINISHED_STATUSES:
-                return Response({'detail': 'Order already completed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'detail': "Buyurtma allaqachon yopilgan yoki bekor qilingan."}, status=status.HTTP_400_BAD_REQUEST)
 
             _, _, balance_due = services.calculate_order_financials(order)
             if balance_due > 0:
@@ -388,7 +388,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             order = Order.objects.select_for_update().get(pk=order.pk)
             if order.status in ORDER_FINISHED_STATUSES:
                 return Response(
-                    {'detail': 'Order already completed or cancelled'},
+                    {'detail': "Buyurtma allaqachon yopilgan yoki bekor qilingan."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

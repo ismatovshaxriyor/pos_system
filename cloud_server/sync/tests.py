@@ -800,3 +800,19 @@ class SubdomainTests(TestCase):
         self.assertEqual(resp.wsgi_request.restaurant, restaurant)
 
 
+
+
+class UzbekErrorMessageTests(TestCase):
+    """Ona xatolari Bola orqali restoran xodimigacha yetadi - hammasi o'zbekcha va aniq bo'lishi kerak."""
+
+    def test_unknown_license_key_on_renew_is_uzbek(self):
+        res = self.client.post(
+            reverse('sync-renew'), {'hardware_hash': 'x'}, content_type='application/json',
+            HTTP_AUTHORIZATION='Token yoq-bunday-kalit',
+        )
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.json()['detail'], "Litsenziya kaliti noto'g'ri.")
+
+    def test_missing_credentials_is_uzbek(self):
+        res = self.client.post(reverse('sync-renew'), {'hardware_hash': 'x'}, content_type='application/json')
+        self.assertNotIn('credentials', res.json()['detail'])

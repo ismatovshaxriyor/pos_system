@@ -50,7 +50,7 @@ class LicenseAuthentication(authentication.BaseAuthentication):
         try:
             token = auth[1].decode()
         except UnicodeError:
-            msg = 'Invalid token header. Token string should not contain invalid characters.'
+            msg = "Litsenziya kaliti sarlavhasi noto'g'ri (yaroqsiz belgilar bor)."
             raise exceptions.AuthenticationFailed(msg)
 
         return self.authenticate_credentials(token)
@@ -59,13 +59,13 @@ class LicenseAuthentication(authentication.BaseAuthentication):
         try:
             license_obj = License.objects.get(key=key)
         except License.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid license key.')
+            raise exceptions.AuthenticationFailed("Litsenziya kaliti noto'g'ri.")
 
         if not license_obj.is_active:
-            raise exceptions.AuthenticationFailed('License is inactive.')
+            raise exceptions.AuthenticationFailed('Litsenziya faol emas.')
             
         if license_obj.expires_at < timezone.now():
-            raise exceptions.AuthenticationFailed('License has expired.')
+            raise exceptions.AuthenticationFailed('Litsenziya muddati tugagan.')
 
         return (DummyUser(license_obj.id), license_obj)
 
@@ -84,6 +84,6 @@ class HeartbeatAuthentication(LicenseAuthentication):
         try:
             license_obj = License.objects.get(key=key)
         except License.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid license key.')
+            raise exceptions.AuthenticationFailed("Litsenziya kaliti noto'g'ri.")
 
         return (DummyUser(license_obj.id), license_obj)

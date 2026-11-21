@@ -34,6 +34,9 @@ export function validateUpdateRequest(url: unknown, sha256: unknown): { url: URL
  * Yangi o'rnatuvchini Bola'dan yuklaydi, sha256 ni tekshiradi, jim (`/S`) ishga tushiradi va ilovani yopadi
  * (NSIS o'rnatuvchi eski nusxani almashtirib, yangisini o'zi ochadi). Faqat Windows.
  */
+/** Foydalanuvchiga ko'rsatishga tayyor (o'zbekcha) xato. */
+class UpdateError extends Error {}
+
 export async function installUpdate(
   url: unknown,
   sha256: unknown,
@@ -48,7 +51,7 @@ export async function installUpdate(
   try {
     await mkdir(dir, { recursive: true });
     const response = await fetch(req.url, { signal: AbortSignal.timeout(15 * 60_000) });
-    if (!response.ok || !response.body) throw new Error(`Server ${response.status} qaytardi.`);
+    if (!response.ok || !response.body) throw new UpdateError(`Yangilanish serveri xato qaytardi (${response.status}).`);
     const total = Number(response.headers.get('content-length')) || 0;
 
     const hash = createHash('sha256');
@@ -57,7 +60,7 @@ export async function installUpdate(
     const meter = new Transform({
       transform(chunk: Buffer, _enc, cb) {
         received += chunk.length;
-        if (received > MAX_BYTES) return cb(new Error('Fayl juda katta.'));
+        if (received > MAX_BYTES) return cb(new UpdateError('Yangilanish fayli juda katta.'));
         hash.update(chunk);
         if (total > 0) {
           const pct = Math.min(99, Math.floor((received / total) * 100));
@@ -71,7 +74,7 @@ export async function installUpdate(
     });
     await pipeline(Readable.fromWeb(response.body as never), meter, createWriteStream(file));
 
-    if (hash.digest('hex') !== req.sha256) throw new Error('Fayl buzilgan (sha256 mos kelmadi).');
+    if (hash.digest('hex') !== req.sha256) throw new UpdateError('Yuklangan fayl buzilgan (sha256 mos kelmadi). Qayta urinib ko\'ring.');
     onProgress(100);
 
     spawn(file, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
@@ -80,6 +83,10 @@ export async function installUpdate(
     return { ok: true };
   } catch (e) {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
-    return { ok: false, error: e instanceof Error ? e.message : 'Yuklab olishda xato.' };
+    // Faqat o'zimiz yozgan (o'zbekcha) xabar ko'rsatiladi; Node/tarmoq xatosi inglizcha - o'rniga umumiy matn.
+    return {
+      ok: false,
+      error: e instanceof UpdateError ? e.message : "Yangilanishni yuklab olib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.",
+    };
   }
 }

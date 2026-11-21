@@ -1,4 +1,4 @@
-import type { Workbook } from '@pos/shared';
+import { describeError, type Workbook } from '@pos/shared';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -21,7 +21,7 @@ export function ExcelButton({ build, disabled }: { build: () => Promise<Workbook
     try {
       await shareWorkbook(await build());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
