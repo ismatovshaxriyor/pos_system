@@ -4,6 +4,7 @@ import {
   DUE_DAY_OPTIONS,
   dueDateFromDays,
   formatMoney,
+  orderLabel,
   formatPhone,
   normalizePhone,
   tiyinToDecimal,
@@ -76,7 +77,7 @@ export function CreditSheet({
         </div>
         <div className="sheet-body">
           <div className="credit-sum">
-            <span className="lbl">{order.table?.name ?? `#${order.id}`} · qarzga yoziladi</span>
+            <span className="lbl">{orderLabel(order)} · qarzga yoziladi</span>
             <span className="mono big">{formatMoney(tiyinToDecimal(due))}</span>
           </div>
 

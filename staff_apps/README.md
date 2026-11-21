@@ -95,6 +95,10 @@ Menejer: ☰ Boshqaruv → **Shablonlar** (`app/(app)/templates.tsx`) — nom + 
 
 ☰ Sozlamalar → **Buyurtma olish ko'rinishi**: `Ro'yxat` (katta qatorlar, qo'lga moslash to'liq ishlaydi), `Ixcham` (past qatorlar, bir ekranda ko'proq taom), `Kartochkalar` (2 ustun, rasmli). **Taom rasmlari** yoqgich — o'chirilsa hamma ko'rinishda rasm chiqmaydi (standart: yoqilgan; rasm yo'q taomda nomning bosh harfi). Sozlama `Appearance.menuStyle`/`showImages` (`ui/theme.tsx`, `pos.mobile.appearance.v1`), turlar `@pos/design` `MENU_STYLES`. Tanlov `MenuPicker`ga (`ui/parts.tsx`) ta'sir qiladi: yangi buyurtma, mavjud buyurtmaga qo'shish va shablon tahrirlash ekranlari. Rasm URL'lari serverdan `bootstrap`da allaqachon keladi (`Product.image`); `expo-image` diskda keshlaydi.
 
+## Kassada buyurtma rasmiylashtirish (cashier)
+
+Chap ustunning tepasidagi **+ Yangi buyurtma** (yoki Stollar tabida bo'sh stolni bosish): avval manzil — bo'sh stol yoki **Olib ketish** (stolsiz, `order_type: takeaway`, `table_id: null`), keyin [menyu | savat] ekrani (qidiruv, toifa, shablonlar, har qatorga izoh, buyurtmaga izoh). Serverga FAQAT tasdiqlash oynasidagi "Tasdiqlash va oshxonaga yuborish"da boradi (`submitDraft`: create → add_item → start, oshxonaga chek shundan keyin); tarmoq uzilsa "Qayta urinish" faqat bajarilmagan qadamlarni takrorlaydi. Yaratilgach buyurtma ro'yxatda ochiladi, kassir to'lovni qabul qiladi. Kassa yopiq bo'lsa tugma o'chiq. Stolsiz buyurtmalar ro'yxatda "Olib ketish #12" deb chiqadi (`orderLabel`, `@pos/shared`). Backend o'zgarmagan (kassirga `POST /api/orders/` ruxsat avvaldan bor).
+
 ## Ilovani yangilash
 
 Ilovalar yangilanishni **faqat Bola'dan** oladi (`GET /api/license/app-updates/`): Ona'dagi `MobileApp` (Ona admin → Mobil ilovalar) o'rnatuvchisi heartbeat orqali Bola'ga yetkaziladi, sha256 tekshiriladi va LAN'dan tarqatiladi. `slug`: kassir ilovasi `kassir`, mobil ilova `ofitsiant`/`manager` (admin shu nom bilan yuklashi kerak). `is_required` belgilangan bo'lsa eski versiya bloklanadi (to'liq ekran), aks holda pastda "Yangilash / Keyinroq" eslatmasi chiqadi.

@@ -1,4 +1,4 @@
-import { elapsedLabel, formatMoney, sortOpenOrders, toTiyin, type Order } from '@pos/shared';
+import { elapsedLabel, formatMoney, orderLabel, sortOpenOrders, toTiyin, type Order } from '@pos/shared';
 
 import { useNow } from '../lib/useNow';
 
@@ -33,7 +33,7 @@ export function OrderList({
         return (
           <button key={o.id} className={cls} onClick={() => onSelect(o.id)}>
             <span className="ot-top">
-              <span className="ot-name">{o.table?.name ?? `#${o.id}`}</span>
+              <span className="ot-name">{orderLabel(o)}</span>
               <span className="ot-time">{elapsedLabel(o.created_at, now)}</span>
             </span>
             <span className="ot-mid">

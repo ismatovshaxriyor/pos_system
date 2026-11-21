@@ -2,6 +2,7 @@ import {
   customerName,
   describeError,
   formatMoney,
+  orderLabel,
   tiyinToDecimal,
   toTiyin,
   type ApiError,
@@ -94,7 +95,7 @@ export function Workspace({ orderId, onChanged, onClose }: { orderId: number; on
         await pos.api.orders.close(orderId);
         await load();
         onChanged();
-        setDone({ table: fresh.table?.name ?? `#${fresh.id}`, paid: toTiyin(fresh.final_amount), change: plan.changeTiyin });
+        setDone({ table: orderLabel(fresh), paid: toTiyin(fresh.final_amount), change: plan.changeTiyin });
         playPaid();
       } catch (e) {
         setError(`To'lov qabul qilindi, lekin buyurtmani yopib bo'lmadi: ${describeError(e)}`);
@@ -110,7 +111,7 @@ export function Workspace({ orderId, onChanged, onClose }: { orderId: number; on
     await load();
     onChanged();
     setDone({
-      table: was?.table?.name ?? `#${orderId}`,
+      table: was ? orderLabel(was) : `#${orderId}`,
       paid: was ? toTiyin(was.balance_due) : 0,
       change: 0,
       credit: customerName(customer),

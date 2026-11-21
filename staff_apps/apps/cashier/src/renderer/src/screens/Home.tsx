@@ -5,6 +5,7 @@ import { DayEndSheet } from '../components/DayEndSheet';
 import { DebtSheet } from '../components/DebtSheet';
 import { Flap } from '../components/Flap';
 import { MenuSheet } from '../components/MenuSheet';
+import { NewOrder, type Destination } from '../components/NewOrder';
 import { OrderList } from '../components/OrderList';
 import { TableGrid } from '../components/TableGrid';
 import { ShiftSheet } from '../components/ShiftSheet';
@@ -32,6 +33,8 @@ export function HomeScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   /** Chap ustun: ochiq buyurtmalar yoki hamma stollar (bo'sh/band). */
   const [leftTab, setLeftTab] = useState<'orders' | 'tables'>('orders');
+  /** Yangi buyurtma ekrani ochiq (boshlang'ich manzil bilan yoki manzilni tanlashdan). */
+  const [creating, setCreating] = useState<null | { dest: Destination | null }>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
@@ -47,13 +50,17 @@ export function HomeScreen() {
   const current = selected;
   const totalDue = orders.reduce((s, o) => s + toTiyin(o.balance_due), 0);
   const closePanel = useCallback(() => setSelected(null), []);
+  const selectOrder = useCallback((id: number) => {
+    setCreating(null);
+    setSelected(id);
+  }, []);
   // Qidiruv maydoni faqat ro'yxat uzun bo'lganda ko'rinadi; yashirin bo'lsa eski so'rov ro'yxatni filtrlamasin.
   const tables = data?.tables ?? [];
   const activeTableCount = tables.filter((t) => t.is_active).length;
   const searchShown = leftTab === 'orders' && orders.length > SEARCH_MIN_ORDERS;
   const activeQuery = searchShown ? query : '';
   const visible = useMemo(() => sortOpenOrders(filterOrders(orders, activeQuery)), [orders, activeQuery]);
-  const sheetOpen = menuOpen || debtsOpen || shiftsOpen || dayEnd !== null;
+  const sheetOpen = menuOpen || debtsOpen || shiftsOpen || dayEnd !== null || creating !== null;
 
   // Klaviatura: "/" yoki Ctrl+F - qidiruv, ↑/↓ - buyurtmalar bo'ylab (monoblokka klaviaturasi ulangan bo'lsa).
   useEffect(() => {
@@ -136,6 +143,18 @@ export function HomeScreen() {
 
       <main className="main">
         <aside className="col-orders">
+          <div className="col-new">
+            <button
+              className="btn go solo"
+              onClick={() => {
+                setSelected(null);
+                setCreating({ dest: null });
+              }}
+              disabled={data ? !data.register_open : false}
+            >
+              + Yangi buyurtma
+            </button>
+          </div>
           <div className="col-tabs tabs" role="tablist" aria-label="Chap ustun">
             <button role="tab" aria-selected={leftTab === 'orders'} className={leftTab === 'orders' ? 'active' : ''} onClick={() => setLeftTab('orders')}>
               Buyurtmalar <span className="count">{orders.length}</span>
@@ -158,19 +177,39 @@ export function HomeScreen() {
           )}
           <div className="orders-scroll">
             {loading && !data ? <div className="orders-empty muted">Yuklanmoqda...</div> : leftTab === 'tables' ? (
-              <TableGrid tables={tables} orders={orders} selectedId={current} onSelect={setSelected} />
+              <TableGrid
+                tables={tables}
+                orders={orders}
+                selectedId={current}
+                onSelect={selectOrder}
+                onPickFree={data?.register_open === false ? undefined : (tableId) => {
+                  setSelected(null);
+                  setCreating({ dest: { kind: 'table', tableId } });
+                }}
+              />
             ) : (
               <OrderList
                 orders={visible}
                 selectedId={current}
-                onSelect={setSelected}
+                onSelect={selectOrder}
                 emptyText={query.trim() ? 'Hech narsa topilmadi' : undefined}
               />
             )}
           </div>
         </aside>
 
-        {current !== null ? (
+        {creating ? (
+          <NewOrder
+            key={creating.dest ? JSON.stringify(creating.dest) : 'pick'}
+            initial={creating.dest}
+            onCancel={() => setCreating(null)}
+            onCreated={(id) => {
+              setCreating(null);
+              setSelected(id);
+              void refresh();
+            }}
+          />
+        ) : current !== null ? (
           <Workspace key={current} orderId={current} onChanged={() => void refresh()} onClose={closePanel} />
         ) : (
           <section className="idle">

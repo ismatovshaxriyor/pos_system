@@ -1,5 +1,6 @@
 import type { PosApi } from './api';
 import type { Cart } from './cart';
+import type { OrderType } from './types';
 
 export interface DraftOrder {
   /**
@@ -8,6 +9,8 @@ export interface DraftOrder {
    */
   syncUuid: string;
   tableId: number | null;
+  /** Standart `dine_in`. Stolsiz buyurtma (olib ketish) uchun `takeaway` va `tableId: null`. */
+  orderType?: OrderType;
   guestCount?: number;
   note?: string;
   lines: Cart;
@@ -35,7 +38,7 @@ export async function submitDraft(api: PosApi, draft: DraftOrder, progress: Subm
     const order = await api.orders.create({
       sync_uuid: draft.syncUuid,
       table_id: draft.tableId,
-      order_type: 'dine_in',
+      order_type: draft.orderType ?? 'dine_in',
       guest_count: draft.guestCount,
       note: draft.note,
     });

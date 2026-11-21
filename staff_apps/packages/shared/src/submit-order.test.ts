@@ -83,6 +83,12 @@ describe('submitDraft', () => {
     expect(orders.addItem).not.toHaveBeenCalled();
   });
 
+  it('olib ketish: stolsiz va order_type=takeaway yuboriladi', async () => {
+    const { api, orders } = fakeApi();
+    await submitDraft(api, { ...draft(), tableId: null, orderType: 'takeaway' });
+    expect(orders.create).toHaveBeenCalledWith(expect.objectContaining({ table_id: null, order_type: 'takeaway' }));
+  });
+
   it('boʼsh savatni yubormaydi', async () => {
     const { api, orders } = fakeApi();
     await expect(submitDraft(api, { ...draft(), lines: emptyCart })).rejects.toThrow("Savat bo'sh");

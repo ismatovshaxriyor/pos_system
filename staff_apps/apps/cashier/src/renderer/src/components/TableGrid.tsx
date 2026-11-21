@@ -23,11 +23,14 @@ export function TableGrid({
   orders,
   selectedId,
   onSelect,
+  onPickFree,
 }: {
   tables: Table[];
   orders: Order[];
   selectedId: number | null;
   onSelect: (orderId: number) => void;
+  /** Bo'sh stol bosilsa: shu stolga yangi buyurtma ochish. */
+  onPickFree?: (tableId: number) => void;
 }) {
   const groups = groupTablesByZone(tables);
   if (groups.length === 0) return <div className="orders-empty muted">Stollar hali qo'shilmagan</div>;
@@ -43,13 +46,13 @@ export function TableGrid({
               const mine = open.filter((o) => o.table?.id === t.id);
               const first = mine[0];
               const due = mine.reduce((s, o) => s + toTiyin(o.balance_due), 0);
-              const cls = ['tg-tile', first ? 'busy' : 'free', first && first.id === selectedId ? 'active' : ''].filter(Boolean).join(' ');
+              const cls = ['tg-tile', first ? 'busy' : 'free', !first && onPickFree ? 'pick' : '', first && first.id === selectedId ? 'active' : ''].filter(Boolean).join(' ');
               return (
                 <button
                   key={t.id}
                   className={cls}
-                  disabled={!first}
-                  onClick={() => first && onSelect(first.id)}
+                  disabled={!first && !onPickFree}
+                  onClick={() => (first ? onSelect(first.id) : onPickFree?.(t.id))}
                   aria-label={`${t.name}: ${first ? 'band' : "bo'sh"}`}
                 >
                   <span className="tg-name">{t.name}</span>

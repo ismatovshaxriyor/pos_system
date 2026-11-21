@@ -1,6 +1,14 @@
 import { fullName } from './roles';
 import type { Order } from './types';
 
+/** Buyurtma nomi: stol nomi; stolsiz bo'lsa turi bo'yicha ("Olib ketish #12" / "Yetkazish #12" / "#12"). */
+export function orderLabel(o: Pick<Order, 'id' | 'table' | 'order_type'>): string {
+  if (o.table?.name) return o.table.name;
+  if (o.order_type === 'takeaway') return `Olib ketish #${o.id}`;
+  if (o.order_type === 'delivery') return `Yetkazish #${o.id}`;
+  return `#${o.id}`;
+}
+
 /** Ochiq buyurtmalar: eng eskisi birinchi (kutib qolgan mijoz tepada). Asl massiv o'zgarmaydi. */
 export function sortOpenOrders(orders: Order[]): Order[] {
   return [...orders].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
@@ -14,7 +22,7 @@ export function filterOrders(orders: Order[], query: string): Order[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return orders;
   return orders.filter((o) => {
-    const hay = [o.table?.name, fullName(o.waiter), String(o.id), `#${o.id}`].filter(Boolean).join(' ').toLowerCase();
+    const hay = [orderLabel(o), fullName(o.waiter), String(o.id), `#${o.id}`].filter(Boolean).join(' ').toLowerCase();
     return words.every((w) => hay.includes(w));
   });
 }

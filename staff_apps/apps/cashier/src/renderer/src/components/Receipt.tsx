@@ -1,4 +1,4 @@
-import { elapsedLabel, formatMoney, toTiyin, type Order } from '@pos/shared';
+import { elapsedLabel, formatMoney, orderLabel, toTiyin, type Order } from '@pos/shared';
 import type { ReactNode } from 'react';
 
 import { useNow } from '../lib/useNow';
@@ -20,7 +20,7 @@ export function Receipt({ order, actions }: { order: Order; actions?: ReactNode 
             .filter(Boolean)
             .join(' · ')}
         </span>
-        <h2>{order.table?.name ?? `Buyurtma #${order.id}`}</h2>
+        <h2>{orderLabel(order)}</h2>
       </div>
 
       <div className="receipt-items">
