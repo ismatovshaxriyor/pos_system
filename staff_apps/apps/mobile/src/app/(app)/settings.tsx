@@ -7,7 +7,7 @@ import { View } from 'react-native';
 import { useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
-import { FormCard, ImageField } from '@/ui/forms';
+import { FormCard, ImageField, SwitchRow } from '@/ui/forms';
 import { Button, ErrorText, Eyebrow, Field, Muted, Screen, Title } from '@/ui/kit';
 import { useHand } from '@/ui/theme';
 
@@ -16,6 +16,7 @@ interface Form {
   phone: string;
   publicDomain: string;
   serviceRate: string;
+  restoreStock: boolean;
   latitude: string;
   longitude: string;
   radius: string;
@@ -30,6 +31,7 @@ function toForm(s: RestaurantSettings): Form {
     phone: s.phone ? formatPhone(s.phone) : '',
     publicDomain: s.public_domain,
     serviceRate: trimDecimal(s.service_charge_rate),
+    restoreStock: s.restore_stock_on_cancel,
     latitude: s.latitude ?? '',
     longitude: s.longitude ?? '',
     radius: String(s.attendance_radius),
@@ -99,6 +101,7 @@ export default function SettingsScreen() {
             phone,
             public_domain: form.publicDomain.trim(),
             service_charge_rate: rate,
+            restore_stock_on_cancel: form.restoreStock,
             latitude: form.latitude.trim() ? form.latitude.trim() : null,
             longitude: form.longitude.trim() ? form.longitude.trim() : null,
             attendance_radius: radius,
@@ -152,6 +155,15 @@ export default function SettingsScreen() {
               keyboardType="url"
             />
             <Field label="Xizmat haqi (%)" value={form.serviceRate} onChangeText={(serviceRate) => setForm({ ...form, serviceRate })} keyboardType="decimal-pad" />
+          </FormCard>
+
+          <FormCard title="Ombor qoidasi">
+            <SwitchRow
+              label="Bekor qilinganda qoldiqni qaytarish"
+              hint="Yoqilsa, bekor qilingan buyurtma uchun oshxonaga yuborilgan taomlarning ingredientlari omborga qaytariladi. O'chiq bo'lsa qaytarilmaydi (taom tayyorlangan bo'lishi mumkin)."
+              value={form.restoreStock}
+              onChange={(restoreStock) => setForm({ ...form, restoreStock })}
+            />
           </FormCard>
 
           <FormCard title="Davomat joylashuvi">

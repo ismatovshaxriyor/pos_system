@@ -31,12 +31,18 @@ fi
 
 echo "==> 1/5: Manba kodni build papkasiga nusxalash ($BUILD_STAFF_APPS)"
 echo "    (bo'shliqli papka nomi ndk-build'ni buzadi, shuning uchun alohida yo'l ishlatiladi)"
+# android/build, .gradle, .cxx - generatsiya qilingan keshlar: repodagi eskisini nusxalamaymiz, aks holda
+# ichidagi (bo'shliqli) asl yo'llar autolinking.json orqali build'ni buzadi.
 mkdir -p "$BUILD_ROOT"
 rsync -a --delete \
   --exclude node_modules \
   --exclude .expo \
   --exclude .git \
   --exclude 'apps/cashier/out' \
+  --exclude 'apps/mobile/android/build' \
+  --exclude 'apps/mobile/android/.gradle' \
+  --exclude 'apps/mobile/android/app/build' \
+  --exclude 'apps/mobile/android/app/.cxx' \
   "$REPO_ROOT/staff_apps/" "$BUILD_STAFF_APPS/"
 
 if [[ $FULL -eq 1 || ! -d "$ANDROID_DIR" ]]; then

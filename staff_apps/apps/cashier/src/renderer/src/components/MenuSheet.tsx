@@ -50,6 +50,7 @@ export function MenuSheet({
   onToggleFullscreen,
   onOpenDebts,
   onOpenDayEnd,
+  onOpenShifts,
   onClose,
 }: {
   registerOpen: boolean;
@@ -62,6 +63,7 @@ export function MenuSheet({
   onToggleFullscreen?: () => void;
   onOpenDebts: () => void;
   onOpenDayEnd: () => void;
+  onOpenShifts: () => void;
   onClose: () => void;
 }) {
   const ap = useAppearance();
@@ -186,6 +188,10 @@ export function MenuSheet({
               <button className="btn ghost" onClick={onOpenDayEnd}>
                 <span>Kun yakuni hisoboti</span>
                 <span className="lbl">bugungi savdo</span>
+              </button>
+              <button className="btn ghost" onClick={onOpenShifts}>
+                <span>Smenadagi xodimlar</span>
+                <span className="lbl">kim ishda</span>
               </button>
               <button className="btn ghost" onClick={onOpenDebts}>
                 <span>Qarzdorlar</span>

@@ -21,3 +21,4 @@ export * from './appupdate';
 export * from './discovery';
 export * from './licenseKey';
 export * from './reports';
+export * from './orderList';

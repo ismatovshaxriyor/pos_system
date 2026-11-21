@@ -14,3 +14,12 @@ export function elapsedLabel(isoOrDate: string | Date, nowMs: number = Date.now(
   const m = minutes % 60;
   return m === 0 ? `${h} soat` : `${h} soat ${m} daq`;
 }
+
+/** Daqiqalarni "2 soat 5 daq" / "45 daq" / "0 daq" ko'rinishiga. Manfiy/NaN - "0 daq". */
+export function durationLabel(totalMinutes: number): string {
+  const m = Number.isFinite(totalMinutes) && totalMinutes > 0 ? Math.floor(totalMinutes) : 0;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h === 0) return `${r} daq`;
+  return r === 0 ? `${h} soat` : `${h} soat ${r} daq`;
+}

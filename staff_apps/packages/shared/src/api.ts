@@ -35,6 +35,8 @@ import type {
 import {
   buildBody,
   type AttendanceRecord,
+  type AttendanceSummary,
+  type ShiftStatus,
   type CategoryInput,
   type CustomerInput,
   type ImageUpload,
@@ -309,6 +311,20 @@ export function createApi(client: ApiClient) {
       /** Eng yangilari birinchi. `date` = YYYY-MM-DD, `user` = xodim id. */
       attendance: (query?: { date?: string; user?: number; page?: number }) =>
         client.get<Paginated<AttendanceRecord>>('/attendance/', { query }),
+    },
+
+    // ---- Smena (kelib-ketish): har bir xodim o'zi uchun; `onShift` kassir/menejer, `summary` menejer ----
+    attendance: {
+      me: () => client.get<ShiftStatus>('/attendance/me/'),
+      /** Koordinatalar restoran radiusi ichida bo'lishi shart (server tekshiradi). */
+      checkIn: (p: { latitude: number; longitude: number }) =>
+        client.post<AttendanceRecord>('/attendance/check-in/', { latitude: p.latitude.toFixed(6), longitude: p.longitude.toFixed(6) }),
+      checkOut: (p: { latitude: number; longitude: number }) =>
+        client.post<AttendanceRecord>('/attendance/check-out/', { latitude: p.latitude.toFixed(6), longitude: p.longitude.toFixed(6) }),
+      /** Hozir smenada turgan xodimlar. */
+      onShift: () => client.get<AttendanceRecord[]>('/attendance/on-shift/'),
+      /** `from`/`to` = YYYY-MM-DD; berilmasa oxirgi 7 kun. */
+      summary: (query?: { from?: string; to?: string }) => client.get<AttendanceSummary>('/attendance/summary/', { query }),
     },
 
     notifications: {

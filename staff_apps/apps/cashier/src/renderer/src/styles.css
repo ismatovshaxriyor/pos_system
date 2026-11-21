@@ -1668,3 +1668,26 @@ html[data-motion='reduced'] *::after {
   font-size: 1.25rem;
   font-weight: 600;
 }
+
+/* Ochiq buyurtmalar qidiruvi */
+.orders-search {
+  flex: none;
+  padding: 4px 10px 6px;
+}
+
+.orders-search input {
+  width: 100%;
+  min-height: 44px;
+  background: var(--card);
+  border: 1px solid var(--grid);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0 14px;
+}
+
+.orders-search input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}

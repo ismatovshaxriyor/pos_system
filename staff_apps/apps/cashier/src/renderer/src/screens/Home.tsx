@@ -1,14 +1,18 @@
-import { describeError, formatMoney, fullName, tiyinToDecimal, toTiyin } from '@pos/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { describeError, filterOrders, formatMoney, fullName, sortOpenOrders, stepSelection, tiyinToDecimal, toTiyin } from '@pos/shared';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DayEndSheet } from '../components/DayEndSheet';
 import { DebtSheet } from '../components/DebtSheet';
 import { Flap } from '../components/Flap';
 import { MenuSheet } from '../components/MenuSheet';
 import { OrderList } from '../components/OrderList';
+import { ShiftSheet } from '../components/ShiftSheet';
 import { Workspace } from '../components/Workspace';
 import { useBootstrap, useRealtimeStatus, useSession } from '../lib/hooks';
 import { pos } from '../lib/pos';
+
+/** Shundan ko'p ochiq buyurtma bo'lsa qidiruv maydoni ko'rsatiladi. */
+const SEARCH_MIN_ORDERS = 4;
 
 function Clock() {
   const [t, setT] = useState(() => new Date());
@@ -27,6 +31,9 @@ export function HomeScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
+  const [shiftsOpen, setShiftsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
   /** 'view' - oddiy hisobot; 'close' - kassani yopish (hisobot ichida tasdiq). */
   const [dayEnd, setDayEnd] = useState<null | 'view' | 'close'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -36,6 +43,37 @@ export function HomeScreen() {
   const current = selected;
   const totalDue = orders.reduce((s, o) => s + toTiyin(o.balance_due), 0);
   const closePanel = useCallback(() => setSelected(null), []);
+  // Qidiruv maydoni faqat ro'yxat uzun bo'lganda ko'rinadi; yashirin bo'lsa eski so'rov ro'yxatni filtrlamasin.
+  const searchShown = orders.length > SEARCH_MIN_ORDERS;
+  const activeQuery = searchShown ? query : '';
+  const visible = useMemo(() => sortOpenOrders(filterOrders(orders, activeQuery)), [orders, activeQuery]);
+  const sheetOpen = menuOpen || debtsOpen || shiftsOpen || dayEnd !== null;
+
+  // Klaviatura: "/" yoki Ctrl+F - qidiruv, ↑/↓ - buyurtmalar bo'ylab (monoblokka klaviaturasi ulangan bo'lsa).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (sheetOpen) return; // oyna ochiq: orqadagi ro'yxat klaviaturaga javob bermasin
+      const t = e.target;
+      const typing =
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        (t instanceof HTMLElement && t.isContentEditable);
+      if ((e.key === '/' && !typing) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f')) {
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      } else if (e.key === 'Escape' && typing && e.target === searchRef.current) {
+        setQuery('');
+        searchRef.current?.blur();
+      } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !(e.ctrlKey || e.metaKey || e.altKey)) {
+        if (typing && e.target !== searchRef.current) return;
+        setSelected((cur) => stepSelection(visible, cur, e.key === 'ArrowDown' ? 1 : -1));
+      } else return;
+      e.preventDefault();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [visible, sheetOpen]);
 
   async function toggleRegister() {
     setActionError(null);
@@ -80,9 +118,26 @@ export function HomeScreen() {
             <span>Ochiq buyurtmalar</span>
             <span className="count">{orders.length}</span>
           </div>
+          {searchShown && (
+            <div className="orders-search">
+              <input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Stol, ofitsiant yoki raqam (/)"
+                aria-label="Buyurtma qidirish"
+              />
+            </div>
+          )}
           <div className="orders-scroll">
             {loading && !data ? <div className="orders-empty muted">Yuklanmoqda...</div> : (
-              <OrderList orders={orders} selectedId={current} onSelect={setSelected} />
+              <OrderList
+                orders={visible}
+                selectedId={current}
+                onSelect={setSelected}
+                emptyText={query.trim() ? 'Hech narsa topilmadi' : undefined}
+              />
             )}
           </div>
         </aside>
@@ -119,10 +174,15 @@ export function HomeScreen() {
             setMenuOpen(false);
             setDayEnd('view');
           }}
+          onOpenShifts={() => {
+            setMenuOpen(false);
+            setShiftsOpen(true);
+          }}
           onClose={() => setMenuOpen(false)}
         />
       )}
       {debtsOpen && <DebtSheet onClose={() => setDebtsOpen(false)} />}
+      {shiftsOpen && <ShiftSheet onClose={() => setShiftsOpen(false)} />}
       {dayEnd && (
         <DayEndSheet
           onClose={() => setDayEnd(null)}

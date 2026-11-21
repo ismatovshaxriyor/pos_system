@@ -138,13 +138,14 @@ export interface PurchaseInput {
   items: { ingredient_id: number; quantity: Decimal; unit_cost: Decimal }[];
 }
 
-export type StockMovementType = 'purchase' | 'sale' | 'adjustment' | 'waste';
+export type StockMovementType = 'purchase' | 'sale' | 'adjustment' | 'waste' | 'return';
 
 export const MOVEMENT_LABEL: Record<StockMovementType, string> = {
   purchase: 'Kirim',
   sale: 'Sotuv',
   adjustment: 'Tuzatish',
   waste: 'Yo‘qotish',
+  return: 'Qaytarish',
 };
 
 export interface StockMovement {
@@ -183,6 +184,29 @@ export interface AttendanceRecord {
   check_out_longitude: Decimal | null;
 }
 
+/** `GET /attendance/me/` - joriy xodimning ochiq smenasi. */
+export interface ShiftStatus {
+  on_shift: boolean;
+  attendance: AttendanceRecord | null;
+}
+
+/** `GET /attendance/summary/` (menejer) - bir xodimning davr bo'yicha jami. */
+export interface AttendanceSummaryRow {
+  user: User;
+  shifts: number;
+  /** Ishlagan kunlar soni. */
+  days: number;
+  /** Jami ishlagan daqiqa (ochiq smena "hozirgacha" hisoblanadi). */
+  minutes: number;
+  on_shift: boolean;
+}
+
+export interface AttendanceSummary {
+  from: string;
+  to: string;
+  staff: AttendanceSummaryRow[];
+}
+
 /** 15 daqiqalik bir martalik kod: kassir shu kod bilan o'z qurilmasida PIN o'rnatadi. */
 export interface RegistrationCode {
   code: string;
@@ -214,6 +238,8 @@ export interface RestaurantSettings {
   attendance_radius: number;
   /** Xizmat haqi, foizda. */
   service_charge_rate: Decimal;
+  /** Qoida: bekor qilingan buyurtma sarfi omborga qaytariladimi (standart: yo'q). */
+  restore_stock_on_cancel: boolean;
   telegram_bot_token: string;
   telegram_chat_id: string;
 }
@@ -228,6 +254,7 @@ export type RestaurantSettingsInput = Partial<
     | 'longitude'
     | 'attendance_radius'
     | 'service_charge_rate'
+    | 'restore_stock_on_cancel'
     | 'telegram_bot_token'
     | 'telegram_chat_id'
   >

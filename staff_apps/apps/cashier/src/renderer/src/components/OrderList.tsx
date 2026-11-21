@@ -1,4 +1,4 @@
-import { elapsedLabel, formatMoney, toTiyin, type Order } from '@pos/shared';
+import { elapsedLabel, formatMoney, sortOpenOrders, toTiyin, type Order } from '@pos/shared';
 
 import { useNow } from '../lib/useNow';
 
@@ -8,11 +8,21 @@ const STATUS: Record<string, string> = { new: 'Yangi', in_progress: 'Jarayonda' 
 export const LATE_AFTER_MS = 45 * 60_000;
 
 /** Ochiq buyurtmalar: eng eskisi tepada (kutib qolgan mijoz birinchi). */
-export function OrderList({ orders, selectedId, onSelect }: { orders: Order[]; selectedId: number | null; onSelect: (id: number) => void }) {
+export function OrderList({
+  orders,
+  selectedId,
+  onSelect,
+  emptyText = "Hozircha ochiq buyurtma yo'q",
+}: {
+  orders: Order[];
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+  emptyText?: string;
+}) {
   const now = useNow();
-  const sorted = [...orders].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const sorted = sortOpenOrders(orders);
 
-  if (sorted.length === 0) return <div className="orders-empty muted">Hozircha ochiq buyurtma yo'q</div>;
+  if (sorted.length === 0) return <div className="orders-empty muted">{emptyText}</div>;
 
   return (
     <>

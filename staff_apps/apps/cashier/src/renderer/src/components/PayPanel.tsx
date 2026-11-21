@@ -65,6 +65,8 @@ export function PayPanel({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Qidiruv maydonida yozilayotganda raqamlar to'lov summasiga tushmasin.
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (/^\d$/.test(e.key)) setInput((v) => pushDigit(v, e.key));
       else if (e.key === 'Backspace') setInput((v) => popDigit(v));
       else if (e.key === 'Escape') setInput('');

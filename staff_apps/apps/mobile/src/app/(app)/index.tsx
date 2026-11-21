@@ -8,6 +8,7 @@ import { useBootstrap, useRealtimeStatus, useSession } from '@/lib/hooks';
 import { Avatar, Card, ErrorText, Muted, Pill, Screen, Txt } from '@/ui/kit';
 import { Chip } from '@/ui/parts';
 import { SettingsSheet } from '@/ui/settings';
+import { ShiftCard } from '@/ui/shift';
 import { useHand, useTheme } from '@/ui/theme';
 import { pos } from '@/lib/pos';
 
@@ -87,6 +88,8 @@ export default function TablesScreen() {
           </Pressable>
         </View>
 
+        <ShiftCard />
+
         {user?.role === 'manager' && (
           <Pressable accessibilityRole="button" onPress={() => router.push('/manage')}>
             <Card style={{ minHeight: 64, justifyContent: 'center', gap: 2 }}>
@@ -111,6 +114,21 @@ export default function TablesScreen() {
                 </Txt>
                 <Txt size={14} tone="muted">
                   Tushum, sotuv, xodimlar
+                </Txt>
+              </View>
+            </Card>
+          </Pressable>
+        )}
+
+        {user?.role === 'manager' && (
+          <Pressable accessibilityRole="button" onPress={() => router.push('/attendance')}>
+            <Card style={{ minHeight: 64, justifyContent: 'center', gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <Txt size={17} weight={600}>
+                  Davomat
+                </Txt>
+                <Txt size={14} tone="muted">
+                  Kim ishda, ish soatlari
                 </Txt>
               </View>
             </Card>
