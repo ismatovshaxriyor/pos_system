@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { findServers, hostsToScan, isPrivateIPv4, mdnsToUrls, mergeFound, probeServer } from './discovery';
 
 const INFO = {
-  service: 'pos-bola',
+  service: 'pos-bola' as const,
   version: '0.3.21',
   activated: true,
   restaurant_id: 'r1',

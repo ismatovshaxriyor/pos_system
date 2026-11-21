@@ -27,6 +27,16 @@ Muhim qarorlar:
 - WebSocket payload'lari "qayta so'ra" signali; stol holati so'rovchiga nisbiy bo'lgani uchun tayyor kelmaydi.
 - Ilova faqat o'z rollarini kiritadi (`roles.ts`): mobil → manager/waiter, kassa → cashier/manager. Bu UX, xavfsizlik chegarasi emas.
 
+## Server manzili o'zgarsa (avtomatik qayta topish)
+
+Ilova server manzilini `restaurant_id` bilan birga saqlaydi (`pos.serverUrl` + `pos.restaurantId`). Manzil javob bermay qolsa
+(router/tarmoq almashdi, DHCP IP'ni o'zgartirdi) `useServerRecovery` (`@pos/shared/react`, ildizda chaqiriladi) tarmoqni
+mDNS + /24 skaner bilan qayta qidiradi va **faqat shu `restaurant_id`li** serverni qabul qiladi (qo'shni restoranga ulanib ketmaydi);
+yangi manzil jimgina saqlanadi, sessiya/token saqlanadi, real-time qayta ulanadi. Mantiq: `packages/shared/src/recovery.ts`
+(`recoverServer` + `ServerWatcher`: birinchi tekshiruv 2 s, sog'lom 30 s, topilmasa 15 s; real-time `reconnecting` bo'lganda darrov).
+Platformaga xos qidiruv: `apps/*/lib/findServer.ts`. ID saqlanmagan eski o'rnatishda manzil javob bersa ID eslab qolinadi,
+o'lik bo'lsa tarmoqda aynan BITTA server topilgandagina qabul qilinadi. Router'da serverga DHCP rezervatsiya baribir tavsiya etiladi.
+
 ## Dizayn tizimi (`@pos/design`)
 
 HamrohPOS "Shveytsariya tartibi"ning **yumshoq** varianti (kundalik, uzoq ishlash uchun): iliq qog'oz fon, oq kartochkalar, 9–18px burchaklar, yengil soya.

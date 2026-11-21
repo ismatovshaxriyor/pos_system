@@ -7,7 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { useSession } from '@/lib/hooks';
+import { findServerOnNetwork } from '@/lib/findServer';
+import { useServerRecovery, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { useAppUpdate } from '@/lib/update';
 import { FONT, ThemeProvider, useTheme } from '@/ui/theme';
@@ -39,6 +40,8 @@ export default function RootLayout() {
 function Shell() {
   const session = useSession();
   const update = useAppUpdate(session.serverUrl);
+  // Server IP'si o'zgarsa (tarmoq almashdi) manzil o'zi yangilanadi - qo'lda qayta ulanish shart emas.
+  useServerRecovery(findServerOnNetwork);
   const { c, name } = useTheme();
   // Xato bo'lsa ham (masalan, shrift fayli ochilmasa) ilova tizim shrifti bilan ishlayveradi.
   const [fontsLoaded, fontError] = useFonts(FONT_MAP);

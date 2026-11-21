@@ -22,6 +22,8 @@ export type SessionStatus =
 export interface SessionState {
   status: SessionStatus;
   serverUrl: string | null;
+  /** Saqlangan serverning restoran ID'si: IP o'zgarsa shu bo'yicha qayta topiladi (`recovery.ts`). Eski o'rnatishda `null`. */
+  restaurantId: string | null;
   /** Qurilmaning doimiy ID'si (`X-Device-ID`). Bir marta yaratiladi, hech qachon o'zgarmaydi. */
   deviceId: string;
   token: string | null;
@@ -39,6 +41,7 @@ export class WrongAppError extends Error {
 
 const KEYS = {
   serverUrl: 'pos.serverUrl',
+  restaurantId: 'pos.restaurantId',
   deviceId: 'pos.deviceId',
   token: 'pos.token',
   user: 'pos.user',
@@ -61,6 +64,7 @@ export class SessionManager {
   private state: SessionState = {
     status: 'loading',
     serverUrl: null,
+    restaurantId: null,
     deviceId: '',
     token: null,
     user: null,
@@ -82,6 +86,7 @@ export class SessionManager {
   };
 
   getBaseUrl = (): string | null => this.state.serverUrl;
+  getRestaurantId = (): string | null => this.state.restaurantId;
   getToken = (): string | null => this.state.token;
   getDeviceId = (): string | null => this.state.deviceId || null;
 
@@ -93,8 +98,9 @@ export class SessionManager {
   /** Ilova ishga tushganda bir marta. */
   async load(): Promise<void> {
     const { storage } = this.opts;
-    const [serverUrl, storedDeviceId, token, userJson] = await Promise.all([
+    const [serverUrl, restaurantId, storedDeviceId, token, userJson] = await Promise.all([
       storage.getItem(KEYS.serverUrl),
+      storage.getItem(KEYS.restaurantId),
       storage.getItem(KEYS.deviceId),
       this.secure.getItem(KEYS.token),
       storage.getItem(KEYS.user),
@@ -118,6 +124,7 @@ export class SessionManager {
     const valid = !!token && !!user && canUseApp(this.opts.app, user.role);
     this.set({
       serverUrl,
+      restaurantId,
       deviceId,
       token: valid ? token : null,
       user: valid ? user : null,
@@ -125,17 +132,27 @@ export class SessionManager {
     });
   }
 
-  async setServerUrl(input: string): Promise<void> {
+  /**
+   * `restaurantId`: `undefined` - avvalgisi qoladi (faqat manzil yangilanadi); `null` - ID noma'lum
+   * (aktivlashmagan server); matn - shu restoranga bog'lanadi.
+   */
+  async setServerUrl(input: string, restaurantId?: string | null): Promise<void> {
     const url = normalizeBaseUrl(input);
     await this.opts.storage.setItem(KEYS.serverUrl, url);
-    this.set({ serverUrl: url });
+    if (restaurantId === undefined) {
+      this.set({ serverUrl: url });
+      return;
+    }
+    if (restaurantId) await this.opts.storage.setItem(KEYS.restaurantId, restaurantId);
+    else await this.opts.storage.removeItem(KEYS.restaurantId);
+    this.set({ serverUrl: url, restaurantId });
   }
 
   /** "Serverni o'zgartirish": manzilni va joriy sessiyani tozalaydi. */
   async clearServer(): Promise<void> {
     await this.signOut();
-    await this.opts.storage.removeItem(KEYS.serverUrl);
-    this.set({ serverUrl: null });
+    await Promise.all([this.opts.storage.removeItem(KEYS.serverUrl), this.opts.storage.removeItem(KEYS.restaurantId)]);
+    this.set({ serverUrl: null, restaurantId: null });
   }
 
   /**

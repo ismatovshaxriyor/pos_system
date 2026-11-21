@@ -144,7 +144,7 @@ export function createPos(opts: PosOptions): Pos {
       if (info.service !== 'pos-bola') {
         throw new Error('Bu manzilda restoran tizimi topilmadi.');
       }
-      await session.setServerUrl(baseUrl);
+      await session.setServerUrl(baseUrl, info.restaurant_id ?? null);
       if (!info.activated) session.markNeedsActivation();
       else if (info.is_blocked) session.markLicenseBlocked();
       return { restaurantName: info.restaurant_name, activated: info.activated };

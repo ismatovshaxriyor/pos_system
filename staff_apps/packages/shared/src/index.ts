@@ -19,6 +19,7 @@ export * from './credit';
 export * from './devices';
 export * from './appupdate';
 export * from './discovery';
+export * from './recovery';
 export * from './licenseKey';
 export * from './reports';
 export * from './orderList';

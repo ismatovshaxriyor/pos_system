@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
-import { BootstrapProvider, useSession } from './lib/hooks';
+import { findServerOnNetwork } from './lib/findServer';
+import { BootstrapProvider, useServerRecovery, useSession } from './lib/hooks';
 import { useAppUpdate } from './lib/update';
 import { pos } from './lib/pos';
 import { BlockedScreen } from './screens/Blocked';
@@ -23,6 +24,8 @@ function Shell({ banner, children }: { banner: React.ReactNode; children: React.
 export function App() {
   const session = useSession();
   const update = useAppUpdate(session.serverUrl);
+  // Server IP'si o'zgarsa (tarmoq almashdi) manzil o'zi yangilanadi - qo'lda qayta ulanish shart emas.
+  useServerRecovery(findServerOnNetwork);
 
   useEffect(() => {
     void pos.session.load();

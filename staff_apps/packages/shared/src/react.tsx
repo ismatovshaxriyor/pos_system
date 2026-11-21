@@ -4,14 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
 
+import type { FoundServer } from './discovery';
 import { describeError } from './errors';
 import type { Pos } from './pos';
 import { RESYNC_EVENT, type RealtimeStatus } from './realtime';
+import { recoverServer, ServerWatcher } from './recovery';
 import type { SessionState } from './session';
 import type { Bootstrap } from './types';
 
@@ -110,7 +113,48 @@ export function createPosHooks(pos: Pos) {
     return ctx;
   }
 
-  return { useSession, useRealtimeStatus, useRealtimeRefresh, BootstrapProvider, useBootstrap };
+  /**
+   * Server IP'si o'zgarsa (tarmoq almashdi) manzilni o'zi yangilaydi: saqlangan restoran ID'si bo'yicha
+   * `find` (platformaga xos qidiruv) orqali qayta topadi, sessiya saqlanadi, real-time qayta ulanadi.
+   * Ilova ildizida bir marta chaqiriladi.
+   */
+  function useServerRecovery(find: (signal: AbortSignal) => Promise<FoundServer[]>): void {
+    const hasServer = useSession().serverUrl !== null;
+    const findRef = useRef(find);
+    findRef.current = find;
+
+    useEffect(() => {
+      if (!hasServer) return;
+      const ctrl = new AbortController();
+      const watcher = new ServerWatcher({
+        check: () =>
+          recoverServer({
+            getUrl: pos.session.getBaseUrl,
+            getRestaurantId: pos.session.getRestaurantId,
+            adopt: (url, id) => pos.session.setServerUrl(url, id),
+            find: (signal) => findRef.current(signal),
+            signal: ctrl.signal,
+          }),
+        // Yangi manzilga darrov ulanish (aks holda eski taymer tugashini kutardi).
+        onMoved: () => {
+          if (pos.session.getState().status !== 'signed_in') return;
+          pos.realtime.stop();
+          pos.realtime.start();
+        },
+      });
+      watcher.start();
+      const off = pos.realtime.onStatus((st) => {
+        if (st === 'reconnecting') watcher.nudge();
+      });
+      return () => {
+        ctrl.abort();
+        watcher.stop();
+        off();
+      };
+    }, [hasServer]);
+  }
+
+  return { useSession, useRealtimeStatus, useRealtimeRefresh, useServerRecovery, BootstrapProvider, useBootstrap };
 }
 
 export type PosHooks = ReturnType<typeof createPosHooks>;
