@@ -1,11 +1,12 @@
 import { describeError, groupDevices, type StaffDevice } from '@pos/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useRealtimeRefresh } from './hooks';
 import { pos } from './pos';
 
 /**
- * Menejer uchun qurilmalar ro'yxati. Backend yangi qurilma so'rovi uchun faqat `Notification`
- * yaratadi (WS event yo'q), shuning uchun `pollMs` oraliqda qayta so'raymiz.
+ * Menejer uchun qurilmalar ro'yxati. Real-vaqtda `devices_changed` (yangi so'rov, tasdiq, chetlashtirish)
+ * kelganda yangilanadi; `pollMs` - WebSocket uzilgan holatlar uchun zaxira.
  * `enabled=false` (ofitsiant) bo'lsa hech narsa so'ralmaydi - bu endpoint faqat menejerga ochiq.
  */
 export function useDevices(enabled: boolean, pollMs = 30_000) {
@@ -25,6 +26,8 @@ export function useDevices(enabled: boolean, pollMs = 30_000) {
       if (alive.current) setError(describeError(e));
     }
   }, [enabled]);
+
+  useRealtimeRefresh(['devices_changed'], refresh);
 
   useEffect(() => {
     alive.current = true;

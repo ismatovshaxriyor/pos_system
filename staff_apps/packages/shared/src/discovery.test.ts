@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findServers, hostsToScan, isPrivateIPv4, mdnsToUrls, probeServer } from './discovery';
+import { findServers, hostsToScan, isPrivateIPv4, mdnsToUrls, mergeFound, probeServer } from './discovery';
 
 const INFO = {
   service: 'pos-bola',
@@ -189,5 +189,38 @@ describe('mdnsToUrls', () => {
 
   it("noto'g'ri port yoki manzilsiz yozuvni o'tkazib yuboradi", () => {
     expect(mdnsToUrls([{ port: 0, addresses: ['10.0.0.1'] }, { port: 8000 }, { host: 'x', port: 70000 }])).toEqual([]);
+  });
+});
+
+describe('bitta server - bir nechta manzil', () => {
+  it('mergeFound: bir xil restaurant_id boshqa manzil orqali kelsa takrorlanmaydi', () => {
+    const a = { url: 'http://localhost:8000', info: INFO };
+    const b = { url: 'http://10.0.0.5:8000', info: INFO };
+    expect(mergeFound(mergeFound([], a), b)).toEqual([a]);
+  });
+
+  it('mergeFound: aktivlashmagan (restaurant_id yo\'q) serverlar manzil bo\'yicha farqlanadi', () => {
+    const a = { url: 'http://10.0.0.5:8000', info: { ...INFO, restaurant_id: null } };
+    const b = { url: 'http://10.0.0.6:8000', info: { ...INFO, restaurant_id: null } };
+    expect(mergeFound(mergeFound([], a), b)).toEqual([a, b]);
+    expect(mergeFound([a], a)).toEqual([a]);
+  });
+
+  it('mergeFound: boshqa restoran qo\'shiladi', () => {
+    const a = { url: 'http://10.0.0.5:8000', info: INFO };
+    const b = { url: 'http://10.0.0.6:8000', info: { ...INFO, restaurant_id: 'r2' } };
+    expect(mergeFound([a], b)).toHaveLength(2);
+  });
+
+  it('findServers: localhost va LAN manzil bitta serverga olib borsa bir marta qaytadi', async () => {
+    const seen: string[] = [];
+    const res = await findServers({
+      localIps: [],
+      extraUrls: ['localhost:8000', '10.0.0.5:8000'],
+      fetchImpl: fakeFetch({ 'http://localhost:8000/': INFO, 'http://10.0.0.5:8000/': INFO }),
+      onFound: (s) => seen.push(s.url),
+    });
+    expect(res).toHaveLength(1);
+    expect(seen).toHaveLength(1);
   });
 });

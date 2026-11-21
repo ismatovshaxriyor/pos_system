@@ -15,6 +15,7 @@ import {
 } from '@pos/shared';
 import { useCallback, useEffect, useState } from 'react';
 
+import { useRealtimeRefresh } from '../lib/hooks';
 import { pos } from '../lib/pos';
 
 const KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
@@ -33,6 +34,10 @@ export function DebtSheet({ onClose }: { onClose: () => void }) {
   const [list, setList] = useState<Customer[] | null>(null);
   const [selected, setSelected] = useState<Customer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Boshqa qurilmada qarz/to'lov o'zgarsa ro'yxat darrov yangilanadi.
+  const [tick, setTick] = useState(0);
+  const bump = useCallback(() => setTick((t) => t + 1), []);
+  useRealtimeRefresh(['customers_changed'], bump);
 
   useEffect(() => {
     if (selected) return;
@@ -47,7 +52,7 @@ export function DebtSheet({ onClose }: { onClose: () => void }) {
       alive = false;
       clearTimeout(t);
     };
-  }, [query, selected]);
+  }, [query, selected, tick]);
 
   const totalDebt = (list ?? []).reduce((s, c) => s + toTiyin(c.balance), 0);
 
@@ -110,6 +115,7 @@ function Repay({ customer, onBack, onChanged }: { customer: Customer; onBack: ()
     pos.api.customers.transactions(customer.id).then(setTxns).catch(() => setTxns([]));
   }, [customer.id]);
   useEffect(loadTxns, [loadTxns]);
+  useRealtimeRefresh(['customers_changed'], loadTxns);
 
   async function submit() {
     if (busy || !check.ok) return;

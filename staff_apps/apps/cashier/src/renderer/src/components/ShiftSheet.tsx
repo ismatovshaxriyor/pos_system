@@ -1,6 +1,7 @@
 import { describeError, elapsedLabel, fullName, type AttendanceRecord } from '@pos/shared';
 import { useCallback, useEffect, useState } from 'react';
 
+import { useRealtimeRefresh } from '../lib/hooks';
 import { pos } from '../lib/pos';
 
 const ROLE = { manager: 'Menejer', waiter: 'Ofitsiant', cashier: 'Kassir' } as const;
@@ -22,6 +23,8 @@ export function ShiftSheet({ onClose }: { onClose: () => void }) {
       setError(describeError(e));
     }
   }, []);
+
+  useRealtimeRefresh(['attendance_changed', 'register_closed', 'register_opened'], load);
 
   useEffect(() => {
     void load();

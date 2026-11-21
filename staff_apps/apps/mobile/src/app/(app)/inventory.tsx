@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, SwitchRow } from '@/ui/forms';
@@ -49,6 +49,8 @@ export default function InventoryScreen() {
     setItems(list);
     setSuppliers(sup.filter((s) => s.is_active));
   }, []);
+
+  useRealtimeRefresh(['inventory_changed', 'low_stock'], load);
 
   useEffect(() => {
     if (allowed) void run(async () => undefined, undefined, load);

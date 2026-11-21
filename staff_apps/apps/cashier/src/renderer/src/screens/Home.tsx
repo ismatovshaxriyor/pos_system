@@ -30,6 +30,7 @@ export function HomeScreen() {
   const { data, loading, error, refresh } = useBootstrap();
   const [selected, setSelected] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
   const [shiftsOpen, setShiftsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -97,6 +98,22 @@ export function HomeScreen() {
         </div>
         <span className={`live ${rt === 'open' ? 'on' : ''}`}>{rt === 'open' ? 'Jonli' : 'Ulanmoqda...'}</span>
         <Clock />
+        <button
+          className={`btn menu-btn refresh-btn ${refreshing ? 'spinning' : ''}`}
+          onClick={() => {
+            if (refreshing) return;
+            setRefreshing(true);
+            // Real-vaqt uzilib qolgan bo'lsa ham qo'lda yangilash ishlaydi; kamida bir aylanish ko'rinsin.
+            void Promise.allSettled([refresh(), new Promise((r) => setTimeout(r, 600))]).then(() => setRefreshing(false));
+          }}
+          aria-label="Yangilash"
+          title="Yangilash"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+            <path d="M20 4v7h-7" />
+          </svg>
+        </button>
         <button className="btn menu-btn" onClick={() => setMenuOpen(true)} aria-label="Menyu">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16" />

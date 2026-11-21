@@ -251,7 +251,16 @@ export type KnownEventName =
   | 'new_print_job'
   | 'print_job_updated'
   | 'register_closed'
-  | 'register_opened';
+  | 'register_opened'
+  // Model yozilganda server avtomatik yuboradi (local_server/core/realtime_signals.py).
+  | 'menu_changed'
+  | 'staff_changed'
+  | 'devices_changed'
+  | 'attendance_changed'
+  | 'customers_changed'
+  | 'inventory_changed'
+  | 'printers_changed'
+  | 'config_changed';
 
 export interface WsEvent<D = Record<string, unknown>> {
   event: KnownEventName | (string & {});

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, SectionTitle, SwitchRow } from '@/ui/forms';
@@ -53,6 +53,8 @@ export default function PrintersScreen() {
     setOptions(o);
     setJobs(j.results.slice(0, 15));
   }, []);
+
+  useRealtimeRefresh(['printers_changed'], load);
 
   useEffect(() => {
     if (isManager) void run(async () => undefined, undefined, load);

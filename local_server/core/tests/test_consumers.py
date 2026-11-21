@@ -3,19 +3,15 @@ from django.test import TransactionTestCase, override_settings
 from rest_framework.authtoken.models import Token
 
 from config.asgi import application
+from config.hosts import PrivateLANHost
 from core.models import User
 
 IN_MEMORY_CHANNEL_LAYERS = {
     'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
 }
 
-# AllowedHostsOriginValidator (config/asgi.py) qat'iy tekshiradi: Origin
-# header umuman bo'lmasa (WebsocketCommunicator sukut bo'yicha yubormaydi),
-# ALLOWED_HOSTS'da '*' bo'lmagan holda ulanish TokenAuthMiddleware'gacha
-# yetib bormasdan rad etiladi. Bu haqiqiy brauzer-klient uchun to'g'ri
-# himoya, lekin test muhitida ALLOWED_HOSTS cheklangan (.env.example:
-# localhost,127.0.0.1) - shu sabab muvaffaqiyatli ulanish kutilgan testlar
-# mos Origin header'ini o'zi yuborishi kerak.
+# config/ws_origin.AllowedHostsOriginValidator: Origin hostname'i ALLOWED_HOSTS bo'yicha
+# (PrivateLANHost bilan) tekshiriladi; Origin umuman bo'lmasa ruxsat (mobil/Electron mijoz).
 ORIGIN_HEADERS = [(b'origin', b'http://localhost')]
 
 
@@ -85,7 +81,48 @@ class EventsConsumerTests(TransactionTestCase):
 
         await sync_to_async(services.revoke_device)(device)
 
+        # Qurilma saqlanishi `devices_changed` signalini ham yuboradi (core/realtime_signals.py) - u
+        # `force_disconnect`dan oldin kelishi mumkin; ulanish baribir yopilishi kerak.
         output = await communicator.receive_output(timeout=5)
+        while output['type'] == 'websocket.send':
+            output = await communicator.receive_output(timeout=5)
         self.assertEqual(output['type'], 'websocket.close')
 
         await communicator.disconnect()
+
+
+@override_settings(CHANNEL_LAYERS=IN_MEMORY_CHANNEL_LAYERS, ALLOWED_HOSTS=['localhost', PrivateLANHost()])
+class EventsOriginTests(TransactionTestCase):
+    """Regressiya: LAN IP orqali WebSocket (React Native `Origin: http://<ip>:8000`) 403 bilan rad etilardi."""
+
+    def setUp(self):
+        import unittest.mock as mock
+        self.license_patcher = mock.patch('licensing.middleware.is_license_blocked', return_value=False)
+        self.license_patcher.start()
+        user = User.objects.create_user(username='+998900000101', role='manager')
+        self.token = Token.objects.create(user=user)
+
+    def tearDown(self):
+        self.license_patcher.stop()
+        super().tearDown()
+
+    async def _connect(self, headers):
+        communicator = WebsocketCommunicator(application, f"/ws/events/?token={self.token.key}", headers=headers)
+        connected, _ = await communicator.connect()
+        await communicator.disconnect()
+        return connected
+
+    async def test_private_lan_ip_origin_is_accepted(self):
+        self.assertTrue(await self._connect([(b'origin', b'http://192.168.1.50:8000')]))
+        self.assertTrue(await self._connect([(b'origin', b'http://10.162.36.253:8000')]))
+
+    async def test_no_origin_header_is_accepted(self):
+        self.assertTrue(await self._connect([]))
+
+    async def test_null_and_file_origin_is_accepted(self):
+        self.assertTrue(await self._connect([(b'origin', b'null')]))
+        self.assertTrue(await self._connect([(b'origin', b'file://')]))
+
+    async def test_foreign_origin_is_rejected(self):
+        self.assertFalse(await self._connect([(b'origin', b'http://evil.example.com')]))
+        self.assertFalse(await self._connect([(b'origin', b'http://8.8.8.8:8000')]))

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect } from '@/ui/forms';
@@ -48,6 +48,12 @@ export default function StockScreen() {
     },
     [ingredientId, type],
   );
+
+  const reloadCurrent = useCallback(() => {
+    if (tab === 'purchases') void loadPurchases(true, 1).catch(() => undefined);
+    else void loadMovements(true, 1).catch(() => undefined);
+  }, [tab, loadPurchases, loadMovements]);
+  useRealtimeRefresh(['inventory_changed'], reloadCurrent);
 
   useEffect(() => {
     if (!allowed) return;

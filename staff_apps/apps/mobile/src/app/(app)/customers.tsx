@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, SectionTitle, SwitchRow } from '@/ui/forms';
@@ -61,6 +61,8 @@ export default function CustomersScreen() {
     const res = await pos.api.customers.list({ search: search.trim() || undefined, has_debt: filter === 'debt' });
     setList(res.results);
   }, [search, filter]);
+
+  useRealtimeRefresh(['customers_changed'], load);
 
   useEffect(() => {
     if (!allowed) return;

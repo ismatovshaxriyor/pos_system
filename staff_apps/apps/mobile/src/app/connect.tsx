@@ -1,4 +1,4 @@
-import { describeError, findServers, mdnsToUrls, type FoundServer, type ScanProgress } from '@pos/shared';
+import { describeError, findServers, mdnsToUrls, mergeFound, type FoundServer, type ScanProgress } from '@pos/shared';
 import { getIpAddressAsync } from 'expo-network';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -69,7 +69,7 @@ export default function ConnectScreen() {
         extraTimeoutMs: Math.max(2500, timeoutMs),
         signal: ctrl.signal,
         onProgress: setProgress,
-        onFound: (s) => setServers((prev) => (prev.some((p) => p.url === s.url) ? prev : [...prev, s])),
+        onFound: (s) => setServers((prev) => mergeFound(prev, s)),
         onRejected: (url, status) => setRejected({ url, status }),
       });
       if (found.length > 0) break;

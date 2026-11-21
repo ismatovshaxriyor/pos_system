@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { FormCard, SwitchRow } from '@/ui/forms';
@@ -28,6 +28,8 @@ export default function SuppliersScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const load = useCallback(async () => setList(await pos.api.inventory.suppliers()), []);
+
+  useRealtimeRefresh(['inventory_changed'], load);
 
   useEffect(() => {
     if (allowed) void run(async () => undefined, undefined, load);

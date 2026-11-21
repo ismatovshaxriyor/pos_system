@@ -28,6 +28,7 @@ export interface BootstrapCtx {
  */
 export const DEFAULT_REFRESH_EVENTS: readonly string[] = [
   'table_status_changed',
+  'menu_changed',
   'order_updated',
   'price_changed',
   'register_closed',

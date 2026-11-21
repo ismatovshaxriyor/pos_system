@@ -217,7 +217,7 @@ export function MenuSheet({
                 )}
               </button>
               <button className="btn ghost" onClick={onSignOut}>
-                Smenani almashtirish
+                Chiqish (smenani almashtirish)
               </button>
             </div>
           </div>

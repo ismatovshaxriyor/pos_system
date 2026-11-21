@@ -2,7 +2,10 @@ import { describeError, type ShiftStatus } from '@pos/shared';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useRealtimeRefresh } from './hooks';
 import { pos } from './pos';
+
+const SHIFT_EVENTS = ['attendance_changed', 'register_closed', 'register_opened'] as const;
 
 /** Joriy joylashuvni oladi; ruxsat yo'q/GPS o'chiq bo'lsa tushunarli xabar bilan xato tashlaydi. */
 export async function getCoords(): Promise<{ latitude: number; longitude: number }> {
@@ -38,6 +41,9 @@ export function useShift(pollMs = 30_000) {
       if (alive.current) setError(describeError(e));
     }
   }, []);
+
+  // Kassa yopilganda hamma smena avtomatik tugaydi; menejer/boshqa qurilma o'zgartirsa ham darrov yangilanadi.
+  useRealtimeRefresh(SHIFT_EVENTS, refresh);
 
   useEffect(() => {
     alive.current = true;

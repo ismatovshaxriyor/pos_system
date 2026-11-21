@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { Button, Card, ErrorText, Eyebrow, Muted, Pill, Screen, Segmented, Title, Txt } from '@/ui/kit';
 import { useHand, useTheme } from '@/ui/theme';
@@ -21,6 +21,8 @@ function range(p: Period): { from: string; to: string } {
 }
 
 /** Menejer: hozir kim ishda va davr bo'yicha ish soatlari (kim qancha ishladi). */
+const REFRESH_EVENTS = ['attendance_changed', 'register_closed', 'register_opened'] as const;
+
 export default function AttendanceScreen() {
   const { user } = useSession();
   const isManager = user?.role === 'manager';
@@ -45,6 +47,8 @@ export default function AttendanceScreen() {
       if (mine === seq.current) setError(describeError(e));
     }
   }, [period]);
+
+  useRealtimeRefresh(REFRESH_EVENTS, load);
 
   useEffect(() => {
     if (!isManager) return;

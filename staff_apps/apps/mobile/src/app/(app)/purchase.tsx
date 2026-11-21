@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, SectionTitle } from '@/ui/forms';
@@ -37,6 +37,8 @@ export default function PurchaseScreen() {
     setIngredients(ing.filter((i) => i.is_active));
     setSuppliers(sup.filter((s) => s.is_active));
   }, []);
+
+  useRealtimeRefresh(['inventory_changed'], load);
 
   useEffect(() => {
     if (allowed) void run(async () => undefined, undefined, load);

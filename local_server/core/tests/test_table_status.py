@@ -46,3 +46,4 @@ class TableStatusTests(TestCase):
         row = next(t for t in response.data['results'] if t['id'] == self.table.id)
         self.assertNotIn('waiter', row)
         self.assertNotIn('orders', row)
+

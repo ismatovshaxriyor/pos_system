@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { useBootstrap, useSession } from '@/lib/hooks';
+import { useBootstrap, useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, ImageField, SectionTitle, SwitchRow } from '@/ui/forms';
@@ -91,6 +91,8 @@ export default function MenuScreen() {
     setPrinters(pr);
     setIngredients(ing.filter((i) => i.is_active));
   }, []);
+
+  useRealtimeRefresh(['menu_changed', 'printers_changed', 'inventory_changed'], load);
 
   useEffect(() => {
     if (isManager) void run(async () => undefined, undefined, load);

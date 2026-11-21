@@ -12,6 +12,20 @@ export interface FoundServer {
   info: DiscoveryInfo;
 }
 
+/**
+ * Bitta serverni boshqa-boshqa manzillar orqali (localhost, LAN IP, `pos-bola.local`) topish mumkin - ro'yxatda
+ * u BIR marta chiqishi kerak. Aktivlashgan server `restaurant_id` bilan, aktivlashmagani manzil bilan farqlanadi.
+ */
+function serverIdentity(s: FoundServer): string {
+  return s.info.restaurant_id ? `restaurant:${s.info.restaurant_id}` : `url:${s.url}`;
+}
+
+/** Topilgan serverni ro'yxatga qo'shadi; o'sha server allaqachon bor bo'lsa (boshqa manzil orqali) ro'yxatni o'zgartirmaydi. */
+export function mergeFound(list: FoundServer[], s: FoundServer): FoundServer[] {
+  const id = serverIdentity(s);
+  return list.some((p) => serverIdentity(p) === id) ? list : [...list, s];
+}
+
 export interface ScanProgress {
   done: number;
   total: number;
@@ -137,10 +151,12 @@ export async function probeServer(
  */
 export async function findServers(opts: FindServersOptions): Promise<FoundServer[]> {
   const ports = opts.ports ?? DEFAULT_PORTS;
-  const found = new Map<string, FoundServer>();
+  let found: FoundServer[] = [];
   const add = (s: FoundServer | null) => {
-    if (s && !found.has(s.url)) {
-      found.set(s.url, s);
+    if (!s) return;
+    const merged = mergeFound(found, s);
+    if (merged !== found) {
+      found = merged;
       opts.onFound?.(s);
     }
   };
@@ -171,7 +187,7 @@ export async function findServers(opts: FindServersOptions): Promise<FoundServer
   );
 
   // Tayyor nomzoddan topilgan bo'lsa, og'ir LAN skaneri kerak emas.
-  if (found.size > 0 && !opts.scanIfFound) return [...found.values()];
+  if (found.length > 0 && !opts.scanIfFound) return found;
 
   // 2-bosqich: LAN'ni skanerlash.
   let next = 0;
@@ -195,5 +211,5 @@ export async function findServers(opts: FindServersOptions): Promise<FoundServer
   }
 
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(lan.length, 1)) }, worker));
-  return [...found.values()];
+  return found;
 }

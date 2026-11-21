@@ -471,6 +471,23 @@ h1 {
   color: var(--ink);
 }
 
+.refresh-btn.spinning svg {
+  animation: refresh-spin 0.7s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-btn.spinning svg {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 .banner {
   flex: none;
   display: flex;
@@ -547,7 +564,7 @@ h1 {
 
 /* Chap qo'l: ☰ chapda (menyu ham chapdan ochiladi), "To'lash" chapda, "Yopish" o'ngda */
 [data-layout='left'] .topbar { padding: 0 20px 0 0; }
-[data-layout='left'] .menu-btn { order: -1; border-left: 0; border-right: 1px solid var(--grid); }
+[data-layout='left'] .menu-btn:not(.refresh-btn) { order: -1; border-left: 0; border-right: 1px solid var(--grid); }
 [data-layout='left'] .overlay.side { justify-content: flex-start; }
 [data-layout='left'] .menu { border-left: 0; border-right: 1px solid var(--grid); }
 [data-layout='left'] .pay-actions { grid-template-columns: 1fr 110px; }

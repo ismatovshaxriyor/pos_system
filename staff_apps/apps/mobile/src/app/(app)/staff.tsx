@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { useSession } from '@/lib/hooks';
+import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, SectionTitle } from '@/ui/forms';
@@ -46,6 +46,9 @@ function worked(a: AttendanceRecord): string {
  * Menejer: xodimlar (qo'shish, ism/lavozim/parolni o'zgartirish, o'chirish), kassir uchun kirish kodi
  * va davomat tarixi (sana bo'yicha; ishlagan vaqt bilan).
  */
+const STAFF_EVENTS = ['staff_changed', 'devices_changed'] as const;
+const ATTENDANCE_EVENTS = ['attendance_changed', 'register_closed'] as const;
+
 export default function StaffScreen() {
   const { user } = useSession();
   const isManager = user?.role === 'manager';
@@ -62,6 +65,9 @@ export default function StaffScreen() {
     const res = await pos.api.staff.attendance({ date: ymd(day) });
     setRecords(res.results);
   }, [day]);
+
+  useRealtimeRefresh(STAFF_EVENTS, loadStaff);
+  useRealtimeRefresh(ATTENDANCE_EVENTS, loadAttendance);
 
   useEffect(() => {
     if (isManager) void run(async () => undefined, undefined, loadStaff);
