@@ -192,7 +192,10 @@ if [[ -z "$POS_IMAGE" ]]; then
   POS_IMAGE="$(env_get POS_IMAGE)"
   if is_placeholder "$POS_IMAGE"; then POS_IMAGE="$(derive_image || true)"; fi
 fi
-[[ -n "$POS_IMAGE" ]] || die "Image manzili aniqlanmadi (git remote yo'q). POS_IMAGE=ghcr.io/<owner>/pos-local bilan qayta ishga tushiring."
+if [[ -z "$POS_IMAGE" ]]; then   # zip'dan yuklangan kodda .git yo'q - rasmiy image
+  POS_IMAGE="ghcr.io/ismatovshaxriyor/pos-local"
+  warn "git remote topilmadi (zip'dan o'rnatilgan) - standart image ishlatiladi: $POS_IMAGE"
+fi
 POS_IMAGE="$(lower "$POS_IMAGE")"
 CHANNEL="$(env_get RELEASE_CHANNEL)"; CHANNEL="${CHANNEL:-stable}"
 

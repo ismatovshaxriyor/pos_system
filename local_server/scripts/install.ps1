@@ -169,7 +169,13 @@ if (-not $image) {
     $image = Env-Get 'POS_IMAGE'
     if (Is-Placeholder $image) { $image = Derive-Image }
 }
-if (-not $image) { Fail "Image manzili aniqlanmadi (git remote yo'q). POS_IMAGE=ghcr.io/<owner>/pos-local bilan qayta ishga tushiring." }
+# GitHub'dan zip sifatida yuklangan kodda .git yo'q - git remote'dan aniqlab bo'lmaydi. Shunda loyihaning
+# rasmiy image'i ishlatiladi (POS_IMAGE bilan o'zgartirish mumkin). UAC qayta ishga tushirishida
+# POS_* o'zgaruvchilari yangi oynaga o'tmaydi - shuning uchun bu zaxira kerak.
+if (-not $image) {
+    $image = 'ghcr.io/ismatovshaxriyor/pos-local'
+    Warn "git remote topilmadi (zip'dan o'rnatilgan) - standart image ishlatiladi: $image"
+}
 $image = $image.ToLower()
 $channel = Env-Get 'RELEASE_CHANNEL'; if (-not $channel) { $channel = 'stable' }
 $imageRef = "${image}:${channel}"
