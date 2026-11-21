@@ -200,7 +200,7 @@ STORAGES = {
         # (runserver, manage.py test) never run it, so they fall back to
         # plain storage where nothing needs to be pre-collected.
         'BACKEND': (
-            'whitenoise.storage.CompressedManifestStaticFilesStorage' if not DEBUG
+            'config.storage.LenientManifestStaticFilesStorage' if not DEBUG
             else 'django.contrib.staticfiles.storage.StaticFilesStorage'
         ),
     },
