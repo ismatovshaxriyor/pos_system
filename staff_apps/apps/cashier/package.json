@@ -13,21 +13,49 @@
     "dist:win": "electron-vite build && electron-builder --win --x64"
   },
   "devDependencies": {
+    "@pos/design": "*",
+    "@pos/shared": "*",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
-    "electron": "^45.4.1",
+    "electron": "45.4.1",
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.9.3",
     "vite": "^8.3.8"
   },
   "dependencies": {
-    "@pos/design": "*",
-    "@pos/shared": "*",
-    "bonjour-service": "^1.4.4",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "bonjour-service": "^1.4.4"
+  },
+  "build": {
+    "appId": "uz.hamrohpos.kassir",
+    "productName": "HamrohPOS Kassir",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**",
+      "package.json"
+    ],
+    "artifactName": "HamrohPOS-Kassir-Setup-${version}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
