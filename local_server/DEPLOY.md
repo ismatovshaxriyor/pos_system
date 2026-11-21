@@ -62,7 +62,11 @@ PowerShell'ni **Administrator** rejimida ochib:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_mdns_windows.ps1
 ```
-*Bu skript Windows Defender Firewall'da 8000 (HTTP) va 5353 (mDNS UDP) portlariga ruxsat beradi.*
+*Bu skript Windows Defender Firewall'da 8000 (HTTP) va 5353 (mDNS UDP) portlariga ruxsat beradi va `_pos-bola._tcp` ni e'lon qiladigan **"POS Bola mDNS"** vazifasini o'rnatadi (`scripts/advertise_mdns_windows.ps1 -Install`). Windows'ning o'zi bu servisni e'lon qilmaydi. Vazifa Windows 10/11 ning ichki mDNS API'sidan (`DnsServiceRegister`) foydalanadi, Bonjour shart emas. U kompyuter yoqilganda SYSTEM nomidan ishga tushadi va har 15 soniyada LAN IP'ni tekshiradi: Wi-Fi/kabel almashsa yoki DHCP yangi manzil bersa, e'lonni yangi IP bilan qayta qiladi. Host nomi `pos-bola.local` (ilovalar shu nomni ham sinaydi). Agar bu nom ochilmasa, `<KOMPYUTER_NOMI>.local` ishlatiladi. `install.ps1` buni avtomatik qiladi.*
+
+Holatni tekshirish: `powershell -ExecutionPolicy Bypass -File .\scripts\advertise_mdns_windows.ps1 -Status` (vazifa holati, hozirgi LAN IP, `C:\ProgramData\PosBola\mdns.log` ning oxiri). Olib tashlash: `-Uninstall`.
+
+**Eslatma:** mDNS IP *o'zgarishini* hal qiladi, IP *yo'qligini* emas. Server routerdan manzil ololmasa (`ipconfig` da `169.254.x.x`: zaif Wi-Fi, IP bermaydigan port), uni hech qaysi usul topa olmaydi. Server uchun Ethernet kabel tavsiya etiladi.
 
 ---
 
@@ -110,7 +114,7 @@ Kassa va planshetlarda xodimlarning ishlashi quyidagicha tashkil etiladi:
 Svet o'chib yonganda yoki kompyuter qayta yoqilganda (reboot), **insonsiz (hech qanday buyruqsiz)** barcha servislar avtomatik ko'tariladi:
 
 1. **Docker Servislar**: `docker-compose.yml` ichidagi `restart: unless-stopped` parametri tufayli Django, Redis, Postgres va Celery avtomatik ishga tushadi.
-2. **mDNS Daemon**: `avahi-daemon` (Linux) yoki `dnscache` (Windows) OS yuklanishi bilan avtomatik yoqiladi.
+2. **mDNS Daemon**: `avahi-daemon` (Linux) yoki "POS Bola mDNS" vazifasi (Windows, Task Scheduler, `AtStartup`) OS yuklanishi bilan avtomatik ishga tushadi.
 3. **BIOS Auto-Power On (Tavsiya)**: Server kompyuteri BIOS sozlamalarida **"Restore AC Power Loss" / "Auto Power On"** parametridagi `Enable` qilib qo'yilsa, tok kelishi bilan kompyuterning o'zi avtomatik yonadi.
 
 ---

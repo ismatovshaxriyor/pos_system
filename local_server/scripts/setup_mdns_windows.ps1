@@ -1,53 +1,28 @@
 # ==============================================================================
-# pos-bola Windows mDNS & Firewall Auto-Discovery Setup Script
+# POS Bola - Windows'da avtomatik topilish (mDNS) sozlamasi
+#
+# 1) Firewall: 8000/tcp (server) va 5353/udp (mDNS) ochiladi.
+# 2) mDNS e'loni: _pos-bola._tcp ni har doim serverning HOZIRGI IP'si bilan e'lon qiladigan
+#    "POS Bola mDNS" vazifasi o'rnatiladi (advertise_mdns_windows.ps1 -Install).
+#    Kompyuter qayta yoqilsa ham, IP o'zgarsa ham ilovalar serverni o'zi topadi.
+#
+# Ishga tushirish (Administrator PowerShell, local_server papkasida):
+#   powershell -ExecutionPolicy Bypass -File .\scripts\setup_mdns_windows.ps1
 # ==============================================================================
 
-# Ensure script is running with Administrator privileges
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Host "ERROR: Please run PowerShell as Administrator:" -ForegroundColor Red
-    Write-Host "  Right-click PowerShell -> 'Run as Administrator'" -ForegroundColor Yellow
+    Write-Host "XATO: PowerShell'ni Administrator sifatida oching:" -ForegroundColor Red
+    Write-Host "  PowerShell ustida o'ng tugma -> 'Run as Administrator'" -ForegroundColor Yellow
     Write-Host "  powershell -ExecutionPolicy Bypass -File .\scripts\setup_mdns_windows.ps1" -ForegroundColor Yellow
-    Exit 1
+    exit 1
 }
 
-Write-Host "=== Configuring Windows mDNS & Firewall Rules for POS Bola ===" -ForegroundColor Cyan
-
-# 1. Allow TCP Port 8000 through Windows Defender Firewall
-$fw8000 = Get-NetFirewallRule -DisplayName "POS Bola Server (HTTP 8000)" -ErrorAction SilentlyContinue
-if (-not $fw8000) {
-    Write-Host "Adding Windows Firewall Inbound Rule for Port 8000 (TCP)..." -ForegroundColor Green
-    New-NetFirewallRule -DisplayName "POS Bola Server (HTTP 8000)" `
-                        -Direction Inbound `
-                        -Protocol TCP `
-                        -LocalPort 8000 `
-                        -Action Allow `
-                        -Profile Any | Out-Null
-} else {
-    Write-Host "Windows Firewall Rule for Port 8000 already exists." -ForegroundColor Yellow
+Write-Host "=== POS Bola: firewall va mDNS e'loni ===" -ForegroundColor Cyan
+$advertiser = Join-Path $PSScriptRoot 'advertise_mdns_windows.ps1'
+if (-not (Test-Path $advertiser)) {
+    Write-Host "XATO: $advertiser topilmadi (repo to'liq yuklab olinganmi?)." -ForegroundColor Red
+    exit 1
 }
-
-# 2. Allow UDP Port 5353 (mDNS) through Windows Defender Firewall
-$fw5353 = Get-NetFirewallRule -DisplayName "POS Bola mDNS (UDP 5353)" -ErrorAction SilentlyContinue
-if (-not $fw5353) {
-    Write-Host "Adding Windows Firewall Inbound Rule for Port 5353 (mDNS UDP)..." -ForegroundColor Green
-    New-NetFirewallRule -DisplayName "POS Bola mDNS (UDP 5353)" `
-                        -Direction Inbound `
-                        -Protocol UDP `
-                        -LocalPort 5353 `
-                        -Action Allow `
-                        -Profile Any | Out-Null
-} else {
-    Write-Host "Windows Firewall Rule for mDNS (UDP 5353) already exists." -ForegroundColor Yellow
-}
-
-# 3. Get Windows Hostname and display .local domain
-$hostname = $env:COMPUTERNAME.ToLower()
-$localDomain = "http://${hostname}.local:8000/api/"
-
-Write-Host "==============================================================================" -ForegroundColor Green
-Write-Host "SUCCESS: Windows mDNS Firewall Rules Configured!" -ForegroundColor Green
-Write-Host "Server Hostname: $env:COMPUTERNAME" -ForegroundColor White
-Write-Host "Local mDNS URL:  $localDomain" -ForegroundColor Cyan
-Write-Host "Discovery URL:   http://${hostname}.local:8000/api/discovery/" -ForegroundColor Cyan
-Write-Host "==============================================================================" -ForegroundColor Green
+& $advertiser -Install
+exit $LASTEXITCODE

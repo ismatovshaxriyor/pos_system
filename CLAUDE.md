@@ -38,7 +38,7 @@ Both prod composes are hardened: `depends_on` is healthcheck-gated (Postgres `pg
 ### First-time licensing setup (both servers, needed before activation/kill-switch will work)
 One-time RSA keypair generation/placement across both servers — see the `setup-licensing` skill.
 
-`local_server/pos-bola.avahi.service` advertises the Bola over mDNS on the restaurant WiFi (`_pos-bola._tcp` on port 8000, `path=/api/` TXT record) so the Flutter staff apps can find it without a static IP/DHCP reservation — see `docs/4_amaliy_ish_oqimi_va_deployment.md` for install steps; not wired into any compose service, it's installed on the host.
+`local_server/pos-bola.avahi.service` advertises the Bola over mDNS on the restaurant WiFi (`_pos-bola._tcp` on port 8000, `path=/api/` TXT record) so the Flutter staff apps can find it without a static IP/DHCP reservation — see `docs/4_amaliy_ish_oqimi_va_deployment.md` for install steps; not wired into any compose service, it's installed on the host. Windows has no Avahi and does **not** advertise `_pos-bola._tcp` by itself (opening firewall ports is not enough). The Windows advertiser is `local_server/scripts/advertise_mdns_windows.ps1`. It calls the OS's built-in `dnsapi.dll!DnsServiceRegister` via `Add-Type` C# (Windows 10 1809+; no Bonjour), and `-Install` (called by `setup_mdns_windows.ps1` and `install.ps1`) registers an `AtStartup` SYSTEM scheduled task "POS Bola mDNS" that re-registers whenever the LAN IP changes. SRV target is `pos-bola.local` (falls back to `<hostname>.local` if that name doesn't resolve locally), because Windows can answer `<hostname>.local` with WSL/Docker `172.x` addresses too and Android NSD picks just one. Not yet run on real Windows hardware; verify with `-Status`.
 
 ## Architecture
 

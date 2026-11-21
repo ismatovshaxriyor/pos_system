@@ -402,7 +402,16 @@ try {
                 New-NetFirewallRule -DisplayName $r.N -Direction Inbound -Protocol $r.P -LocalPort $r.Port -Action Allow -Profile Any | Out-Null
             }
         }
-        Ok "Windows Firewall: 8000/tcp va 5353/udp ochildi (Windows'da hostname.local ni tizimning o'zi e'lon qiladi; ilovalar topa olmasa /24 skaner zaxira)"
+        Ok "Windows Firewall: 8000/tcp va 5353/udp ochildi"
+        # mDNS e'loni (_pos-bola._tcp): Windows o'zi e'lon qilmaydi, shuning uchun alohida vazifa o'rnatiladi.
+        $adv = Join-Path $ScriptDir 'advertise_mdns_windows.ps1'
+        try {
+            & $adv -Install | Out-Host
+            if ($LASTEXITCODE -eq 0) { Ok "mDNS e'loni o'rnatildi: ilovalar serverni IP o'zgarsa ham topadi ('POS Bola mDNS' vazifasi)" }
+            else { Warn "mDNS e'lonini o'rnatib bo'lmadi (kod $LASTEXITCODE) - ilovalar /24 skaner orqali topadi. Keyinroq: scripts\setup_mdns_windows.ps1" }
+        } catch {
+            Warn "mDNS e'lonini o'rnatib bo'lmadi: $($_.Exception.Message) - ilovalar /24 skaner orqali topadi."
+        }
     }
     # --- uxlamaslik
     if ($doSleep) {
