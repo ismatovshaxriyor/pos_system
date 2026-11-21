@@ -1,4 +1,4 @@
-import { barRatios, formatMoney, tiyinToDecimal, toTiyin, type DateRange } from '@pos/shared';
+import { barRatios, formatMoney, staffWorkbook, tiyinToDecimal, toTiyin, type DateRange } from '@pos/shared';
 import { View } from 'react-native';
 
 import { pos } from '@/lib/pos';
@@ -8,6 +8,7 @@ import { Txt } from '../kit';
 import { HBar } from '../charts';
 import { Pill } from '../kit';
 import { Block, Row, Status } from './common';
+import { ExcelButton } from './excel';
 
 const ROLE_LABEL: Record<string, string> = { manager: 'Menejer', waiter: 'Ofitsiant', cashier: 'Kassir' };
 
@@ -51,6 +52,8 @@ export function StaffSection({ range, onRefreshRef }: { range: DateRange; onRefr
               </View>
             ))}
           </Block>
+
+          <ExcelButton build={async () => staffWorkbook(range, data)} />
         </>
       )}
     </>

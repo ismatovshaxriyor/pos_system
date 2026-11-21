@@ -22,4 +22,6 @@ export * from './discovery';
 export * from './recovery';
 export * from './licenseKey';
 export * from './reports';
+export * from './xlsx';
+export * from './reportsExcel';
 export * from './orderList';

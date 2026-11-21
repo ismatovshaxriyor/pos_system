@@ -65,7 +65,8 @@
         {
           "locationWhenInUsePermission": "Restoran joylashuvini belgilash va davomat uchun joylashuv kerak."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

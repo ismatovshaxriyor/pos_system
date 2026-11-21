@@ -1,4 +1,4 @@
-import { barRatios, formatMoney } from '@pos/shared';
+import { barRatios, financeWorkbook, formatMoney, isoDay } from '@pos/shared';
 import { useState } from 'react';
 
 import { pos } from '@/lib/pos';
@@ -7,6 +7,7 @@ import { useReport } from '@/lib/reports';
 import { Txt } from '../kit';
 import { HBar } from '../charts';
 import { Block, Hero, KpiGrid, Row, ShowMore, Status } from './common';
+import { ExcelButton } from './excel';
 
 /** Qarz (nasiya) va ombor: kunga bog'liq emas - hozirgi holat. */
 export function FinanceSection({ onRefreshRef }: { onRefreshRef: (fn: () => Promise<void>) => void }) {
@@ -76,6 +77,8 @@ export function FinanceSection({ onRefreshRef }: { onRefreshRef: (fn: () => Prom
           </Block>
         </>
       )}
+
+      {(dd || inv) && <ExcelButton build={async () => financeWorkbook(dd, inv, isoDay(new Date()))} />}
     </>
   );
 }

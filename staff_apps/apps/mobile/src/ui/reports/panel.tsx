@@ -1,4 +1,4 @@
-import { addDays, barRatios, fillHours, formatMoney, isoDay, methodShares, type DashboardReport } from '@pos/shared';
+import { addDays, barRatios, dashboardWorkbook, fillHours, formatMoney, isoDay, methodShares, type DashboardReport } from '@pos/shared';
 import { useState } from 'react';
 import { Share, View } from 'react-native';
 
@@ -8,6 +8,7 @@ import { dashboardText, useReport, withPrevious } from '@/lib/reports';
 import { Button, Txt } from '../kit';
 import { ColumnChart, Dot, HBar, StackBar } from '../charts';
 import { Block, Delta, Hero, KpiGrid, Row, ShowMore, Status } from './common';
+import { ExcelButton } from './excel';
 
 const SHADES = { cash: 'ink', card: 'ink60', other: 'edge' } as const;
 const METHOD_LABEL = { cash: 'Naqd', card: 'Karta', other: 'Boshqa' } as const;
@@ -140,6 +141,7 @@ function PanelBody({
         variant="ghost"
         onPress={() => void Share.share({ message: dashboardText(d, restaurant) })}
       />
+      <ExcelButton build={async () => dashboardWorkbook(d, prev)} />
     </>
   );
 }

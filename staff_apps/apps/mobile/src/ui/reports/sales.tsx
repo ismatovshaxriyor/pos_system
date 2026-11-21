@@ -4,9 +4,12 @@ import {
   formatMoney,
   methodShares,
   previousRange,
+  salesWorkbook,
   type DateRange,
   type SalesGroupBy,
+  type SalesReport,
   type SalesRow,
+  type Workbook,
 } from '@pos/shared';
 import { useState } from 'react';
 import { Share, View } from 'react-native';
@@ -15,6 +18,7 @@ import { pos } from '@/lib/pos';
 import { salesText, useReport, withPrevious } from '@/lib/reports';
 
 import { Button, Txt } from '../kit';
+import { ExcelButton } from './excel';
 import { Dot, HBar, StackBar } from '../charts';
 import { Chip } from '../parts';
 import { Block, Delta, Hero, KpiGrid, Row, ShowMore, Status } from './common';
@@ -36,6 +40,17 @@ function rowSub(group: SalesGroupBy, r: SalesRow): string | undefined {
   if (group === 'product' || group === 'category') return r.quantity !== undefined ? `${r.quantity} ta` : undefined;
   if (group === 'day') return r.payment_count !== undefined ? `${r.payment_count} ta to'lov` : undefined;
   return undefined;
+}
+
+/**
+ * Excel uchun to'rt kesim ham kerak, ekranda esa bittasi ochiq: tanlanganini qayta so'ramaymiz, qolgan uchtasini
+ * olamiz. Oldingi davr (`prev`) ixtiyoriy - bo'lmasa taqqoslash ustuni chiqmaydi.
+ */
+async function buildSalesBook(range: DateRange, current: SalesReport, group: SalesGroupBy, prev: SalesReport | null): Promise<Workbook> {
+  const groups: SalesGroupBy[] = ['day', 'waiter', 'product', 'category'];
+  const loaded = await Promise.all(groups.map((g) => (g === group ? Promise.resolve(current) : pos.api.reports.sales(range, g))));
+  const [day, waiter, product, category] = loaded as [SalesReport, SalesReport, SalesReport, SalesReport];
+  return salesWorkbook(range, { day, waiter, product, category }, prev);
 }
 
 /** Sotuv tahlili: davr KPI'lari + oldingi davr bilan taqqoslash + kunlar/ofitsiantlar/taomlar/toifalar kesimi. */
@@ -116,6 +131,7 @@ export function SalesSection({
           </Block>
 
           <Button title="Hisobotni ulashish" variant="ghost" onPress={() => void Share.share({ message: salesText(s, range, restaurant) })} />
+          <ExcelButton build={() => buildSalesBook(range, s, group, prev)} />
         </>
       )}
     </>
