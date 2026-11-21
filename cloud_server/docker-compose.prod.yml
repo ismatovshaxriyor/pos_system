@@ -50,6 +50,7 @@ services:
       - DEBUG=0
     volumes:
       - ./keys:/app/keys:ro
+      - ./backups:/backups:ro   # jonli monitor oxirgi zaxirani ko'rsatadi (faqat o'qish)
       - media_data:/app/media
     ports:
       # 127.0.0.1 only - public traffic comes in through the cloudflared

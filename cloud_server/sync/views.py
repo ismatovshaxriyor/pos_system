@@ -207,6 +207,9 @@ class HeartbeatView(APIView):
 
         now = timezone.now()
         cache.set(f"restaurant_metrics_{restaurant.id}", metrics, timeout=180)
+        # Jonli monitor uchun 3 soatlik tarix (faqat Redis, xatosi heartbeat'ni buzmaydi).
+        from tenants.ops import record_heartbeat
+        record_heartbeat(restaurant.id, metrics)
 
         if not restaurant.is_online or not restaurant.last_seen or (now - restaurant.last_seen).total_seconds() > 300:
             RestaurantStatus.objects.update_or_create(

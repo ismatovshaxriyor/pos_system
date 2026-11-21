@@ -21,6 +21,8 @@ from django.views.static import serve as serve_static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
+    # Jonli monitor (faqat superuser) - `admin/` dan OLDIN turishi shart, aks holda admin.site.urls ushlab oladi.
+    path('admin/ops/', include('tenants.ops_urls')),
     path('admin/', admin.site.urls),
 
     # Cloud Sync API

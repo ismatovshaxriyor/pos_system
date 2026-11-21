@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Jonli monitor</title>
+<style>
+:root{
+  --bg:#0d1117;--panel:#161b22;--panel2:#1c232c;--line:#2a323d;--text:#e6edf3;--muted:#8b97a5;
+  --ok:#3fb950;--warn:#d29922;--crit:#f85149;--info:#58a6ff;--accent:#58a6ff;--shadow:0 8px 30px rgba(0,0,0,.45);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){--bg:#f4f6f9;--panel:#ffffff;--panel2:#f0f3f7;--line:#d8dee6;--text:#18212b;--muted:#5d6b7a;--ok:#1a7f37;--warn:#9a6700;--crit:#cf222e;--info:#0969da;--accent:#0969da;--shadow:0 8px 30px rgba(20,30,45,.18)}
+}
+:root[data-theme="light"]{--bg:#f4f6f9;--panel:#ffffff;--panel2:#f0f3f7;--line:#d8dee6;--text:#18212b;--muted:#5d6b7a;--ok:#1a7f37;--warn:#9a6700;--crit:#cf222e;--info:#0969da;--accent:#0969da;--shadow:0 8px 30px rgba(20,30,45,.18)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{border-color:var(--crit);color:var(--crit)}
+.btn.danger:hover{background:var(--crit);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input[type=text],input[type=search],select,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:0}
+header{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:10px 16px}
+header h1{font-size:16px;margin:0;display:flex;align-items:center;gap:8px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--ok);display:inline-block}
+.dot.live-on{animation:pulse 1.6s infinite}
+.dot.off{background:var(--crit);animation:none}
+.dot.paused{background:var(--warn);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.6)}100%{box-shadow:0 0 0 8px rgba(63,185,80,0)}}
+.grow{flex:1}
+nav.tabs{display:flex;gap:4px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;cursor:pointer;color:var(--muted);white-space:nowrap}
+nav.tabs button.active{color:var(--text);border-bottom-color:var(--accent)}
+nav.tabs .count{background:var(--crit);color:#fff;border-radius:9px;padding:0 6px;font-size:11px;margin-left:6px}
+main{padding:16px;max-width:1500px;margin:0 auto}
+#banner{display:none;margin:0 0 12px;padding:10px 14px;border-radius:10px;background:rgba(248,81,73,.12);border:1px solid var(--crit);color:var(--crit)}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.cols2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.cols3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.card h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kpi .v{font-size:26px;font-weight:650;line-height:1.1}
+.kpi .s{color:var(--muted);font-size:12px;margin-top:4px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.crit{color:var(--crit)}.muted{color:var(--muted)}.info{color:var(--info)}
+.bar{height:8px;border-radius:5px;background:var(--panel2);overflow:hidden;min-width:48px}
+.bar>i{display:block;height:100%;border-radius:5px}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line)}
+.row:last-child{border-bottom:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;border:1px solid var(--line);background:var(--panel2);white-space:nowrap}
+.chip.ok{border-color:var(--ok)}.chip.crit{border-color:var(--crit)}.chip.warn{border-color:var(--warn)}.chip.info{border-color:var(--info)}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff}
+.badge.online{background:var(--ok)}.badge.offline{background:var(--crit)}.badge.blocked,.badge.expired{background:#8250df}.badge.pending{background:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);position:sticky;top:0;background:var(--panel);cursor:default}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--panel2)}
+.tablewrap{overflow:auto;max-height:calc(100vh - 290px);border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.pill{padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:13px}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.bulk{display:none;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 12px;margin-bottom:10px;border:1px solid var(--accent);border-radius:10px;background:var(--panel)}
+.bulk.show{display:flex}
+.mini{display:flex;align-items:center;gap:6px;min-width:96px}
+.mini .bar{flex:1}
+.mini span{font-size:12px;width:34px;text-align:right}
+.alerts-inline{display:flex;gap:4px;flex-wrap:wrap}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+svg text{fill:var(--muted);font-size:10px}
+.chartwrap{width:100%}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
+.legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.feed{max-height:420px;overflow:auto}
+.feed .item{padding:8px 0;border-bottom:1px dashed var(--line)}
+.feed .item:last-child{border-bottom:0}
+.feed small{color:var(--muted)}
+details>summary{cursor:pointer;color:var(--accent)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;overflow:auto;max-height:240px;font-size:11px;margin:6px 0 0;white-space:pre-wrap;word-break:break-word}
+/* drawer & modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none}
+.overlay.show{display:block}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(760px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:41;transform:translateX(100%);transition:transform .2s;overflow:auto;box-shadow:var(--shadow)}
+.drawer.show{transform:none}
+.drawer .head{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:2}
+.drawer .body{padding:14px 16px;display:grid;gap:12px}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,calc(100% - 24px));background:var(--panel);border:1px solid var(--line);border-radius:14px;z-index:60;padding:18px;box-shadow:var(--shadow);display:none}
+.modal.show{display:block}
+.modal h2{margin:0 0 10px;font-size:16px}
+.modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.modal label{display:block;margin:10px 0 4px;color:var(--muted);font-size:12px}
+.modal input,.modal select,.modal textarea{width:100%}
+#toasts{position:fixed;right:14px;bottom:14px;display:grid;gap:8px;z-index:80;max-width:min(380px,calc(100% - 28px))}
+.toast{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--info);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow);animation:in .2s}
+.toast.crit{border-left-color:var(--crit)}.toast.ok{border-left-color:var(--ok)}.toast.warn{border-left-color:var(--warn)}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+@media (max-width:700px){main{padding:10px}.kpi .v{font-size:22px}.tablewrap{max-height:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Jonli monitor <span class="muted" style="font-weight:400">· hamrohpos</span></h1>
+  <span class="live" id="live"><i class="dot live-on" id="dot"></i><span id="liveText">ulanmoqda…</span></span>
+  <span class="grow"></span>
+  <label class="live">Yangilanish
+    <select id="interval">
+      <option value="2000">2 s</option><option value="3000" selected>3 s</option>
+      <option value="5000">5 s</option><option value="10000">10 s</option><option value="30000">30 s</option>
+    </select>
+  </label>
+  <button class="btn" id="pauseBtn" title="Jonli yangilanishni to'xtatish (probel)">⏸ To'xtatish</button>
+  <button class="btn" id="soundBtn" title="Jiddiy ogohlantirishda tovush">🔕 Tovush</button>
+  <button class="btn" id="notifBtn" title="Brauzer bildirishnomalari">🔔 Bildirish</button>
+  <button class="btn" id="themeBtn" title="Mavzu">🌓</button>
+  <a class="btn" href="/admin/" style="text-decoration:none">← Admin</a>
+</header>
+<nav class="tabs" id="tabs">
+  <button data-tab="overview" class="active">Umumiy</button>
+  <button data-tab="server">Server</button>
+  <button data-tab="fleet">Bolalar <span class="count" id="fleetCount" hidden></span></button>
+  <button data-tab="events">Voqealar <span class="count" id="eventsCount" hidden></span></button>
+</nav>
+<main>
+  <div id="banner"></div>
+  <section id="view"></section>
+</main>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ========================= yordamchilar ========================= */
+const $ = (s, r = document) => r.querySelector(s);
+const SVGNS = "http://www.w3.org/2000/svg";
+// Bolalardan kelgan matnlar ishonchsiz: HECH QACHON innerHTML ishlatilmaydi, faqat textContent.
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat(Infinity)) {
+    if (c == null || c === false) continue;
+    e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+function svg(tag, attrs, ...kids) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  for (const c of kids.flat()) if (c != null) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
+}
+const fmtBytes = (n) => {
+  if (n == null) return "–";
+  const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; n = Number(n);
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n >= 100 || i === 0 ? 0 : 1) + " " + u[i];
+};
+const fmtRate = (n) => (n == null ? "–" : fmtBytes(Math.max(0, n)) + "/s");
+const fmtMoney = (v) => Math.round(Number(v) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so'm";
+const pct = (v) => (v == null ? "–" : Math.round(v) + "%");
+function fmtDur(s) {
+  s = Math.max(0, Math.floor(s));
+  const d = Math.floor(s / 86400), hh = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return d ? `${d}k ${hh}s` : hh ? `${hh}s ${m}d` : m ? `${m} daq` : `${s} s`;
+}
+const ago = (ts) => (ts ? fmtDur(Date.now() / 1000 - ts) + " oldin" : "–");
+const clock = (ts) => new Date(ts * 1000).toLocaleTimeString("en-GB");
+const dt = (ts) => new Date(ts * 1000).toLocaleString("en-GB", { hour12: false });
+const level = (v, w = 70, c = 88) => (v == null ? "" : v >= c ? "crit" : v >= w ? "warn" : "ok");
+const colorVar = (cls) => ({ ok: "var(--ok)", warn: "var(--warn)", crit: "var(--crit)" }[cls] || "var(--muted)");
+const STATE = { online: "Onlayn", offline: "Oflayn", blocked: "Bloklangan", expired: "Muddati o'tgan", pending: "Faollashtirilmagan" };
+
+function bar(v, w, c) {
+  const cls = level(v, w, c);
+  return h("div", { class: "bar" }, h("i", { style: { width: Math.min(100, Math.max(0, v || 0)) + "%", background: colorVar(cls) } }));
+}
+function mini(v) {
+  return h("div", { class: "mini" }, bar(v), h("span", { class: level(v) }, pct(v)));
+}
+function chip(text, cls) { return h("span", { class: "chip " + (cls || "") }, text); }
+
+/* ========================= grafiklar ========================= */
+function lineChart(series, opt = {}) {
+  const W = 640, H = opt.h || 140, L = 34, R = 8, T = 8, B = 18;
+  const pts = series.flatMap((s) => s.points);
+  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chartwrap", preserveAspectRatio: "none", role: "img" });
+  if (!pts.length) { el.append(svg("text", { x: W / 2, y: H / 2, "text-anchor": "middle" }, "ma'lumot yo'q")); return el; }
+  const t0 = Math.min(...pts.map((p) => p[0])), t1 = Math.max(...pts.map((p) => p[0]), t0 + 1);
+  const ymax = opt.max != null ? opt.max : Math.max(1, ...pts.map((p) => p[1])) * 1.15;
+  const X = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R);
+  const Y = (v) => T + (1 - Math.min(v, ymax) / ymax) * (H - T - B);
+  for (let i = 0; i <= 4; i++) {
+    const y = T + (i / 4) * (H - T - B), val = ymax * (1 - i / 4);
+    el.append(svg("line", { x1: L, x2: W - R, y1: y, y2: y, stroke: "var(--line)", "stroke-width": 1 }));
+    el.append(svg("text", { x: L - 4, y: y + 3, "text-anchor": "end" }, opt.fmt ? opt.fmt(val) : Math.round(val)));
+  }
+  el.append(svg("text", { x: L, y: H - 4 }, clock(t0)), svg("text", { x: W - R, y: H - 4, "text-anchor": "end" }, clock(t1)));
+  for (const s of series) {
+    if (s.points.length < 2) continue;
+    const d = s.points.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
+    el.append(svg("path", { d, fill: "none", stroke: s.color, "stroke-width": 1.8, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" }));
+  }
+  return el;
+}
+function legend(series) {
+  return h("div", { class: "legend" }, series.map((s) => h("span", {}, h("b", { style: { background: s.color } }), s.name)));
+}
+function sparkline(values, color = "var(--accent)", W = 84, H = 22) {
+  const v = values.filter((x) => x != null);
+  const el = svg("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+  if (v.length < 2) return el;
+  const d = v.map((x, i) => (i ? "L" : "M") + ((i / (v.length - 1)) * W).toFixed(1) + " " + (H - 2 - (Math.min(x, 100) / 100) * (H - 4)).toFixed(1)).join(" ");
+  el.append(svg("path", { d, fill: "none", stroke: color, "stroke-width": 1.5 }));
+  return el;
+}
+function barChart(days, W = 640, H = 120) {
+  const el = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chartwrap", preserveAspectRatio: "none" });
+  if (!days.length) { el.append(svg("text", { x: W / 2, y: H / 2, "text-anchor": "middle" }, "ma'lumot yo'q")); return el; }
+  const max = Math.max(1, ...days.map((d) => Number(d.revenue)));
+  const bw = (W - 20) / days.length;
+  days.forEach((d, i) => {
+    const v = Number(d.revenue), bh = (v / max) * (H - 34);
+    el.append(svg("rect", { x: 10 + i * bw + 4, y: H - 18 - bh, width: Math.max(2, bw - 8), height: Math.max(1, bh), rx: 3, fill: "var(--accent)", opacity: 0.85 }));
+    el.append(svg("text", { x: 10 + i * bw + bw / 2, y: H - 5, "text-anchor": "middle" }, d.day.slice(5)));
+    if (v) el.append(svg("text", { x: 10 + i * bw + bw / 2, y: H - 22 - bh, "text-anchor": "middle" }, fmtShort(v)));
+  });
+  return el;
+}
+const fmtShort = (v) => (v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "k" : Math.round(v));
+
+/* ========================= holat ========================= */
+const S = {
+  snap: null, prev: null, hist: [], tab: "overview", filter: "all", sort: "problem", search: "",
+  selected: new Set(), openId: null, detail: null, openErr: new Set(), paused: false, timer: null,
+  sound: false, notif: false, netPrev: null, rates: { net_in: null, net_out: null, dr: null, dw: null },
+  alertKeys: null, stateMap: null, failures: 0, pressing: false,
+};
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem("ops." + k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem("ops." + k, JSON.stringify(v)); } catch (e) {} } };
+function csrf() { const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/); return m ? decodeURIComponent(m[1]) : ""; }
+
+async function api(path, opts) {
+  const r = await fetch(path, { credentials: "same-origin", cache: "no-store", ...opts });
+  if (r.status === 401) { showBanner("Sessiya tugagan. Sahifani yangilab, qayta kiring."); throw new Error("auth"); }
+  return r;
+}
+function showBanner(t) { const b = $("#banner"); b.textContent = t; b.style.display = t ? "block" : "none"; }
+
+/* ========================= toast / modal / bildirish ========================= */
+function toast(text, cls = "", ms = 6000) {
+  const t = h("div", { class: "toast " + cls }, text);
+  $("#toasts").append(t);
+  setTimeout(() => t.remove(), ms);
+}
+let audioCtx = null;
+function beep() {
+  if (!S.sound) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = 880; g.gain.value = 0.06; o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.25);
+  } catch (e) {}
+}
+function notify(title, body) {
+  if (S.notif && "Notification" in window && Notification.permission === "granted") {
+    try { new Notification(title, { body }); } catch (e) {}
+  }
+}
+function closeModal() { $("#modal").classList.remove("show"); if (!$("#drawer").classList.contains("show")) $("#overlay").classList.remove("show"); }
+function openModal(title, bodyNodes, buttons) {
+  const m = $("#modal");
+  m.replaceChildren(h("h2", {}, title), ...bodyNodes, h("div", { class: "acts" }, buttons));
+  m.classList.add("show"); $("#overlay").classList.add("show");
+}
+function confirmBox(title, text, okLabel, danger) {
+  return new Promise((resolve) => {
+    openModal(title, [h("p", {}, text)], [
+      h("button", { class: "btn", onclick: () => { closeModal(); resolve(false); } }, "Bekor qilish"),
+      h("button", { class: "btn " + (danger ? "danger" : "primary"), onclick: () => { closeModal(); resolve(true); } }, okLabel),
+    ]);
+  });
+}
+
+/* ========================= amallar ========================= */
+const NEED_CONFIRM = { block: true, reset_hardware: true, mark_paid: true };
+async function runAction(action, ids, params) {
+  const names = S.snap ? S.snap.fleet.restaurants.filter((r) => ids.includes(r.id)).map((r) => r.name) : [];
+  const label = (ACTIONS[action] || action) + ` — ${names.length > 3 ? names.slice(0, 3).join(", ") + ` va yana ${names.length - 3} ta` : names.join(", ")}`;
+  if (NEED_CONFIRM[action] || (action === "update" && params && params.mode === "force")) {
+    const ok = await confirmBox("Tasdiqlang", label + ". Davom etamizmi?", "Ha, bajarish", action === "block" || action === "reset_hardware" || (params && params.mode === "force"));
+    if (!ok) return;
+  }
+  try {
+    const r = await api("/admin/ops/api/action/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() }, body: JSON.stringify({ action, restaurant_ids: ids, params }) });
+    const j = await r.json();
+    toast(j.message || (j.ok ? "Bajarildi" : "Xato"), j.ok ? "ok" : "crit");
+    if (j.ok && j.token) showToken(j);
+    if (j.ok) { S.selected.clear(); await poll(true); if (S.openId) loadDetail(S.openId); }
+  } catch (e) { if (e.message !== "auth") toast("So'rov bajarilmadi: " + e.message, "crit"); }
+}
+function updateDialog(ids) {
+  const target = S.snap ? S.snap.fleet.summary.target_version : "";
+  const ver = h("input", { type: "text", value: target, placeholder: "masalan 0.3.27" });
+  const mode = h("select", {}, h("option", { value: "window" }, "Yangilanish oynasida (xavfsiz, tavsiya)"), h("option", { value: "force" }, "Darhol, majburiy (oynani chetlab)"));
+  openModal("Yangi versiya yuborish", [
+    h("p", { class: "muted" }, `${ids.length} ta restoran. Bola heartbeat orqali buyruqni oladi va Watchtower image'ni yangilaydi.`),
+    h("label", {}, "Versiya"), ver, h("label", {}, "Qachon o'rnatilsin"), mode,
+  ], [
+    h("button", { class: "btn", onclick: closeModal }, "Bekor qilish"),
+    h("button", { class: "btn primary", onclick: () => { const v = ver.value.trim(); if (!v) { ver.focus(); return; } closeModal(); runAction("update", ids, { version: v, mode: mode.value }); } }, "Yuborish"),
+  ]);
+  setTimeout(() => ver.focus(), 50);
+}
+function showToken(j) {
+  const ta = h("textarea", { rows: 6, readonly: true, class: "mono" }); ta.value = j.token;
+  openModal("Oflayn yangilash kodi", [
+    h("p", { class: "muted" }, "Buni Telegram/SMS orqali restoranga yuboring (telefonda diktovka qilmang, kod uzun). Ular Bola ilovasida \"oflayn kod\" maydoniga kiritadi."),
+    ta, h("p", { class: "muted" }, "Amal qilish muddati: " + new Date(j.expires_at).toLocaleString("en-GB")),
+  ], [
+    h("button", { class: "btn", onclick: () => { ta.select(); navigator.clipboard && navigator.clipboard.writeText(j.token).then(() => toast("Nusxalandi", "ok")); } }, "Nusxalash"),
+    h("button", { class: "btn primary", onclick: closeModal }, "Yopish"),
+  ]);
+}
+const ACTIONS = {{ actions_json|safe }};
+function actionButtons(ids, compact) {
+  const b = (label, action, cls, fn) => h("button", { class: "btn " + (cls || ""), onclick: fn || (() => runAction(action, ids, {})) }, label);
+  return [
+    b("⛔ Bloklash", "block", "danger"),
+    b("✅ Blokdan chiqarish", "unblock"),
+    b("🔄 Litsenziyani yangilash", "renew"),
+    b("⬆️ Yangilash…", "update", "", () => updateDialog(ids)),
+    b("💳 To'lov qilindi", "mark_paid"),
+    b("🧹 Xatolarni yopish", "resolve_errors"),
+    !compact && ids.length === 1 && b("🔑 Oflayn kod", "offline_token"),
+    ids.length === 1 && b("♻️ Qurilmani bo'shatish", "reset_hardware", "danger"),
+  ];
+}
+
+/* ========================= ma'lumot yuklash ========================= */
+function trackRates(sv) {
+  const p = S.netPrev;
+  if (p && sv.ts > p.ts) {
+    const dt_ = sv.ts - p.ts;
+    S.rates = {
+      net_in: (sv.net.recv - p.recv) / dt_, net_out: (sv.net.sent - p.sent) / dt_,
+      dr: sv.diskio && p.dr != null ? (sv.diskio.read - p.dr) / dt_ : null, dw: sv.diskio && p.dw != null ? (sv.diskio.write - p.dw) / dt_ : null,
+    };
+    S.hist.push({ ts: sv.ts, cpu: sv.cpu.percent, ram: sv.ram.percent, disk: sv.disk.percent, load1: sv.cpu.load[0], net_sent: sv.net.sent, net_recv: sv.net.recv });
+    if (S.hist.length > 700) S.hist.splice(0, S.hist.length - 700);
+  }
+  S.netPrev = { ts: sv.ts, recv: sv.net.recv, sent: sv.net.sent, dr: sv.diskio ? sv.diskio.read : null, dw: sv.diskio ? sv.diskio.write : null };
+}
+function detectChanges(snap) {
+  const states = {}, keys = new Set();
+  for (const r of snap.fleet.restaurants) {
+    states[r.id] = r.state;
+    for (const a of r.alerts) if (a.level === "critical") keys.add(`${r.id}|${a.code}|${r.name}|${a.text}`);
+  }
+  for (const a of snap.server.alerts) if (a.level === "critical") keys.add(`server|${a.text}|Server|${a.text}`);
+  if (S.stateMap) {
+    for (const r of snap.fleet.restaurants) {
+      const was = S.stateMap[r.id];
+      if (was && was !== r.state) {
+        if (r.state === "offline") { toast(`${r.name}: oflayn bo'ldi`, "crit"); notify("Bola oflayn", r.name); beep(); }
+        else if (r.state === "online" && (was === "offline")) toast(`${r.name}: yana onlayn`, "ok");
+        else if (r.state === "blocked") toast(`${r.name}: bloklandi`, "warn");
+      }
+    }
+    for (const k of keys) {
+      if (!S.alertKeys.has(k)) {
+        const [, , who, text] = k.split("|");
+        if (!k.includes("|offline|")) { toast(`${who}: ${text}`, "crit"); notify("Jiddiy ogohlantirish", `${who}: ${text}`); beep(); }
+      }
+    }
+  }
+  S.stateMap = states; S.alertKeys = keys;
+}
+async function poll(force) {
+  if (S.paused && !force) return;
+  try {
+    const r = await api("/admin/ops/api/snapshot/");
+    const snap = await r.json();
+    S.failures = 0; showBanner("");
+    trackRates(snap.server); detectChanges(snap);
+    S.snap = snap; render();
+    $("#dot").className = "dot live-on"; $("#liveText").textContent = "jonli · " + clock(snap.server.ts);
+  } catch (e) {
+    if (e.message === "auth") { $("#dot").className = "dot off"; $("#liveText").textContent = "sessiya tugagan"; return; }
+    S.failures++; $("#dot").className = "dot off"; $("#liveText").textContent = "aloqa yo'q (" + S.failures + ")";
+    if (S.failures === 3) showBanner("Ona serveriga ulanib bo'lmayapti. Server o'chiq yoki tarmoq uzilgan bo'lishi mumkin.");
+  }
+}
+function schedule() {
+  clearInterval(S.timer);
+  S.timer = setInterval(poll, Number($("#interval").value));
+}
+
+/* ========================= ko'rinishlar ========================= */
+function render() {
+  const { snap } = S; if (!snap) return;
+  const f = snap.fleet.summary, crit = f.alerts_critical + snap.server.alerts.filter((a) => a.level === "critical").length;
+  document.title = (crit ? `(${crit}) ` : "") + "Jonli monitor";
+  const fc = $("#fleetCount"); fc.hidden = !f.alerts_critical; fc.textContent = f.alerts_critical;
+  const ec = $("#eventsCount"); ec.hidden = !f.errors_open; ec.textContent = f.errors_open;
+  if (S.pressing) return;   // bosish paytida qayta chizish "click"ni yutib yuboradi
+  const view = $("#view"), scroll = window.scrollY;
+  if (S.tab === "fleet" && $("#fleetBody")) { updateFleetBody(); return; }
+  const build = { overview: viewOverview, server: viewServer, fleet: viewFleet, events: viewEvents }[S.tab];
+  view.replaceChildren(build());
+  window.scrollTo(0, scroll);
+}
+
+function kpi(label, value, sub, cls) {
+  return h("div", { class: "card kpi" }, h("div", { class: "muted", style: { fontSize: "12px" } }, label), h("div", { class: "v " + (cls || "") }, value), h("div", { class: "s" }, sub));
+}
+function allAlerts(snap) {
+  const out = snap.server.alerts.map((a) => ({ ...a, who: "Server", id: null }));
+  for (const r of snap.fleet.restaurants) for (const a of r.alerts) if (a.level !== "info") out.push({ ...a, who: r.name, id: r.id });
+  const rank = { critical: 0, warn: 1 };
+  return out.sort((a, b) => rank[a.level] - rank[b.level]);
+}
+function alertRow(a) {
+  return h("div", { class: "row", style: { cursor: a.id ? "pointer" : "default" }, onclick: a.id ? () => openDrawer(a.id) : null },
+    h("span", {}, h("span", { class: a.level === "critical" ? "crit" : "warn" }, a.level === "critical" ? "● " : "▲ "), h("b", {}, a.who), " · ", a.text));
+}
+
+function viewOverview() {
+  const { server: sv, fleet } = S.snap, f = fleet.summary;
+  const alerts = allAlerts(S.snap);
+  const svcOk = Object.values(sv.services).every((s) => s.ok);
+  const wrap = h("div", { class: "grid" });
+  wrap.append(h("div", { class: "grid kpis" },
+    kpi("Bolalar", `${f.online}/${f.total}`, `onlayn · ${f.offline} oflayn · ${f.blocked + f.expired} bloklangan/muddati o'tgan${f.pending ? " · " + f.pending + " faollashtirilmagan" : ""}`, f.offline ? "warn" : "ok"),
+    kpi("Bugungi tushum", fmtMoney(f.revenue_today), `${f.orders_today} ta yopilgan buyurtma (Toshkent vaqti)`),
+    kpi("Ogohlantirishlar", `${f.alerts_critical + sv.alerts.filter((a) => a.level === "critical").length} jiddiy`, `${f.alerts_warn + sv.alerts.filter((a) => a.level === "warn").length} ta ogohlantirish`, f.alerts_critical ? "crit" : f.alerts_warn ? "warn" : "ok"),
+    kpi("Hal qilinmagan xatolar", f.errors_open, "Bolalardan kelgan ERROR/CRITICAL", f.errors_open ? "warn" : "ok"),
+    kpi("Yetkazilmagan buyurtmalar", f.unsynced_total, "Bolalarda Ona'ga hali sinxronlanmagan", f.unsynced_total > 200 ? "warn" : ""),
+    kpi("Server", svcOk ? "Sog'lom" : "Muammo", `CPU ${pct(sv.cpu.percent)} · RAM ${pct(sv.ram.percent)} · Disk ${pct(sv.disk.percent)}`, svcOk ? "ok" : "crit"),
+  ));
+  wrap.append(h("div", { class: "grid cols2" },
+    h("div", { class: "card" }, h("h3", {}, "Diqqat talab qiladi", h("span", { class: "chip" }, alerts.length)),
+      alerts.length ? h("div", { class: "feed" }, alerts.slice(0, 14).map(alertRow)) : h("div", { class: "empty ok" }, "Hammasi joyida ✓")),
+    h("div", { class: "card" }, h("h3", {}, "Ona server", h("a", { href: "#", onclick: (e) => { e.preventDefault(); setTab("server"); } }, "batafsil →")),
+      gaugeRow("CPU", sv.cpu.percent, `${sv.host.cpu_count} yadro · yuklama ${sv.cpu.load[0]}`),
+      gaugeRow("RAM", sv.ram.percent, `${fmtBytes(sv.ram.used)} / ${fmtBytes(sv.ram.total)}`),
+      gaugeRow("Disk", sv.disk.percent, `${fmtBytes(sv.disk.used)} / ${fmtBytes(sv.disk.total)}`),
+      h("div", { style: { marginTop: "10px", display: "flex", gap: "6px", flexWrap: "wrap" } }, serviceChips(sv)))));
+  wrap.append(h("div", { class: "grid cols2" },
+    h("div", { class: "card" }, h("h3", {}, "Tushum — oxirgi 7 kun"), barChart(f.daily_revenue)),
+    h("div", { class: "card" }, h("h3", {}, "Versiyalar", h("span", { class: "chip" }, "kutilgan: " + (f.target_version || "–"))),
+      Object.keys(f.versions).length ? Object.entries(f.versions).sort().reverse().map(([v, n]) => h("div", { class: "row" }, h("span", { class: "mono" }, v), h("span", {}, bar((n / f.total) * 100, 101, 101), ` ${n} ta`))) : h("div", { class: "empty" }, "Hali versiya hisobot qilinmagan"))));
+  return wrap;
+}
+function gaugeRow(label, v, sub) {
+  return h("div", { style: { margin: "8px 0" } }, h("div", { class: "row", style: { border: 0, padding: "0 0 4px" } }, h("b", {}, label), h("span", { class: level(v) }, pct(v) + "  ", h("small", { class: "muted" }, sub))), bar(v));
+}
+function serviceChips(sv) {
+  const n = { db: "Postgres", redis: "Redis", celery: "Celery", website: "Sayt" };
+  const chips = Object.entries(sv.services).map(([k, s]) => chip((s.ok ? "● " : "✕ ") + n[k], s.ok ? "ok" : "crit"));
+  if (sv.services.celery) chips.push(chip((sv.services.celery.beat_ok ? "● " : "✕ ") + "Beat", sv.services.celery.beat_ok ? "ok" : "crit"));
+  if (sv.backups && sv.backups.available) chips.push(chip((sv.backups.ok ? "● " : "▲ ") + "Zaxira", sv.backups.ok ? "ok" : "warn"));
+  return chips;
+}
+
+function histSeries(key, color, name, scale) {
+  const pts = S.hist.filter((s) => s[key] != null).map((s) => [s.ts, s[key] * (scale || 1)]);
+  return { name, color, points: pts };
+}
+function rateSeries(key, color, name) {
+  const pts = [];
+  for (let i = 1; i < S.hist.length; i++) {
+    const a = S.hist[i - 1], b = S.hist[i], dt_ = b.ts - a.ts;
+    if (dt_ > 0 && b[key] >= a[key]) pts.push([b.ts, (b[key] - a[key]) / dt_]);
+  }
+  return { name, color, points: pts };
+}
+function viewServer() {
+  const sv = S.snap.server;
+  const cpuS = [histSeries("cpu", "var(--accent)", "CPU %"), histSeries("ram", "var(--warn)", "RAM %"), histSeries("disk", "var(--ok)", "Disk %")];
+  const netS = [rateSeries("net_recv", "var(--ok)", "Kiruvchi"), rateSeries("net_sent", "var(--info)", "Chiquvchi")];
+  const loadS = [histSeries("load1", "#a371f7", "Load (1 daq)")];
+  const w = h("div", { class: "grid" });
+  w.append(h("div", { class: "grid cols3" },
+    h("div", { class: "card" }, h("h3", {}, "Protsessor"), gaugeRow("CPU", sv.cpu.percent, `${sv.host.cpu_count} yadro`),
+      h("div", { class: "row" }, h("span", { class: "muted" }, "Yuklama (1/5/15)"), h("span", { class: "mono" }, sv.cpu.load.join(" · "))),
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(44px,1fr))", gap: "4px", marginTop: "8px" } },
+        sv.cpu.per_core.map((v, i) => h("div", { title: `Yadro ${i}: ${v}%` }, bar(v), h("small", { class: "muted" }, "#" + i))))),
+    h("div", { class: "card" }, h("h3", {}, "Xotira va disk"), gaugeRow("RAM", sv.ram.percent, `${fmtBytes(sv.ram.used)} / ${fmtBytes(sv.ram.total)}`),
+      gaugeRow("Swap", sv.swap.percent, `${fmtBytes(sv.swap.used)} / ${fmtBytes(sv.swap.total)}`), gaugeRow("Disk /", sv.disk.percent, `${fmtBytes(sv.disk.used)} / ${fmtBytes(sv.disk.total)}`)),
+    h("div", { class: "card" }, h("h3", {}, "Tarmoq va disk I/O"),
+      h("div", { class: "row" }, h("span", { class: "muted" }, "⬇ Kiruvchi"), h("b", {}, fmtRate(S.rates.net_in))),
+      h("div", { class: "row" }, h("span", { class: "muted" }, "⬆ Chiquvchi"), h("b", {}, fmtRate(S.rates.net_out))),
+      h("div", { class: "row" }, h("span", { class: "muted" }, "Diskdan o'qish"), h("b", {}, fmtRate(S.rates.dr))),
+      h("div", { class: "row" }, h("span", { class: "muted" }, "Diskka yozish"), h("b", {}, fmtRate(S.rates.dw))),
+      h("div", { class: "row" }, h("span", { class: "muted" }, "Jami (bootdan beri)"), h("span", { class: "mono" }, `${fmtBytes(sv.net.recv)} ↓ ${fmtBytes(sv.net.sent)} ↑`)))));
+  w.append(h("div", { class: "grid cols2" },
+    h("div", { class: "card" }, h("h3", {}, "CPU / RAM / Disk — oxirgi soatlar"), lineChart(cpuS, { max: 100, fmt: (v) => Math.round(v) + "%" }), legend(cpuS)),
+    h("div", { class: "card" }, h("h3", {}, "Tarmoq trafigi"), lineChart(netS, { fmt: (v) => fmtBytes(v) }), legend(netS))));
+  w.append(h("div", { class: "grid cols3" }, serviceCards(sv)));
+  w.append(h("div", { class: "grid cols2" },
+    h("div", { class: "card" }, h("h3", {}, "Yuklama (load average)"), lineChart(loadS, { h: 110 })),
+    h("div", { class: "card" }, h("h3", {}, "Eng ko'p xotira ishlatayotgan jarayonlar (konteyner ichida)"),
+      sv.processes.map((p) => h("div", { class: "row" }, h("span", { class: "mono", style: { overflow: "hidden", textOverflow: "ellipsis", maxWidth: "75%" } }, `${p.pid} ${p.cmd}`), h("b", {}, fmtBytes(p.rss)))))));
+  w.append(h("div", { class: "card" }, h("h3", {}, "Host"),
+    h("div", { class: "grid cols3" },
+      h("div", {}, h("div", { class: "muted" }, "Nomi"), h("div", { class: "mono" }, sv.host.hostname)),
+      h("div", {}, h("div", { class: "muted" }, "Tizim"), h("div", { class: "mono" }, sv.host.platform)),
+      h("div", {}, h("div", { class: "muted" }, "Ishlash vaqti (uptime)"), h("b", {}, fmtDur(sv.host.uptime_s))),
+      h("div", {}, h("div", { class: "muted" }, "Python"), h("div", { class: "mono" }, sv.host.python)),
+      h("div", {}, h("div", { class: "muted" }, "DEBUG"), h("b", { class: sv.host.debug ? "crit" : "ok" }, sv.host.debug ? "YOQILGAN (xavfli)" : "o'chiq")),
+      h("div", {}, h("div", { class: "muted" }, "Cloudflare orqali"), h("b", {}, sv.cloudflare.via_cloudflare ? `ha · ray ${sv.cloudflare.ray || "?"} · ${sv.cloudflare.country || "?"}` : "yo'q (to'g'ridan-to'g'ri)")))));
+  return w;
+}
+function serviceCards(sv) {
+  const s = sv.services, cards = [];
+  const head = (name, ok) => h("h3", {}, name, h("span", { class: "chip " + (ok ? "ok" : "crit") }, ok ? "● ishlayapti" : "✕ ishlamayapti"));
+  const kv = (k, v) => h("div", { class: "row" }, h("span", { class: "muted" }, k), h("b", {}, v));
+  cards.push(h("div", { class: "card" }, head("Postgres", s.db.ok), s.db.ok ? [kv("Versiya", s.db.version), kv("Javob vaqti", s.db.latency_ms + " ms"), kv("Baza hajmi", fmtBytes(s.db.size_bytes)),
+    kv("Ulanishlar", `${s.db.connections} / ${s.db.max_connections}`), bar((s.db.connections / s.db.max_connections) * 100, 70, 90)] : h("div", { class: "crit" }, s.db.error)));
+  cards.push(h("div", { class: "card" }, head("Redis", s.redis.ok), s.redis.ok ? [kv("Versiya", s.redis.version), kv("Javob vaqti", s.redis.latency_ms + " ms"),
+    kv("Xotira", fmtBytes(s.redis.used_memory) + (s.redis.maxmemory ? " / " + fmtBytes(s.redis.maxmemory) : "")), kv("Klientlar", s.redis.clients), kv("Operatsiya/s", s.redis.ops_per_sec),
+    kv("Kalitlar", s.redis.keys), kv("Celery navbati", s.redis.queue_len + " ta")] : h("div", { class: "crit" }, s.redis.error)));
+  cards.push(h("div", { class: "card" }, head("Celery", s.celery.ok && s.celery.beat_ok), s.celery.ok ? [kv("Worker'lar", s.celery.workers.length),
+    ...s.celery.workers.map((w) => kv(w.name.replace(/^celery@/, ""), w.active_tasks + " ta faol vazifa")),
+    kv("Beat", s.celery.beat_ok ? `ishlayapti (${s.celery.beat_age_s}s oldin)` : "ishlamayapti")] : h("div", { class: "crit" }, s.celery.error || "javob yo'q")));
+  cards.push(h("div", { class: "card" }, head("Sayt (nginx)", s.website.ok), s.website.ok ? [kv("HTTP", s.website.status), kv("Javob vaqti", s.website.latency_ms + " ms")] : h("div", { class: "crit" }, s.website.error || "javob yo'q")));
+  const b = sv.backups;
+  cards.push(h("div", { class: "card" }, h("h3", {}, "Zaxira (pg_dump)", h("span", { class: "chip " + (b.ok ? "ok" : b.available ? "warn" : "") }, b.ok ? "● yangi" : b.available ? "▲ eski/yo'q" : "ulanmagan")),
+    b.available && b.count ? [kv("Oxirgisi", b.newest_name), kv("Yoshi", b.newest_age_h + " soat"), kv("Hajmi", fmtBytes(b.newest_size)), kv("Jami fayllar", `${b.count} ta · ${fmtBytes(b.total_size)}`)]
+      : h("div", { class: "muted" }, b.available ? b.error : "Zaxira papkasi web konteyneriga ulanmagan.")));
+  cards.push(h("div", { class: "card" }, h("h3", {}, "Cloudflare Tunnel"), h("div", { class: "muted" }, "Konteyner holatini bu yerdan ko'rib bo'lmaydi (docker.sock yo'q). Quyidagi belgi — shu sahifa tunnel orqali ochilganini ko'rsatadi."),
+    h("div", { style: { marginTop: "8px" } }, chip(sv.cloudflare.via_cloudflare ? "● tunnel ishlayapti" : "so'rov tunnelsiz keldi", sv.cloudflare.via_cloudflare ? "ok" : "warn"))));
+  return cards;
+}
+
+const FILTERS = [["all", "Hammasi"], ["online", "Onlayn"], ["offline", "Oflayn"], ["blocked", "Bloklangan"], ["issues", "Muammolilar"], ["outdated", "Eski versiya"], ["license", "Litsenziya"]];
+function passFilter(r) {
+  switch (S.filter) {
+    case "online": return r.state === "online";
+    case "offline": return r.state === "offline";
+    case "blocked": return r.state === "blocked" || r.state === "expired";
+    case "issues": return r.alerts.some((a) => a.level !== "info");
+    case "outdated": return r.alerts.some((a) => a.code === "outdated");
+    case "license": return r.alerts.some((a) => a.code.startsWith("license"));
+    default: return true;
+  }
+}
+function sortRows(rows) {
+  const k = S.sort;
+  const num = (f) => (a, b) => (f(b) ?? -1) - (f(a) ?? -1);
+  const m = { name: (a, b) => a.name.localeCompare(b.name), cpu: num((r) => r.cpu), ram: num((r) => r.ram), disk: num((r) => r.disk), revenue: num((r) => Number(r.today.revenue)), seen: (a, b) => (b.seen_age_s ?? 1e12) - (a.seen_age_s ?? 1e12), license: (a, b) => (a.license.days_left ?? 1e9) - (b.license.days_left ?? 1e9) };
+  return k === "problem" ? rows : rows.slice().sort(m[k] || m.name);
+}
+function viewFleet() {
+  const w = h("div", {});
+  const search = h("input", { type: "search", placeholder: "Qidirish: nom yoki subdomen…", value: S.search, style: { minWidth: "220px" }, oninput: (e) => { S.search = e.target.value; updateFleetBody(); } });
+  const sort = h("select", { onchange: (e) => { S.sort = e.target.value; store.set("sort", S.sort); updateFleetBody(); } },
+    [["problem", "Muammolilar birinchi"], ["name", "Nomi"], ["seen", "Oxirgi signal"], ["cpu", "CPU"], ["ram", "RAM"], ["disk", "Disk"], ["revenue", "Bugungi tushum"], ["license", "Litsenziya muddati"]].map(([v, t]) => h("option", { value: v, selected: v === S.sort }, t)));
+  w.append(h("div", { class: "toolbar" }, search, FILTERS.map(([k, t]) => h("button", { class: "pill" + (S.filter === k ? " active" : ""), "data-f": k, onclick: () => { S.filter = k; store.set("filter", k); document.querySelectorAll(".pill").forEach((p) => p.classList.toggle("active", p.dataset.f === k)); updateFleetBody(); } }, t)), h("span", { class: "grow" }), sort,
+    h("button", { class: "btn", onclick: () => updateDialog(S.snap.fleet.restaurants.filter((r) => r.is_active).map((r) => r.id)) }, "⬆️ Hammasiga yangilash")));
+  w.append(h("div", { class: "bulk", id: "bulk" }));
+  const head = h("tr", {}, h("th", {}, h("input", { type: "checkbox", id: "selAll", onclick: (e) => { const rows = visibleRows(); rows.forEach((r) => (e.target.checked ? S.selected.add(r.id) : S.selected.delete(r.id))); updateFleetBody(); } })),
+    ["Restoran", "Holat", "Oxirgi signal", "CPU", "RAM", "Disk", "Versiya", "Sinxron", "Bugun", "Litsenziya", "Ogohlantirish"].map((t) => h("th", {}, t)));
+  w.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, head), h("tbody", { id: "fleetBody" }))));
+  setTimeout(updateFleetBody, 0);
+  return w;
+}
+function visibleRows() {
+  const q = S.search.trim().toLowerCase();
+  return sortRows(S.snap.fleet.restaurants.filter((r) => passFilter(r) && (!q || r.name.toLowerCase().includes(q) || r.subdomain.toLowerCase().includes(q))));
+}
+function updateFleetBody() {
+  const body = $("#fleetBody"); if (!body) return;
+  const rows = visibleRows();
+  const target = S.snap.fleet.summary.target_version;
+  body.replaceChildren(...(rows.length ? rows.map((r) => {
+    const lic = r.license, ld = lic.days_left;
+    return h("tr", { onclick: () => openDrawer(r.id) },
+      h("td", { onclick: (e) => e.stopPropagation() }, h("input", { type: "checkbox", checked: S.selected.has(r.id), onclick: (e) => { e.target.checked ? S.selected.add(r.id) : S.selected.delete(r.id); updateBulk(); } })),
+      h("td", {}, h("b", {}, r.name), h("div", { class: "muted mono" }, r.subdomain + ".hamrohpos.uz")),
+      h("td", {}, h("span", { class: "badge " + r.state }, STATE[r.state] || r.state)),
+      h("td", { class: r.state === "offline" ? "crit" : "" }, r.seen_age_s != null ? fmtDur(r.seen_age_s) + " oldin" : "–"),
+      h("td", {}, mini(r.cpu), sparkline(r.spark.cpu, "var(--accent)", 90, 16)),
+      h("td", {}, mini(r.ram), sparkline(r.spark.ram, "var(--warn)", 90, 16)),
+      h("td", {}, mini(r.disk)),
+      h("td", { class: "mono " + (r.version && target && r.version !== target && r.alerts.some((a) => a.code === "outdated") ? "warn" : "") }, r.version || "–"),
+      h("td", { class: r.unsynced >= 100 ? "warn" : "" }, r.unsynced == null ? "–" : r.unsynced),
+      h("td", {}, h("div", {}, fmtMoney(r.today.revenue)), h("small", { class: "muted" }, r.today.orders + " ta buyurtma")),
+      h("td", { class: ld == null ? "" : ld < 0 ? "crit" : ld <= 7 ? "warn" : "ok" }, ld == null ? "–" : ld < 0 ? `${-ld} kun o'tgan` : `${ld} kun`),
+      h("td", {}, h("div", { class: "alerts-inline" }, r.alerts.filter((a) => a.level !== "info").map((a) => chip(a.text.length > 34 ? a.text.slice(0, 33) + "…" : a.text, a.level === "critical" ? "crit" : "warn")), r.errors_open ? "" : "")));
+  }) : [h("tr", {}, h("td", { colspan: 12, class: "empty" }, S.snap.fleet.restaurants.length ? "Filtrga mos restoran yo'q" : "Hali restoran qo'shilmagan. Admin → Restaurants bo'limidan qo'shing."))]));
+  const sa = $("#selAll"); if (sa) sa.checked = rows.length > 0 && rows.every((r) => S.selected.has(r.id));
+  updateBulk();
+}
+function updateBulk() {
+  const b = $("#bulk"); if (!b) return;
+  const ids = [...S.selected].filter((id) => S.snap.fleet.restaurants.some((r) => r.id === id));
+  b.classList.toggle("show", ids.length > 0);
+  b.replaceChildren(h("b", {}, `${ids.length} ta tanlandi`), ...actionButtons(ids, true).filter(Boolean), h("button", { class: "btn", onclick: () => { S.selected.clear(); updateFleetBody(); } }, "Tanlovni bekor qilish"));
+}
+
+function viewEvents() {
+  const ev = S.snap.events;
+  const errItem = (e) => h("div", { class: "item" }, h("div", {}, h("span", { class: e.level === "CRITICAL" ? "crit" : "warn" }, e.level), " · ",
+    h("a", { href: "#", onclick: (x) => { x.preventDefault(); openDrawer(e.restaurant_id); } }, e.restaurant), e.resolved ? chip("hal qilingan", "ok") : ""),
+    h("div", { class: "mono" }, e.message), h("small", {}, `${e.module || e.logger} · ${ago(e.received_at)}`));
+  const statusCls = { completed: "ok", failed: "crit", pending: "warn", sent: "info", acknowledged: "info" };
+  const cmdItem = (c) => h("div", { class: "item" }, h("div", {}, h("b", {}, c.label), " · ", h("a", { href: "#", onclick: (x) => { x.preventDefault(); openDrawer(c.restaurant_id); } }, c.restaurant), " ", chip(c.status, statusCls[c.status])),
+    c.result ? h("div", { class: "mono muted" }, JSON.stringify(c.result).slice(0, 160)) : "", h("small", {}, ago(c.created_at)));
+  const auditItem = (a) => h("div", { class: "item" }, h("div", {}, h("b", {}, a.user), " · ", a.object), h("div", { class: "muted" }, a.message), h("small", {}, ago(a.at)));
+  return h("div", { class: "grid cols3" },
+    h("div", { class: "card" }, h("h3", {}, "Oxirgi xatolar (Bolalardan)"), h("div", { class: "feed" }, ev.errors.length ? ev.errors.map(errItem) : h("div", { class: "empty ok" }, "Xato yo'q ✓"))),
+    h("div", { class: "card" }, h("h3", {}, "Masofaviy buyruqlar"), h("div", { class: "feed" }, ev.commands.length ? ev.commands.map(cmdItem) : h("div", { class: "empty" }, "Buyruq yo'q"))),
+    h("div", { class: "card" }, h("h3", {}, "Admin amallari (audit)"), h("div", { class: "feed" }, ev.audit.length ? ev.audit.map(auditItem) : h("div", { class: "empty" }, "Hali amal yo'q"))));
+}
+
+/* ========================= restoran paneli ========================= */
+async function openDrawer(id) {
+  S.openId = id; S.detail = null; S.openErr = new Set();
+  $("#drawer").classList.add("show"); $("#overlay").classList.add("show"); $("#drawer").setAttribute("aria-hidden", "false");
+  $("#drawer").replaceChildren(h("div", { class: "empty" }, "Yuklanmoqda…"));
+  await loadDetail(id);
+}
+function closeDrawer() { S.openId = null; S.detail = null; $("#drawer").classList.remove("show"); $("#drawer").setAttribute("aria-hidden", "true"); if (!$("#modal").classList.contains("show")) $("#overlay").classList.remove("show"); }
+async function loadDetail(id) {
+  try {
+    const r = await api(`/admin/ops/api/restaurant/${id}/`);
+    if (!r.ok) { $("#drawer").replaceChildren(h("div", { class: "empty crit" }, "Restoran topilmadi")); return; }
+    if (S.openId !== id) return;
+    S.detail = await r.json(); renderDrawer();
+  } catch (e) {}
+}
+function renderDrawer() {
+  const d = S.detail; if (!d || S.pressing) return;
+  const live = S.snap && S.snap.fleet.restaurants.find((r) => r.id === d.id);
+  const drawer = $("#drawer"), scrollTop = drawer.scrollTop;
+  const hist = d.history || [];
+  const mk = (k, c, n) => ({ name: n, color: c, points: hist.filter((x) => x[k] != null).map((x) => [x.ts, x[k]]) });
+  const hs = [mk("cpu", "var(--accent)", "CPU %"), mk("ram", "var(--warn)", "RAM %"), mk("disk", "var(--ok)", "Disk %")];
+  const kv = (k, v, c) => h("div", { class: "row" }, h("span", { class: "muted" }, k), h("b", { class: c || "" }, v));
+  const lic = d.license, secs = lic.seconds_left;
+  const body = h("div", { class: "body" },
+    live ? h("div", { class: "card" }, h("h3", {}, "Hozirgi holat", h("span", { class: "badge " + live.state }, STATE[live.state])),
+      h("div", { class: "grid cols3" }, h("div", {}, gaugeRow("CPU", live.cpu, "")), h("div", {}, gaugeRow("RAM", live.ram, "")), h("div", {}, gaugeRow("Disk", live.disk, ""))),
+      live.alerts.length ? h("div", { class: "alerts-inline", style: { marginTop: "6px" } }, live.alerts.map((a) => chip(a.text, a.level === "critical" ? "crit" : a.level === "warn" ? "warn" : "info"))) : h("div", { class: "ok" }, "Muammo yo'q ✓")) : "",
+    h("div", { class: "card" }, h("h3", {}, "Amallar"), h("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } }, actionButtons([d.id], false).filter(Boolean))),
+    h("div", { class: "grid cols2" },
+      h("div", { class: "card" }, h("h3", {}, "Litsenziya"), kv("Kalit", lic.key_masked), kv("Holat", lic.active ? "faol" : "o'chirilgan", lic.active ? "ok" : "crit"),
+        kv("Muddati", lic.expires_at ? new Date(lic.expires_at).toLocaleString("en-GB") : "–", secs != null && secs < 0 ? "crit" : secs != null && secs < 7 * 86400 ? "warn" : ""),
+        kv("Qurilma bog'langan", lic.bound ? "ha (" + lic.hardware_prefix + "…)" : "yo'q (faollashtirilmagan)")),
+      h("div", { class: "card" }, h("h3", {}, "Ma'lumot"), kv("Subdomen", d.subdomain + ".hamrohpos.uz"), kv("Manzil", d.address || "–"), kv("Aloqa", d.contact || "–"),
+        kv("Admin telefoni", d.admin_phone || "–"), kv("Kutilgan versiya", d.desired_version || "–"), kv("Yangilanish oynasi", d.update_window), kv("Telegram", d.telegram_configured ? "sozlangan" : "sozlanmagan", d.telegram_configured ? "ok" : "warn"))),
+    h("div", { class: "card" }, h("h3", {}, "Resurslar tarixi (3 soat)"), lineChart(hs, { max: 100, fmt: (v) => Math.round(v) + "%", h: 120 }), legend(hs)),
+    h("div", { class: "grid cols2" },
+      h("div", { class: "card" }, h("h3", {}, "Tushum — 14 kun"), barChart(d.sales_days, 640, 110)),
+      h("div", { class: "card" }, h("h3", {}, "Bugungi to'lov usullari / mashhur taomlar (7 kun)"),
+        Object.keys(d.payment_methods).length ? Object.entries(d.payment_methods).map(([m, v]) => kv(m, fmtMoney(v))) : h("div", { class: "muted" }, "Bugun to'lov yo'q"),
+        h("div", { style: { height: "8px" } }), d.top_products.map((p) => kv(p.name, p.qty + " ta")))),
+    h("div", { class: "card" }, h("h3", {}, "Oxirgi buyurtmalar"), d.last_orders.length ? d.last_orders.map((o) => h("div", { class: "row" }, h("span", {}, `${fmtMoney(o.amount)} · ${o.waiter || "–"} · ${o.type}`), h("small", { class: "muted" }, ago(o.at)))) : h("div", { class: "muted" }, "Hali buyurtma sinxronlanmagan")),
+    h("div", { class: "card" }, h("h3", {}, "Xatolar", h("span", { class: "chip" }, d.errors.filter((e) => !e.resolved).length + " ta hal qilinmagan")),
+      d.errors.length ? h("div", { class: "feed" }, d.errors.map((e) => {
+        const det = h("details", { ontoggle: (ev) => { ev.target.open ? S.openErr.add(e.id) : S.openErr.delete(e.id); } }, h("summary", {}, "traceback"), h("pre", {}, e.traceback || "(yo'q)"));
+        if (S.openErr.has(e.id)) det.open = true;
+        return h("div", { class: "item" }, h("div", {}, h("span", { class: e.level === "CRITICAL" ? "crit" : "warn" }, e.level), e.resolved ? chip("hal qilingan", "ok") : "", " ", h("small", {}, ago(e.at))),
+          h("div", { class: "mono" }, e.message), h("small", {}, `${e.module}${e.func ? "." + e.func : ""}${e.line ? ":" + e.line : ""}`), e.traceback ? det : "");
+      })) : h("div", { class: "empty ok" }, "Xato yo'q ✓")),
+    h("div", { class: "card" }, h("h3", {}, "Buyruqlar"), d.commands.length ? h("div", { class: "feed" }, d.commands.map((c) =>
+      h("div", { class: "item" }, h("b", {}, c.label), " ", chip(c.status, { completed: "ok", failed: "crit", pending: "warn" }[c.status] || "info"), " ", h("small", {}, ago(c.at)),
+        c.payload && Object.keys(c.payload).length ? h("div", { class: "mono muted" }, JSON.stringify(c.payload)) : "", c.result ? h("div", { class: "mono muted" }, JSON.stringify(c.result).slice(0, 200)) : ""))) : h("div", { class: "muted" }, "Buyruq yo'q")));
+  drawer.replaceChildren(h("div", { class: "head" }, h("div", {}, h("b", { style: { fontSize: "16px" } }, d.name), h("div", { class: "muted mono" }, d.subdomain + ".hamrohpos.uz")), h("span", { class: "grow" }),
+    h("button", { class: "btn", onclick: closeDrawer }, "✕ Yopish")), body);
+  drawer.scrollTop = scrollTop;
+}
+
+/* ========================= boshqaruv ========================= */
+function setTab(t) {
+  S.tab = t; store.set("tab", t);
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
+  location.hash = t; render();
+  if (t === "server") window.scrollTo(0, 0);
+}
+$("#tabs").addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); });
+$("#overlay").addEventListener("click", () => { closeModal(); closeDrawer(); });
+document.addEventListener("pointerdown", () => { S.pressing = true; }, true);
+["pointerup", "pointercancel", "click"].forEach((ev) => document.addEventListener(ev, () => setTimeout(() => { S.pressing = false; }, 80), true));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeModal(); closeDrawer(); }
+  if (e.key === " " && !/INPUT|TEXTAREA|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); $("#pauseBtn").click(); }
+});
+$("#interval").addEventListener("change", () => { store.set("interval", $("#interval").value); schedule(); });
+$("#pauseBtn").addEventListener("click", () => {
+  S.paused = !S.paused; $("#pauseBtn").textContent = S.paused ? "▶ Davom ettirish" : "⏸ To'xtatish";
+  $("#dot").className = "dot " + (S.paused ? "paused" : "live-on"); $("#liveText").textContent = S.paused ? "to'xtatilgan" : "yangilanmoqda…";
+  if (!S.paused) poll(true);
+});
+$("#soundBtn").addEventListener("click", () => { S.sound = !S.sound; store.set("sound", S.sound); $("#soundBtn").textContent = S.sound ? "🔊 Tovush" : "🔕 Tovush"; if (S.sound) beep(); });
+$("#notifBtn").addEventListener("click", async () => {
+  if (!("Notification" in window)) { toast("Brauzer bildirishnomalarni qo'llamaydi", "warn"); return; }
+  if (!S.notif) { const p = await Notification.requestPermission(); S.notif = p === "granted"; } else S.notif = false;
+  store.set("notif", S.notif); $("#notifBtn").textContent = S.notif ? "🔔 Bildirish: yoqiq" : "🔔 Bildirish";
+});
+$("#themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "light" ? "dark" : cur === "dark" ? "" : "light";
+  if (next) document.documentElement.setAttribute("data-theme", next); else document.documentElement.removeAttribute("data-theme");
+  store.set("theme", next);
+});
+
+(async function init() {
+  const th = store.get("theme", ""); if (th) document.documentElement.setAttribute("data-theme", th);
+  S.filter = store.get("filter", "all"); S.sort = store.get("sort", "problem");
+  S.sound = !!store.get("sound", false); $("#soundBtn").textContent = S.sound ? "🔊 Tovush" : "🔕 Tovush";
+  S.notif = !!store.get("notif", false) && "Notification" in window && Notification.permission === "granted"; if (S.notif) $("#notifBtn").textContent = "🔔 Bildirish: yoqiq";
+  $("#interval").value = store.get("interval", "3000");
+  const tab = (location.hash || "").slice(1) || store.get("tab", "overview");
+  S.tab = ["overview", "server", "fleet", "events"].includes(tab) ? tab : "overview";
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === S.tab));
+  try { const r = await api("/admin/ops/api/history/"); S.hist = (await r.json()).samples.map((s) => ({ ...s })); } catch (e) {}
+  await poll(true); schedule();
+  setInterval(() => { if (S.openId && !S.paused && $("#drawer").classList.contains("show")) loadDetail(S.openId); }, 6000);
+})();
+</script>
+</body>
+</html>

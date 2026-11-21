@@ -48,3 +48,10 @@ def cleanup_old_data():
     ).delete()
     
     return {"deleted_errors": deleted_errors, "deleted_commands": deleted_commands}
+
+
+@shared_task
+def record_server_sample():
+    """Ona serverining 30 soniyalik namunasi (jonli monitor grafiklari uchun, Redis keshiga)."""
+    from . import ops
+    ops.record_server_sample()

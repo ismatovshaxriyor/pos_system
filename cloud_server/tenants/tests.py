@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import uuid as uuid_module
+
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -268,3 +270,185 @@ class ReleaseVersionActionTests(TestCase):
         messages = list(response.context['messages'])
         self.assertEqual(messages[0].level, django_messages.ERROR)
         self.assertEqual(RemoteCommand.objects.count(), 0)
+
+
+class OpsDashboardTests(TestCase):
+    """Jonli monitor (/admin/ops/): kirish huquqi, ma'lumot shakli va amallar."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.superuser = User.objects.create_superuser('boss', password='pass-12345')
+        self.staff = User.objects.create_user('staffer', password='pass-12345', is_staff=True)
+        self.restaurant = Restaurant.objects.create(name='Anhor', subdomain='anhor')
+
+    def test_anonymous_is_redirected_to_login(self):
+        res = self.client.get('/admin/ops/')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('/admin/login/', res['Location'])
+
+    def test_anonymous_api_gets_401_json(self):
+        res = self.client.get('/admin/ops/api/snapshot/')
+        self.assertEqual(res.status_code, 401)
+
+    def test_staff_without_superuser_gets_404(self):
+        self.client.force_login(self.staff)
+        for url in ('/admin/ops/', '/admin/ops/api/snapshot/', '/admin/ops/api/history/'):
+            self.assertEqual(self.client.get(url).status_code, 404, url)
+        res = self.client.post('/admin/ops/api/action/', data='{}', content_type='application/json')
+        self.assertEqual(res.status_code, 404)
+
+    def test_superuser_sees_page_without_cache(self):
+        self.client.force_login(self.superuser)
+        res = self.client.get('/admin/ops/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('no-store', res['Cache-Control'])
+        self.assertContains(res, 'Jonli monitor')
+
+    def test_snapshot_shape(self):
+        self.client.force_login(self.superuser)
+        data = self.client.get('/admin/ops/api/snapshot/').json()
+        self.assertEqual(set(data), {'server', 'fleet', 'events'})
+        self.assertIn('percent', data['server']['cpu'])
+        self.assertIn('db', data['server']['services'])
+        self.assertTrue(data['server']['services']['db']['ok'])
+        self.assertEqual(data['fleet']['summary']['total'], 1)
+        row = data['fleet']['restaurants'][0]
+        self.assertEqual(row['name'], 'Anhor')
+        # Hali faollashtirilmagan: onlayn emas, "pending"
+        self.assertEqual(row['state'], 'pending')
+
+    def test_heartbeat_makes_restaurant_online_and_records_history(self):
+        from . import ops
+        ops.record_heartbeat(self.restaurant.id, {'cpu_percent': 12.0, 'ram_percent': 40.0, 'disk_percent': 95.0, 'app_version': '0.3.27'})
+        from django.core.cache import cache
+        cache.set(f'restaurant_metrics_{self.restaurant.id}', {'cpu_percent': 12.0, 'ram_percent': 40.0, 'disk_percent': 95.0, 'app_version': '0.3.27', 'unsynced_count': 3}, 180)
+        row = ops.fleet_snapshot()['restaurants'][0]
+        self.assertEqual(row['state'], 'online')
+        self.assertEqual(row['version'], '0.3.27')
+        self.assertTrue(any(a['code'] == 'disk' and a['level'] == 'critical' for a in row['alerts']))
+        self.assertEqual(len(ops.restaurant_detail(self.restaurant.id)['history']), 1)
+
+    def test_offline_and_license_alerts(self):
+        from . import ops
+        lic = self.restaurant.license
+        lic.expires_at = timezone.now() - timedelta(days=2)
+        lic.save()
+        self.restaurant.last_seen = timezone.now() - timedelta(minutes=30)
+        self.restaurant.save(update_fields=['last_seen'])
+        row = ops.fleet_snapshot()['restaurants'][0]
+        codes = {a['code'] for a in row['alerts']}
+        self.assertIn('license_expired', codes)
+        self.assertEqual(row['state'], 'expired')
+
+    def test_outdated_version_is_flagged(self):
+        from django.core.cache import cache
+        from . import ops
+        other = Restaurant.objects.create(name='Yangi', subdomain='yangi')
+        cache.set(f'restaurant_metrics_{self.restaurant.id}', {'app_version': '0.3.20'}, 180)
+        cache.set(f'restaurant_metrics_{other.id}', {'app_version': '0.3.27'}, 180)
+        fleet = ops.fleet_snapshot()
+        self.assertEqual(fleet['summary']['target_version'], '0.3.27')
+        old = next(r for r in fleet['restaurants'] if r['name'] == 'Anhor')
+        self.assertTrue(any(a['code'] == 'outdated' for a in old['alerts']))
+
+    def test_action_block_enqueues_command_and_audits(self):
+        from django.contrib.admin.models import LogEntry
+        self.client.force_login(self.superuser)
+        res = self.client.post(
+            '/admin/ops/api/action/',
+            data={'action': 'block', 'restaurant_ids': [str(self.restaurant.id)]}, content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(RemoteCommand.objects.filter(restaurant=self.restaurant, command_type='block_system', status='pending').exists())
+        self.assertTrue(LogEntry.objects.filter(user=self.superuser, change_message__contains='Jonli monitor').exists())
+
+    def test_action_update_sets_desired_version_and_payload(self):
+        self.client.force_login(self.superuser)
+        res = self.client.post(
+            '/admin/ops/api/action/',
+            data={'action': 'update', 'restaurant_ids': [str(self.restaurant.id)], 'params': {'version': '0.3.27', 'mode': 'force'}},
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200, res.content)
+        self.restaurant.refresh_from_db()
+        self.assertEqual(self.restaurant.desired_version, '0.3.27')
+        cmd = RemoteCommand.objects.get(restaurant=self.restaurant, command_type='update_app')
+        self.assertEqual(cmd.payload['mode'], 'force')
+
+    def test_action_update_requires_version(self):
+        self.client.force_login(self.superuser)
+        res = self.client.post(
+            '/admin/ops/api/action/',
+            data={'action': 'update', 'restaurant_ids': [str(self.restaurant.id)], 'params': {}}, content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(RemoteCommand.objects.exists())
+
+    def test_unknown_action_and_bad_input_rejected(self):
+        self.client.force_login(self.superuser)
+        post = lambda body: self.client.post('/admin/ops/api/action/', data=body, content_type='application/json')
+        self.assertEqual(post({'action': 'rm_rf', 'restaurant_ids': [str(self.restaurant.id)]}).status_code, 400)
+        self.assertEqual(post({'action': 'block', 'restaurant_ids': 'x'}).status_code, 400)
+        self.assertEqual(post({'action': 'block', 'restaurant_ids': ['not-a-uuid']}).status_code, 400)
+        self.assertEqual(self.client.post('/admin/ops/api/action/', data='{bad', content_type='application/json').status_code, 400)
+
+    def test_action_requires_post_and_csrf_is_enforced(self):
+        from django.test import Client
+        self.client.force_login(self.superuser)
+        self.assertEqual(self.client.get('/admin/ops/api/action/').status_code, 405)
+        strict = Client(enforce_csrf_checks=True)
+        strict.force_login(self.superuser)
+        res = strict.post('/admin/ops/api/action/', data={'action': 'block', 'restaurant_ids': [str(self.restaurant.id)]}, content_type='application/json')
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(RemoteCommand.objects.exists())
+
+    def test_resolve_errors_and_mark_paid(self):
+        from . import ops
+        ErrorLog.objects.create(
+            id=uuid_module.uuid4(), restaurant=self.restaurant, level='ERROR', message='boom',
+            occurred_at=timezone.now(), received_at=timezone.now(),
+        )
+        res = ops.perform_action(self.superuser, 'resolve_errors', [self.restaurant.id])
+        self.assertTrue(res['ok'])
+        self.assertFalse(ErrorLog.objects.filter(is_resolved=False).exists())
+        lic = self.restaurant.license
+        lic.is_active = False
+        lic.expires_at = timezone.now() - timedelta(days=1)
+        lic.save()
+        ops.perform_action(self.superuser, 'mark_paid', [self.restaurant.id])
+        lic.refresh_from_db()
+        self.assertGreater(lic.expires_at, timezone.now())
+        self.assertFalse(lic.is_active)  # to'lov bloklashni yechmaydi (admin _mark_paid bilan bir xil)
+
+    def test_offline_token_requires_bound_hardware(self):
+        from . import ops
+        res = ops.perform_action(self.superuser, 'offline_token', [self.restaurant.id])
+        self.assertFalse(res['ok'])
+
+    def test_detail_masks_license_key(self):
+        from . import ops
+        d = ops.restaurant_detail(self.restaurant.id)
+        self.assertNotIn(self.restaurant.license.key, str(d))
+        self.assertTrue(d['license']['key_masked'].endswith(self.restaurant.license.key[-4:]))
+
+    def test_untrusted_error_text_is_returned_raw_but_json_escaped(self):
+        """Bola xabari xom qaytadi (frontend textContent bilan chiqaradi) - JSON'da ekranlanadi."""
+        from . import ops
+        evil = '<img src=x onerror=alert(1)>'
+        ErrorLog.objects.create(
+            id=uuid_module.uuid4(), restaurant=self.restaurant, level='ERROR', message=evil,
+            occurred_at=timezone.now(), received_at=timezone.now(),
+        )
+        self.client.force_login(self.superuser)
+        res = self.client.get('/admin/ops/api/snapshot/')
+        self.assertEqual(res['Content-Type'], 'application/json')
+        self.assertEqual(res.json()['events']['errors'][0]['message'], evil)
+        self.assertNotIn('innerHTML', open('tenants/templates/ops/dashboard.html').read().replace('innerHTML ishlatilmaydi', ''))
+
+    def test_record_server_sample_caps_history(self):
+        from . import ops
+        for _ in range(3):
+            ops.record_server_sample()
+        self.assertEqual(len(ops.server_history()), 3)
+        self.assertIn('cpu', ops.server_history()[-1])

@@ -264,6 +264,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'tenants.tasks.mark_offline_restaurants',
         'schedule': 60.0,
     },
+    'ops-record-sample': {
+        'task': 'tenants.tasks.record_server_sample',
+        'schedule': 30.0,
+        'options': {'expires': 25},
+    },
     'cleanup-old-data': {
         'task': 'tenants.tasks.cleanup_old_data',
         'schedule': crontab(hour=3, minute=30),
@@ -344,6 +349,10 @@ JAZZMIN_SETTINGS = {
     "copyright": f"POS System Cloud HQ (v{LATEST_RELEASE_VERSION})",
 
     "search_model": ["tenants.Restaurant", "tenants.License"],
+    # Jonli monitor (faqat superuser ko'radi - view o'zi ham tekshiradi).
+    "topmenu_links": [
+        {"name": "Jonli monitor", "url": "/admin/ops/", "icon": "fas fa-heartbeat", "permissions": ["auth.view_user"], "new_window": False},
+    ],
     "show_ui_builder": False,
     "icons": {
         "auth": "fas fa-users-cog",
