@@ -274,6 +274,47 @@ if ($domain) { Env-Set 'CSRF_TRUSTED_ORIGINS' "https://$domain" } else { Env-Set
 Env-Set 'ONLINE_MODE' $online
 if ($cfToken) { Env-Set 'CLOUDFLARE_TUNNEL_TOKEN' $cfToken }
 
+# ---- Resurs profili: RAM/yadro/disk bo'yicha avtomatik (foydalanuvchidan hech narsa so'ralmaydi).
+# Har ishga tushirishda qayta hisoblanadi; sirlarga tegmaydi. Override: POS_PROFILE=small|mid|large.
+function Pick-Profile([int]$ramMb, [int]$cores) {
+    if ($ramMb -le 0) { $p = 'mid' }
+    elseif ($ramMb -lt 3000) { $p = 'small' }
+    elseif ($ramMb -lt 6000) { $p = 'mid' }
+    else { $p = 'large' }
+    if ($cores -le 2 -and $p -eq 'large') { $p = 'mid' }
+    return $p
+}
+function Apply-Profile($name) {
+    switch ($name) {
+        'small' { $v = @{ CELERY_MAX_CONCURRENCY='1'; CELERY_MAX_MEMORY_KB='200000'; PG_SHARED_BUFFERS='64MB'; PG_MAX_CONNECTIONS='30'; PG_WORK_MEM='2MB'; PG_EFFECTIVE_CACHE_SIZE='128MB'; REDIS_MAXMEMORY='64mb'; BACKUP_KEEP_DAYS='3'; BACKUP_KEEP_WEEKS='1'; BACKUP_KEEP_MONTHS='1' } }
+        'large' { $v = @{ CELERY_MAX_CONCURRENCY='4'; CELERY_MAX_MEMORY_KB='400000'; PG_SHARED_BUFFERS='256MB'; PG_MAX_CONNECTIONS='100'; PG_WORK_MEM='8MB'; PG_EFFECTIVE_CACHE_SIZE='1GB'; REDIS_MAXMEMORY='256mb'; BACKUP_KEEP_DAYS='14'; BACKUP_KEEP_WEEKS='4'; BACKUP_KEEP_MONTHS='6' } }
+        default { $name = 'mid'; $v = @{ CELERY_MAX_CONCURRENCY='2'; CELERY_MAX_MEMORY_KB='250000'; PG_SHARED_BUFFERS='128MB'; PG_MAX_CONNECTIONS='60'; PG_WORK_MEM='4MB'; PG_EFFECTIVE_CACHE_SIZE='384MB'; REDIS_MAXMEMORY='128mb'; BACKUP_KEEP_DAYS='7'; BACKUP_KEEP_WEEKS='2'; BACKUP_KEEP_MONTHS='3' } }
+    }
+    foreach ($k in $v.Keys) { Env-Set $k $v[$k] }
+    Env-Set 'RESOURCE_PROFILE' $name
+}
+$ramMb = 0; $cores = 1
+try {
+    $cs = Get-CimInstance Win32_ComputerSystem
+    $ramMb = [int]([math]::Round($cs.TotalPhysicalMemory / 1MB))
+    $cores = [int]$cs.NumberOfLogicalProcessors
+} catch {}
+# Windows + Docker Desktop (WSL2) da OS va VM ~2.5 GB oladi.
+$effRam = $ramMb - 2500
+$profile = Get-EnvVar 'POS_PROFILE'
+if ($profile -notin @('small','mid','large')) { $profile = Pick-Profile $effRam $cores }
+Apply-Profile $profile
+Ok "resurs profili: $profile (RAM $ramMb MB, $cores yadro) - Celery/Postgres/Redis/zaxira shunga moslandi"
+if ($ramMb -gt 0 -and $ramMb -lt 3000) { Warn "RAM juda kam ($ramMb MB): tizim sekin ishlashi mumkin. Tavsiya: kamida 4 GB (ideal 8 GB)." }
+try {
+    $drv = Get-PSDrive -Name ((Get-Location).Drive.Name) -ErrorAction Stop
+    $freeGb = [int]([math]::Floor($drv.Free / 1GB))
+    if ($freeGb -lt 15) { Warn "Diskda bo'sh joy kam ($freeGb GB): Docker image va zaxira nusxalar uchun kamida 15 GB kerak." }
+    $part = Get-Partition -DriveLetter (Get-Location).Drive.Name -ErrorAction Stop
+    $pd = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq $part.DiskNumber } | Select-Object -First 1
+    if ($pd -and $pd.MediaType -eq 'HDD') { Warn "Disk HDD (aylanuvchi): Postgres sekin ishlaydi. SSD'ga o'tish kassa tezligini keskin oshiradi." }
+} catch {}
+
 # Qurilma barmoq izi: Docker Desktop konteynerida barqaror ID yo'q, shuning uchun host'ning
 # anakart UUID'sidan olinadi. Bir marta belgilangach O'ZGARTIRILMAYDI (litsenziya shu izga bog'lanadi).
 if (-not (Env-Get 'HARDWARE_ID_OVERRIDE')) {

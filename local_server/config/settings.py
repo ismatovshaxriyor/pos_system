@@ -293,6 +293,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'licensing.tasks.cleanup_error_logs',
         'schedule': crontab(hour=4, minute=0),
     },
+    'disk-guard': {
+        'task': 'licensing.tasks.disk_guard',
+        'schedule': 3600.0,
+        'options': {'expires': 3000},
+    },
     # Ona'dan "oyna" rejimida kelgan yangilanishni oynada va ochiq buyurtma qolmaganda o'rnatadi.
     'run-scheduled-update': {
         'task': 'licensing.tasks.run_scheduled_update',
@@ -333,6 +338,11 @@ if 'test' in sys.argv and CACHES['default']['LOCATION'].endswith('/0'):
 ERROR_LOG_BATCH_SIZE = int(os.environ.get('ERROR_LOG_BATCH_SIZE', 200))
 ERROR_LOG_RETENTION_DAYS = int(os.environ.get('ERROR_LOG_RETENTION_DAYS', 14))
 ERROR_LOG_MAX_UNREPORTED = int(os.environ.get('ERROR_LOG_MAX_UNREPORTED', 5000))
+
+# Disk bosimiga moslashish (licensing.tasks.disk_guard, soatiga bir marta)
+DISK_WARN_PCT = int(os.environ.get('DISK_WARN_PCT', 85))
+DISK_CRITICAL_PCT = int(os.environ.get('DISK_CRITICAL_PCT', 92))
+HISTORY_PRUNE_DAYS_ON_PRESSURE = int(os.environ.get('HISTORY_PRUNE_DAYS_ON_PRESSURE', 180))
 
 # ERROR/CRITICAL darajadagi barcha loglarni (view'lardagi unhandled
 # exception'lar, Celery tasklardagi xatoliklar, logger.error()/critical()

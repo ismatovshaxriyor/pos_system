@@ -5,13 +5,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# Barcha bog'liqliklar tayyor wheel bilan keladi (psycopg2-binary o'z libpq'ini
+# olib keladi) - gcc/libpq-dev va pip keshi image'da kerak emas.
 COPY requirements.txt /app/
-RUN pip install --default-timeout=100 --retries 10 --upgrade pip && pip install --default-timeout=100 --retries 10 -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=100 --retries 10 --upgrade pip && pip install --no-cache-dir --default-timeout=100 --retries 10 -r requirements.txt
 
 COPY . /app/
 RUN chmod +x /app/entrypoint.sh

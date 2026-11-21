@@ -6,14 +6,13 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
+# Builder'da faqat kompilyator va Cython kerak: modullar Cython orqali
+# o'qiladi (import qilinmaydi), shuning uchun requirements.txt bu yerda
+# o'rnatilmaydi (build tezroq, hajmga ta'siri yo'q).
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /app/
-RUN pip install --default-timeout=100 --retries 10 -r requirements.txt \
-    && pip install "Cython>=3.0,<4.0" setuptools
+RUN pip install --no-cache-dir --default-timeout=100 --retries 10 "Cython>=3.0,<4.0" setuptools
 
 COPY . /app/
 
@@ -24,14 +23,11 @@ COPY . /app/
 # models.py, migrations/, urls.py/apps.py/admin.py/serializers.py/routing.py
 # ataylab tegilmaydi - Django/DRF/Channels ular ustida runtime introspeksiya
 # qiladi (admin registratsiyasi, serializer metaklassi, migratsiya grafigi).
-RUN python licensing/setup.py build_ext --inplace \
-    && rm -f licensing/middleware.py licensing/jwt_utils.py licensing/hardware.py \
-             licensing/client.py licensing/tasks.py licensing/views.py \
-             core/services.py core/views.py core/auth_views.py core/reports.py \
-             core/inventory.py core/customers.py core/escpos.py core/tasks.py \
-             core/consumers.py core/realtime.py core/permissions.py \
-             core/authentication.py core/exceptions.py core/middleware.py \
-             core/middleware_ws.py \
+# Manba .py fayllarni o'chirish ro'yxati setup.py'ning PROTECTED_MODULES'idan
+# olinadi (REMOVE_SOURCES=1) - Dockerfile'da ikkinchi nusxa yo'q, shuning
+# uchun ro'yxatlar bir-biridan ajralib ketmaydi (ilgari core/order_templates.py
+# kompilyatsiya qilinib, lekin manbasi image'da qolib ketgan edi).
+RUN REMOVE_SOURCES=1 python licensing/setup.py build_ext --inplace \
     && rm -rf build licensing/*.c core/*.c licensing/setup.py \
     && rm -rf licensing/tests
 
@@ -44,12 +40,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# psycopg2-binary o'zining libpq'ini olib keladi - apt paketlari (libpq-dev
+# ~22 MB) va --no-cache-dir (pip keshi ~50 MB) kerak emas.
 COPY requirements.txt /app/
-RUN pip install --default-timeout=100 --retries 10 -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=100 --retries 10 -r requirements.txt
 
 # Builder bosqichidan faqat tayyor natija ko'chiriladi: .so fayllar +
 # kompilyatsiya qilinmagan qolgan barcha .py fayllar (core, config,

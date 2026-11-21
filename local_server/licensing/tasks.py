@@ -1,9 +1,12 @@
 import logging
 from datetime import time as dt_time, timedelta
 
+import psutil
 import requests
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
+from django.core.management import call_command
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -207,6 +210,56 @@ def cleanup_error_logs():
         )
 
     return {"reported_deleted": reported_deleted, "overflow_deleted": overflow_deleted}
+
+
+DISK_ALERT_CACHE_KEY = 'disk_guard:alerted'
+DISK_ALERT_COOLDOWN = 6 * 60 * 60
+
+
+@shared_task
+def disk_guard():
+    """
+    Disk to'lib qolishiga moslashuvchi himoya (soatiga bir marta). Restoran mashinasi
+    kichik diskli bo'lishi mumkin; to'lgan disk Postgres'ni to'xtatadi va kassa ishdan chiqadi.
+
+    - DISK_WARN_PCT (85%) dan yuqori: Onaga allaqachon yuborilgan xato jurnallari 1 kundan
+      keyin o'chiriladi (odatdagi saqlash muddati ERROR_LOG_RETENTION_DAYS o'rniga).
+    - DISK_CRITICAL_PCT (92%) dan yuqori: bundan tashqari tarixiy (simple_history) yozuvlar
+      HISTORY_PRUNE_DAYS_ON_PRESSURE kundan eskilari o'chiriladi. Tozalashdan keyin ham
+      kritik bo'lsa - logger.error() (u ErrorLog -> Ona kanali orqali admin panelda
+      ko'rinadi; 6 soatda bir martadan ko'p emas).
+
+    Docker log/zaxira nusxalar bu konteynerdan ko'rinmaydi: ularni compose'dagi log
+    rotatsiyasi va db_backup'ning BACKUP_KEEP_* cheklovi nazorat qiladi.
+    """
+    percent = psutil.disk_usage('/').percent
+    result = {"disk_percent": percent, "level": "ok", "error_logs_deleted": 0, "history_pruned": False}
+    if percent < settings.DISK_WARN_PCT:
+        return result
+
+    result["level"] = "warn"
+    cutoff = timezone.now() - timedelta(days=1)
+    result["error_logs_deleted"], _ = ErrorLog.objects.filter(is_reported=True, reported_at__lt=cutoff).delete()
+
+    if percent >= settings.DISK_CRITICAL_PCT:
+        result["level"] = "critical"
+        try:
+            call_command('clean_old_history', auto=True, days=settings.HISTORY_PRUNE_DAYS_ON_PRESSURE, verbosity=0)
+            result["history_pruned"] = True
+        except Exception:  # tozalash muvaffaqiyatsiz bo'lsa ham ogohlantirish yuborilishi kerak
+            logger.warning("Disk bosimida tarixni tozalash muvaffaqiyatsiz tugadi.", exc_info=True)
+
+        after = psutil.disk_usage('/').percent
+        if after >= settings.DISK_CRITICAL_PCT and cache.add(DISK_ALERT_CACHE_KEY, 1, DISK_ALERT_COOLDOWN):
+            logger.error(
+                "Disk deyarli to'lgan: %.0f%% band (chegara %d%%). Joy bo'shatilmasa tizim ishdan chiqadi - "
+                "eski zaxira nusxalar/Docker image'larni tozalang yoki diskni kengaytiring.",
+                after, settings.DISK_CRITICAL_PCT,
+            )
+    else:
+        logger.warning("Disk to'lib bormoqda: %.0f%% band (ogohlantirish chegarasi %d%%).", percent, settings.DISK_WARN_PCT)
+
+    return result
 
 
 @shared_task

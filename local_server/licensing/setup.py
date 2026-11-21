@@ -13,8 +13,11 @@ serializer metaklassi, migratsiya grafigi) va bu yerda himoyalanadigan
 maxfiy mantiq yo'q.
 
 Ishlatilishi (Dockerfile'ning builder bosqichida):
-    python licensing/setup.py build_ext --inplace
+    REMOVE_SOURCES=1 python licensing/setup.py build_ext --inplace
 """
+import os
+import sys
+
 from setuptools import setup
 from Cython.Build import cythonize
 
@@ -49,3 +52,9 @@ setup(
         compiler_directives={"language_level": "3"},
     ),
 )
+
+# Dockerfile REMOVE_SOURCES=1 bilan chaqiradi: kompilyatsiya tugagach manba
+# .py fayllarni shu ro'yxat bo'yicha o'chiradi (ro'yxat bitta joyda yashaydi).
+if os.environ.get("REMOVE_SOURCES") == "1" and "build_ext" in sys.argv:
+    for _module in PROTECTED_MODULES:
+        os.remove(_module)

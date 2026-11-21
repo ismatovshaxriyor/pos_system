@@ -232,3 +232,71 @@ class CleanupErrorLogsTaskTests(TestCase):
 
         remaining = set(ErrorLog.objects.values_list('message', flat=True))
         self.assertEqual(remaining, {"xato 2", "xato 3", "xato 4"})
+
+
+class DiskGuardTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        from licensing.tasks import DISK_ALERT_CACHE_KEY
+        cache.delete(DISK_ALERT_CACHE_KEY)
+
+    def _row(self, reported, days_ago):
+        when = timezone.now() - timezone.timedelta(days=days_ago)
+        return ErrorLog.objects.create(
+            level='ERROR', logger_name='t', message='m', is_reported=reported,
+            occurred_at=when, reported_at=when if reported else None,
+        )
+
+    def _usage(self, *percents):
+        return patch('licensing.tasks.psutil.disk_usage', side_effect=[MagicMock(percent=p) for p in percents])
+
+    def test_below_warn_does_nothing(self):
+        from licensing.tasks import disk_guard
+        old = self._row(True, 5)
+        with self._usage(40):
+            result = disk_guard()
+        self.assertEqual(result['level'], 'ok')
+        self.assertTrue(ErrorLog.objects.filter(pk=old.pk).exists())
+
+    def test_warn_trims_reported_logs_but_keeps_unreported(self):
+        from licensing.tasks import disk_guard
+        old_reported = self._row(True, 5)
+        fresh_reported = self._row(True, 0)
+        unreported = self._row(False, 5)
+        with self._usage(88):
+            result = disk_guard()
+        self.assertEqual(result['level'], 'warn')
+        self.assertFalse(ErrorLog.objects.filter(pk=old_reported.pk).exists())
+        self.assertTrue(ErrorLog.objects.filter(pk=fresh_reported.pk).exists())
+        self.assertTrue(ErrorLog.objects.filter(pk=unreported.pk).exists())
+
+    def test_warn_level_does_not_raise_error_log(self):
+        from licensing.tasks import disk_guard
+        before = ErrorLog.objects.count()
+        with self._usage(88):
+            disk_guard()
+        self.assertEqual(ErrorLog.objects.count(), before)  # warning ErrorLog'ga yozilmaydi
+
+    def test_critical_prunes_history_and_alerts_once_per_cooldown(self):
+        from licensing.tasks import disk_guard
+        with patch('licensing.tasks.call_command') as cc, self._usage(95, 95, 95, 95), \
+                self.assertLogs('licensing.tasks', level='ERROR') as logs:
+            first = disk_guard()
+            second = disk_guard()
+        self.assertEqual(first['level'], 'critical')
+        self.assertTrue(first['history_pruned'])
+        self.assertEqual(cc.call_count, 2)
+        self.assertEqual(len([r for r in logs.records if r.levelno == logging.ERROR]), 1)  # cooldown
+
+    def test_critical_resolved_by_cleanup_does_not_alert(self):
+        from licensing.tasks import disk_guard
+        with patch('licensing.tasks.call_command'), self._usage(95, 80):
+            with self.assertNoLogs('licensing.tasks', level='ERROR'):
+                disk_guard()
+
+    def test_history_prune_failure_still_alerts(self):
+        from licensing.tasks import disk_guard
+        with patch('licensing.tasks.call_command', side_effect=RuntimeError('boom')), self._usage(95, 95), \
+                self.assertLogs('licensing.tasks', level='ERROR'):
+            result = disk_guard()
+        self.assertFalse(result['history_pruned'])

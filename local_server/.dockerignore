@@ -1,0 +1,24 @@
+# Image'ga tushmasligi shart bo'lgan narsalar: sirlar, ma'lumotlar, dev fayllari.
+# (.env - SECRET_KEY/DB_PASSWORD/tunnel token; keys/ - litsenziya kalitlari
+# prod'da volume sifatida ulanadi; backups/ - DB dump'lar; media/ - yuklangan fayllar.)
+.git
+.gitignore
+.env
+.env.*
+keys
+backups
+media
+staticfiles
+celerybeat-schedule
+celerybeat.pid
+**/__pycache__
+**/*.pyc
+
+# Image ichida kerak emas
+*.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
+Makefile
+scripts
+pos-bola.avahi.service

@@ -292,6 +292,55 @@ if [[ -n "$POS_PUBLIC_DOMAIN" ]]; then env_set CSRF_TRUSTED_ORIGINS "https://$PO
 env_set ONLINE_MODE "$POS_ONLINE"
 [[ -n "$POS_CF_TOKEN" ]] && env_set CLOUDFLARE_TUNNEL_TOKEN "$POS_CF_TOKEN"
 
+# ---- Resurs profili: RAM/yadro/disk bo'yicha avtomatik (foydalanuvchidan hech narsa so'ralmaydi).
+# Har ishga tushirishda qayta hisoblanadi (RAM qo'shilgan bo'lishi mumkin); sirlarga tegmaydi.
+# Override: POS_PROFILE=small|mid|large. Qiymatlar docker-compose.prod.yml'da ishlatiladi.
+host_ram_mb() {
+  if [[ $PLATFORM == mac ]]; then echo $(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1048576 ))
+  else awk '/^MemTotal:/{print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0; fi
+}
+host_cores() { if [[ $PLATFORM == mac ]]; then sysctl -n hw.ncpu 2>/dev/null || echo 1; else nproc 2>/dev/null || echo 1; fi; }
+# pick_profile <konteynerlarga mavjud RAM, MB> <yadrolar> -> small|mid|large
+pick_profile() {
+  local ram="$1" cores="$2" p
+  if (( ram <= 0 )); then p=mid
+  elif (( ram < 3000 )); then p=small
+  elif (( ram < 6000 )); then p=mid
+  else p=large; fi
+  if (( cores <= 2 )) && [[ $p == large ]]; then p=mid; fi
+  echo "$p"
+}
+apply_profile() {
+  case "$1" in
+    small) env_set CELERY_MAX_CONCURRENCY 1; env_set CELERY_MAX_MEMORY_KB 200000
+           env_set PG_SHARED_BUFFERS 64MB; env_set PG_MAX_CONNECTIONS 30; env_set PG_WORK_MEM 2MB; env_set PG_EFFECTIVE_CACHE_SIZE 128MB
+           env_set REDIS_MAXMEMORY 64mb; env_set BACKUP_KEEP_DAYS 3; env_set BACKUP_KEEP_WEEKS 1; env_set BACKUP_KEEP_MONTHS 1 ;;
+    large) env_set CELERY_MAX_CONCURRENCY 4; env_set CELERY_MAX_MEMORY_KB 400000
+           env_set PG_SHARED_BUFFERS 256MB; env_set PG_MAX_CONNECTIONS 100; env_set PG_WORK_MEM 8MB; env_set PG_EFFECTIVE_CACHE_SIZE 1GB
+           env_set REDIS_MAXMEMORY 256mb; env_set BACKUP_KEEP_DAYS 14; env_set BACKUP_KEEP_WEEKS 4; env_set BACKUP_KEEP_MONTHS 6 ;;
+    *)     env_set CELERY_MAX_CONCURRENCY 2; env_set CELERY_MAX_MEMORY_KB 250000
+           env_set PG_SHARED_BUFFERS 128MB; env_set PG_MAX_CONNECTIONS 60; env_set PG_WORK_MEM 4MB; env_set PG_EFFECTIVE_CACHE_SIZE 384MB
+           env_set REDIS_MAXMEMORY 128mb; env_set BACKUP_KEEP_DAYS 7; env_set BACKUP_KEEP_WEEKS 2; env_set BACKUP_KEEP_MONTHS 3 ;;
+  esac
+  env_set RESOURCE_PROFILE "$1"
+}
+RAM_MB="$(host_ram_mb)"; CORES="$(host_cores)"
+# macOS (Docker Desktop VM) da OS + VM ~2.5 GB oladi; Linux'da konteynerlar RAM'ni to'g'ridan-to'g'ri ishlatadi.
+if [[ $PLATFORM == mac ]]; then EFF_RAM=$(( RAM_MB - 2500 )); else EFF_RAM=$RAM_MB; fi
+PROFILE="${POS_PROFILE:-}"
+case "$PROFILE" in small|mid|large) ;; *) PROFILE="$(pick_profile "$EFF_RAM" "$CORES")" ;; esac
+apply_profile "$PROFILE"
+ok "resurs profili: $PROFILE (RAM ${RAM_MB} MB, ${CORES} yadro) - Celery/Postgres/Redis/zaxira shunga moslandi"
+if (( RAM_MB > 0 && RAM_MB < 3000 )); then warn "RAM juda kam (${RAM_MB} MB): tizim sekin ishlashi mumkin. Tavsiya: kamida 4 GB (ideal 8 GB)."; fi
+FREE_GB="$(df -Pk . 2>/dev/null | awk 'NR==2{print int($4/1048576)}')"
+if [[ -n "$FREE_GB" ]] && (( FREE_GB < 15 )); then warn "Diskda bo'sh joy kam (${FREE_GB} GB): Docker image va zaxira nusxalar uchun kamida 15 GB kerak."; fi
+if [[ $PLATFORM == linux ]] && command -v lsblk >/dev/null 2>&1; then
+  SRC="$(findmnt -no SOURCE -T . 2>/dev/null || true)"
+  if [[ -n "$SRC" ]] && lsblk -s -no ROTA "$SRC" 2>/dev/null | grep -qx '1'; then
+    warn "Disk HDD (aylanuvchi) ko'rinadi: Postgres sekin ishlaydi. SSD'ga o'tish kassa tezligini keskin oshiradi."
+  fi
+fi
+
 # Qurilma barmoq izi. Bir marta belgilangach O'ZGARTIRILMAYDI (litsenziya shu izga bog'lanadi).
 # Docker Desktop (macOS) konteynerida barqaror ID yo'q; Linux'da ham ba'zi mini-PC'larda
 # DMI product_uuid bo'sh bo'ladi - shunda host'ning o'zidan barqaror ID olamiz.

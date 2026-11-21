@@ -1,6 +1,25 @@
+# Barcha servislar uchun log rotatsiyasi: sozlanmasa Docker loglari cheksiz
+# o'sadi va kichik diskli restoran mashinasi bir necha oyda to'lib qoladi.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Resurs profili (RESOURCE_PROFILE=small|mid|large) scripts/install.sh|ps1 tomonidan
+# .env'ga yoziladi (RAM/yadro/disk bo'yicha avtomatik). Quyidagi ${...:-default}
+# qiymatlar "mid" profilga teng - .env'da bo'lmasa shu ishlaydi.
 services:
   db:
     image: postgres:15
+    # Profilga qarab sozlanadi (restart talab qiladi - ish paytida o'zgarmaydi).
+    command: >
+      postgres
+      -c shared_buffers=${PG_SHARED_BUFFERS:-128MB}
+      -c max_connections=${PG_MAX_CONNECTIONS:-60}
+      -c work_mem=${PG_WORK_MEM:-4MB}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-384MB}
+    logging: *default-logging
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -26,12 +45,19 @@ services:
       - POSTGRES_USER=${DB_USER:-pos_user}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-7}
+      - BACKUP_KEEP_WEEKS=${BACKUP_KEEP_WEEKS:-2}
+      - BACKUP_KEEP_MONTHS=${BACKUP_KEEP_MONTHS:-3}
+    logging: *default-logging
     volumes:
       - ./backups:/backups
 
   redis:
     image: redis:7-alpine
+    # volatile-lru: faqat TTL'li kalitlar (kesh, throttle, WS bilet) siqib chiqariladi;
+    # Celery navbati va Channels qatlami (TTL'siz) hech qachon yo'qolmaydi.
+    command: redis-server --maxmemory ${REDIS_MAXMEMORY:-128mb} --maxmemory-policy volatile-lru
+    logging: *default-logging
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -73,6 +99,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    logging: *default-logging
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -80,7 +107,10 @@ services:
   celery_worker:
     image: ${POS_IMAGE:-ghcr.io/ORG/pos-local}:${RELEASE_CHANNEL:-stable}
     platform: linux/amd64
-    command: celery -A config worker --loglevel=info --concurrency=2
+    # --autoscale=MAX,1: yuklama yo'q paytda 1 jarayon, ko'p bo'lsa MAX gacha ko'tariladi
+    # (MAX profilga qarab; kichik mashinada 1). --max-memory-per-child (KiB): jarayon
+    # shuncha xotiradan oshsa, joriy vazifadan keyin qayta ishga tushadi (xotira oqishidan himoya).
+    command: celery -A config worker --loglevel=info --autoscale=${CELERY_MAX_CONCURRENCY:-2},1 --max-memory-per-child=${CELERY_MAX_MEMORY_KB:-250000}
     env_file: .env
     environment:
       - PYTHONDONTWRITEBYTECODE=1
@@ -100,6 +130,7 @@ services:
         condition: service_healthy
       web:
         condition: service_started
+    logging: *default-logging
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -130,6 +161,7 @@ services:
         condition: service_healthy
       web:
         condition: service_started
+    logging: *default-logging
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -150,6 +182,7 @@ services:
   # yaratiladi.
   watchtower:
     image: nickfedor/watchtower:1.24.1
+    logging: *default-logging
     restart: unless-stopped
     # docker.sock baribir kuchli huquq (tekshirilgan: docker-socket-proxy ham exec/privileged create'ni to'sa
     # olmaydi, shuning uchun qo'yilmadi) - lekin konteynerning o'zi imkon qadar toraytirilgan.
@@ -190,6 +223,7 @@ services:
     build:
       context: ../website
       dockerfile: Dockerfile
+    logging: *default-logging
     restart: unless-stopped
     environment:
       - BACKEND_WEB=web:8000
@@ -214,6 +248,7 @@ services:
   # `docker compose restart cloudflared` ham qo'lda bajarilishi kerak.
   cloudflared:
     image: cloudflare/cloudflared:2026.11.1
+    logging: *default-logging
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:

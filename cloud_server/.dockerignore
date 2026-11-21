@@ -1,0 +1,21 @@
+# Image'ga tushmasligi shart bo'lgan narsalar. DIQQAT: keys/ ichida
+# LITSENZIYA IMZOLASH MAXFIY KALITI (license_private.pem) bor - u image'ga
+# tushsa, image'ni ko'rgan har kim cheksiz litsenziya yarata oladi. Prod'da
+# kalit docker-compose.prod.yml orqali `./keys:/app/keys:ro` volume sifatida ulanadi.
+.git
+.gitignore
+.env
+.env.*
+keys
+media
+staticfiles
+backups
+celerybeat-schedule
+celerybeat.pid
+**/__pycache__
+**/*.pyc
+
+*.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
