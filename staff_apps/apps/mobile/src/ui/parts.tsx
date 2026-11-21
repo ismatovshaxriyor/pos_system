@@ -1,9 +1,20 @@
-import { cartCount, cartTotalTiyin, formatMoney, tiyinToDecimal, type Cart, type Category, type Product } from '@pos/shared';
+import {
+  cartCount,
+  cartTotalTiyin,
+  formatMoney,
+  MAX_NOTE_LENGTH,
+  NOTE_PRESETS,
+  tiyinToDecimal,
+  toggleNotePart,
+  type Cart,
+  type Category,
+  type Product,
+} from '@pos/shared';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Card, Txt, useLift } from './kit';
+import { Button, Card, ErrorText, Txt, useLift } from './kit';
 import { FONT, useHand, useTheme } from './theme';
 
 /** Filtr chipi: tanlangan = och tus (`sel`) + ink-60 chegara, qora to'ldirish emas. */
@@ -241,10 +252,13 @@ export function TotalRow({ label, value, strong }: { label: string; value: strin
 export function CartSheet({
   cart,
   onQty,
+  onNote,
   children,
 }: {
   cart: Cart;
   onQty: (line: Cart[number], q: number) => void;
+  /** Berilsa har qatorda "Izoh" (tezkor tugmalar + yozish) chiqadi. */
+  onNote?: (line: Cart[number], note: string) => void;
   /** Asosiy tugma + xato matni */
   children: ReactNode;
 }) {
@@ -252,6 +266,8 @@ export function CartSheet({
   const hand = useHand();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+  // Izoh tahrirlanayotgan qator kaliti (`mahsulot|izoh`); izoh o'zgarganda kalit ham o'zgaradi - quyida yangilanadi.
+  const [editing, setEditing] = useState<string | null>(null);
   const empty = cart.length === 0;
 
   return (
@@ -291,27 +307,197 @@ export function CartSheet({
 
       {open && !empty && (
         <ScrollView style={{ maxHeight: 280 }} contentContainerStyle={{ gap: 4 }}>
-          {cart.map((l) => (
-            <View
-              key={`${l.productId}|${l.note}`}
-              style={{ flexDirection: hand.addDirection, alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 4 }}
-            >
-              <View style={{ flex: 1 }}>
-                <Txt size={16} weight={500}>
-                  {l.name}
-                </Txt>
-                <Txt family="mono" size={13} tone="muted">
-                  {formatMoney(l.unitPrice)}
-                </Txt>
+          {cart.map((l) => {
+            const key = `${l.productId}|${l.note}`;
+            const isEditing = !!onNote && editing === key;
+            return (
+              <View key={key} style={{ gap: 6, paddingVertical: 4 }}>
+                <View style={{ flexDirection: hand.addDirection, alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Txt size={16} weight={500}>
+                      {l.name}
+                    </Txt>
+                    <Txt family="mono" size={13} tone="muted">
+                      {formatMoney(l.unitPrice)}
+                    </Txt>
+                    {onNote && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${l.name} uchun izoh`}
+                        onPress={() => setEditing(isEditing ? null : key)}
+                        style={{ minHeight: 36, justifyContent: 'center', alignSelf: 'flex-start' }}
+                      >
+                        <Txt size={14} weight={600} tone={l.note ? 'ink' : 'muted'}>
+                          {l.note ? `✎ ${l.note}` : '＋ Izoh'}
+                        </Txt>
+                      </Pressable>
+                    )}
+                  </View>
+                  <QtyStepper value={l.quantity} onChange={(q) => onQty(l, q)} />
+                </View>
+                {isEditing && (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {NOTE_PRESETS.map((preset) => {
+                        const on = l.note.split(';').some((x) => x.trim().toLowerCase() === preset.toLowerCase());
+                        return (
+                          <Chip
+                            key={preset}
+                            label={preset}
+                            active={on}
+                            onPress={() => {
+                              const next = toggleNotePart(l.note, preset);
+                              onNote?.(l, next);
+                              setEditing(`${l.productId}|${next}`);
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+                    <NoteInput
+                      key={key}
+                      initial={l.note}
+                      onCommit={(text) => {
+                        onNote?.(l, text);
+                        setEditing(`${l.productId}|${text.trim().slice(0, MAX_NOTE_LENGTH)}`);
+                      }}
+                    />
+                  </View>
+                )}
               </View>
-              <QtyStepper value={l.quantity} onChange={(q) => onQty(l, q)} />
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
 
       {children}
     </View>
+  );
+}
+
+/**
+ * Yuborishdan oldingi yakuniy tasdiq: ofitsiant nima ketayotganini ko'rib chiqadi. Oshxonaga chek FAQAT
+ * "Tasdiqlash" bosilgandan keyin ketadi; "Tahrirlash" savatga qaytaradi, hech narsa yuborilmaydi.
+ */
+export function ConfirmOrderSheet({
+  visible,
+  title,
+  subtitle,
+  cart,
+  busy,
+  error,
+  confirmLabel = 'Tasdiqlash va oshxonaga yuborish',
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean;
+  title: string;
+  /** Stol, mehmonlar soni, buyurtma izohi kabi qisqa qator. */
+  subtitle?: string;
+  cart: Cart;
+  busy?: boolean;
+  error?: string | null;
+  confirmLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => {
+        if (!busy) onCancel();
+      }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+        <View
+          style={{
+            backgroundColor: c.card,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            paddingHorizontal: 20,
+            paddingTop: 20,
+            paddingBottom: insets.bottom + 16,
+            gap: 12,
+            maxHeight: '85%',
+          }}
+        >
+          <View style={{ gap: 2 }}>
+            <Txt size={22} weight={600}>
+              {title}
+            </Txt>
+            {subtitle ? (
+              <Txt size={14} tone="muted">
+                {subtitle}
+              </Txt>
+            ) : null}
+          </View>
+          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 10 }}>
+            {cart.map((l) => (
+              <View key={`${l.productId}|${l.note}`} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Txt size={16} weight={500}>
+                    <Txt family="mono" size={15} tone="muted">
+                      {l.quantity}×{' '}
+                    </Txt>
+                    {l.name}
+                  </Txt>
+                  {l.note ? (
+                    <Txt size={14} tone="muted">
+                      ✎ {l.note}
+                    </Txt>
+                  ) : null}
+                </View>
+                <Txt family="mono" size={15} tone="muted">
+                  {formatMoney(tiyinToDecimal(cartTotalTiyin([l])))}
+                </Txt>
+              </View>
+            ))}
+          </ScrollView>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <Txt size={15} weight={500} tone="muted">
+              Jami · {cartCount(cart)} ta
+            </Txt>
+            <Txt family="mono" weight={500} size={22}>
+              {formatMoney(tiyinToDecimal(cartTotalTiyin(cart)))}
+            </Txt>
+          </View>
+          <Txt size={13} tone="muted">
+            Tasdiqlasangiz, buyurtma oshxonaga chek bo'lib chiqadi.
+          </Txt>
+          {error ? <ErrorText>{error}</ErrorText> : null}
+          <Button title={confirmLabel} onPress={onConfirm} loading={busy} />
+          <Button title="Tahrirlash" variant="ghost" disabled={busy} onPress={onCancel} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** Erkin izoh: yozib bo'lgach (klaviatura "tayyor" yoki fokus ketganda) saqlanadi - har harfda qator kaliti o'zgarmasin. */
+function NoteInput({ initial, onCommit }: { initial: string; onCommit: (text: string) => void }) {
+  const { c, scale } = useTheme();
+  const [text, setText] = useState(initial);
+  return (
+    <TextInput
+      value={text}
+      onChangeText={setText}
+      onEndEditing={() => onCommit(text)}
+      onSubmitEditing={() => onCommit(text)}
+      placeholder="Boshqa izoh yozing..."
+      placeholderTextColor={c.ink60}
+      maxLength={MAX_NOTE_LENGTH}
+      returnKeyType="done"
+      style={{
+        backgroundColor: c.panel,
+        borderColor: c.grid,
+        borderWidth: 1,
+        borderRadius: 12,
+        color: c.ink,
+        fontFamily: FONT.body400,
+        fontSize: Math.round(15 * scale),
+        paddingHorizontal: 14,
+        minHeight: 44,
+      }}
+    />
   );
 }
 

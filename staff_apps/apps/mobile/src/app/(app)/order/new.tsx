@@ -1,7 +1,11 @@
 import {
   addProduct,
+  decreaseProduct,
   describeError,
   emptyCart,
+  GUEST_PRESETS,
+  setLineNote,
+  productCounts,
   setQuantity,
   submitDraft,
   type Cart,
@@ -13,8 +17,8 @@ import { View } from 'react-native';
 
 import { useBootstrap } from '@/lib/hooks';
 import { newUuid, pos } from '@/lib/pos';
-import { Button, Card, ErrorText, Eyebrow, Field, Muted, Screen, Title } from '@/ui/kit';
-import { CartSheet, MenuPicker } from '@/ui/parts';
+import { Button, Card, ErrorText, Eyebrow, Field, Muted, Screen, Title, Txt } from '@/ui/kit';
+import { CartSheet, Chip, ConfirmOrderSheet, MenuPicker } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
 /**
@@ -34,9 +38,10 @@ export default function NewOrderScreen() {
   const [guests, setGuests] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const counts = useMemo(() => new Map(cart.map((l) => [l.productId, l.quantity] as const)), [cart]);
+  const counts = useMemo(() => productCounts(cart), [cart]);
   const registerClosed = data ? !data.register_open : false;
 
   async function send() {
@@ -50,6 +55,7 @@ export default function NewOrderScreen() {
     } catch (e) {
       // progress saqlanib qoladi: "Qayta urinish" faqat bajarilmagan qadamlarni takrorlaydi.
       setError(describeError(e));
+      setConfirming(false);
     } finally {
       setBusy(false);
     }
@@ -59,11 +65,15 @@ export default function NewOrderScreen() {
     <Screen
       scroll
       footer={
-        <CartSheet cart={cart} onQty={(l, q) => setCart((c) => setQuantity(c, l.productId, l.note, q))}>
+        <CartSheet
+          cart={cart}
+          onQty={(l, q) => setCart((c) => setQuantity(c, l.productId, l.note, q))}
+          onNote={(l, note) => setCart((c) => setLineNote(c, l.productId, l.note, note))}
+        >
           {error && <ErrorText>{error}</ErrorText>}
           <Button
-            title={progress.current.orderId ? 'Qayta urinish' : 'Oshxonaga yuborish'}
-            onPress={() => void send()}
+            title={progress.current.orderId ? 'Qayta urinish' : 'Ko\u2018rib chiqish va yuborish'}
+            onPress={() => (progress.current.orderId ? void send() : setConfirming(true))}
             loading={busy}
             disabled={cart.length === 0 || registerClosed}
           />
@@ -77,12 +87,30 @@ export default function NewOrderScreen() {
         </View>
         <Button title="← Orqaga" variant="ghost" compact onPress={() => router.back()} />
       </View>
+      <ConfirmOrderSheet
+        visible={confirming}
+        title="Buyurtmani tasdiqlang"
+        subtitle={[table?.name, Number(guests) > 0 ? `${guests} mehmon` : '', note.trim()].filter(Boolean).join(' · ')}
+        cart={cart}
+        busy={busy}
+        error={error}
+        onConfirm={() => void send()}
+        onCancel={() => setConfirming(false)}
+      />
       {registerClosed && <ErrorText>Kassa yopiq — buyurtma ochib bo'lmaydi.</ErrorText>}
       {!data && <Muted>Yuklanmoqda...</Muted>}
 
       {data && (
         <Card>
-          <Field label="Mehmonlar soni (ixtiyoriy)" value={guests} onChangeText={(v) => setGuests(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" />
+          <Txt size={14} weight={500} tone="muted">
+            Mehmonlar soni (ixtiyoriy)
+          </Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {GUEST_PRESETS.map((n) => (
+              <Chip key={n} label={String(n)} active={guests === String(n)} onPress={() => setGuests(guests === String(n) ? '' : String(n))} />
+            ))}
+          </View>
+          <Field label="Boshqa son" value={guests} onChangeText={(v) => setGuests(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" />
           <Field label="Buyurtmaga izoh (ixtiyoriy)" value={note} onChangeText={setNote} autoCapitalize="sentences" />
         </Card>
       )}
@@ -93,7 +121,7 @@ export default function NewOrderScreen() {
           products={data.products}
           counts={counts}
           onPick={(p) => setCart((c) => addProduct(c, p))}
-          onDecrease={(p) => setCart((c) => setQuantity(c, p.id, '', (counts.get(p.id) ?? 0) - 1))}
+          onDecrease={(p) => setCart((c) => decreaseProduct(c, p.id))}
         />
       )}
     </Screen>

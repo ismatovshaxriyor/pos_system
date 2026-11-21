@@ -18,9 +18,9 @@ export function paletteFor(theme: ThemeName): Palette {
   return theme === 'night' ? night : light;
 }
 
-export type TextScale = 'normal' | 'large' | 'xlarge';
+export type TextScale = 'small' | 'normal' | 'large' | 'xlarge';
 
-export const TEXT_SCALES: Record<TextScale, number> = { normal: 1, large: 1.125, xlarge: 1.25 };
+export const TEXT_SCALES: Record<TextScale, number> = { small: 0.875, normal: 1, large: 1.125, xlarge: 1.25 };
 
 export function textScaleFactor(scale: TextScale): number {
   return TEXT_SCALES[scale] ?? 1;
@@ -31,5 +31,5 @@ export function isThemePref(v: unknown): v is ThemePref {
 }
 
 export function isTextScale(v: unknown): v is TextScale {
-  return v === 'normal' || v === 'large' || v === 'xlarge';
+  return v === 'small' || v === 'normal' || v === 'large' || v === 'xlarge';
 }

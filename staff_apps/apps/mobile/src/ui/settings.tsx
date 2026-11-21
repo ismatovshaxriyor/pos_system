@@ -11,6 +11,7 @@ const THEMES: { value: ThemePref; label: string }[] = [
   { value: 'auto', label: 'Avto' },
 ];
 const SCALES: { value: TextScale; label: string }[] = [
+  { value: 'small', label: 'Kichik' },
   { value: 'normal', label: 'Oddiy' },
   { value: 'large', label: 'Katta' },
   { value: 'xlarge', label: 'Juda katta' },

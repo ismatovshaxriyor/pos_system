@@ -1,12 +1,28 @@
-import { describeError, elapsedLabel, formatMoney, parseDecimalInput, toTiyin, type Order, type OrderStatus } from '@pos/shared';
+import {
+  addProduct,
+  decreaseProduct,
+  cartCount,
+  describeError,
+  elapsedLabel,
+  emptyCart,
+  formatMoney,
+  parseDecimalInput,
+  setLineNote,
+  productCounts,
+  setQuantity,
+  toTiyin,
+  type Cart,
+  type Order,
+  type OrderStatus,
+} from '@pos/shared';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useBootstrap, useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
-import { MenuPicker, TotalRow } from '@/ui/parts';
+import { CartSheet, ConfirmOrderSheet, MenuPicker, TotalRow } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -28,13 +44,15 @@ export default function OrderScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  // Qo'shiladigan taomlar savatda yig'iladi va BIR martada yuboriladi: har "+" bosilganda alohida
+  // so'rov va oshxonaga alohida chek ketmasin.
+  const [cart, setCart] = useState<Cart>(emptyCart);
+  const counts = useMemo(() => productCounts(cart), [cart]);
   const [info, setInfo] = useState<string | null>(null);
   const [discount, setDiscount] = useState<{ amount: string; reason: string } | null>(null);
   const [saving, setSaving] = useState(false);
-  // Tez-tez bosishlar ketma-ket ketsin (parallel `add_item` serverda qator qulfi bilan baribir
-  // ketma-ket bajariladi, lekin UI'da tartib va xatoni aniq ushlash uchun zanjirlaymiz).
-  const queue = useRef<Promise<void>>(Promise.resolve());
 
   const load = useCallback(async () => {
     try {
@@ -52,13 +70,26 @@ export default function OrderScreen() {
 
   const finished = order?.status === 'completed' || order?.status === 'cancelled';
 
-  function addItem(productId: number) {
+  /** Savatdagi taomlarni buyurtmaga qo'shadi (server oshxonaga chekni o'zi chiqaradi). Xatoda savat saqlanadi. */
+  async function sendCart() {
+    if (adding || cart.length === 0) return;
     setAdding(true);
-    queue.current = queue.current
-      .then(() => pos.api.orders.addItem(orderId, { product_id: productId, quantity: 1 }))
-      .then(() => load())
-      .catch((e) => setError(describeError(e)))
-      .finally(() => setAdding(false));
+    setError(null);
+    try {
+      await pos.api.orders.addItem(
+        orderId,
+        cart.map((l) => ({ product_id: l.productId, quantity: l.quantity, note: l.note })),
+      );
+      setCart(emptyCart);
+      setShowMenu(false);
+      setConfirming(false);
+      await load();
+    } catch (e) {
+      setError(describeError(e));
+      setConfirming(false);
+    } finally {
+      setAdding(false);
+    }
   }
 
   async function start() {
@@ -122,7 +153,19 @@ export default function OrderScreen() {
   const due = order ? toTiyin(order.balance_due) : 0;
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        showMenu && !finished && cart.length > 0 ? (
+          <CartSheet
+            cart={cart}
+            onQty={(l, q) => setCart((c) => setQuantity(c, l.productId, l.note, q))}
+            onNote={(l, note) => setCart((c) => setLineNote(c, l.productId, l.note, note))}
+          >
+            <Button title={`Ko\u2018rib chiqish va qo\u2018shish (${cartCount(cart)} ta)`} onPress={() => setConfirming(true)} />
+          </CartSheet>
+        ) : undefined
+      }
+    >
       <View style={{ flexDirection: hand.headerDirection, alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Eyebrow>
@@ -132,6 +175,17 @@ export default function OrderScreen() {
         </View>
         <Button title="← Stollar" variant="ghost" compact onPress={() => router.back()} />
       </View>
+      <ConfirmOrderSheet
+        visible={confirming}
+        title="Qo'shishni tasdiqlang"
+        subtitle={order?.table?.name}
+        cart={cart}
+        busy={adding}
+        error={error}
+        confirmLabel="Tasdiqlash va oshxonaga qo'shish"
+        onConfirm={() => void sendCart()}
+        onCancel={() => setConfirming(false)}
+      />
       {order && <Pill label={STATUS_LABEL[order.status]} kind={order.status === 'completed' ? 'ok' : 'neutral'} />}
       {error && <ErrorText>{error}</ErrorText>}
       {info && <Muted>{info}</Muted>}
@@ -165,15 +219,30 @@ export default function OrderScreen() {
         </Card>
       )}
 
-      {order?.status === 'new' && <Button title="Oshxonaga yuborish" onPress={() => void start()} />}
+      {order?.status === 'new' && (
+        <Button
+          title="Oshxonaga yuborish"
+          onPress={() =>
+            Alert.alert('Oshxonaga yuborish', 'Buyurtma tasdiqlansa, oshxonaga chek chiqadi. Davom etasizmi?', [
+              { text: 'Yo\u2018q', style: 'cancel' },
+              { text: 'Tasdiqlash', onPress: () => void start() },
+            ])
+          }
+        />
+      )}
 
       {order && !finished && (
         <Button title={showMenu ? 'Menyuni yopish' : "Mahsulot qo'shish"} variant="ghost" onPress={() => setShowMenu((v) => !v)} />
       )}
       {showMenu && boot && !finished && (
         <>
-          {adding && <Muted>Qo'shilmoqda...</Muted>}
-          <MenuPicker categories={boot.categories} products={boot.products} onPick={(p) => addItem(p.id)} />
+          <MenuPicker
+            categories={boot.categories}
+            products={boot.products}
+            counts={counts}
+            onPick={(p) => setCart((c) => addProduct(c, p))}
+            onDecrease={(p) => setCart((c) => decreaseProduct(c, p.id))}
+          />
         </>
       )}
 

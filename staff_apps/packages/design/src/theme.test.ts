@@ -21,6 +21,8 @@ describe('resolveTheme', () => {
 
 describe('textScaleFactor', () => {
   it("o'lchamlar o'sib boradi", () => {
+    expect(textScaleFactor('small')).toBeLessThan(1);
+    expect(textScaleFactor('small')).toBeGreaterThan(0.7);
     expect(textScaleFactor('normal')).toBe(1);
     expect(textScaleFactor('large')).toBeGreaterThan(1);
     expect(textScaleFactor('xlarge')).toBeGreaterThan(textScaleFactor('large'));
