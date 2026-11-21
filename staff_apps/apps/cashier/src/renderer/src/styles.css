@@ -589,6 +589,85 @@ h1 {
   color: var(--ink-60);
 }
 
+.col-tabs {
+  flex: none;
+  margin: 10px 10px 4px;
+}
+
+.col-tabs button {
+  min-height: 48px;
+  font-size: 0.9375rem;
+}
+
+/* ----- Stollar ko'rinishi ----- */
+.tg-zone-name {
+  margin: 10px 4px 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-60);
+}
+
+.tg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.tg-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  min-height: 84px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-align: left;
+  border: 1px solid var(--grid);
+  border-left: 5px solid var(--grid);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.tg-tile.free {
+  opacity: 0.55;
+  cursor: default;
+  box-shadow: none;
+}
+
+.tg-tile.busy {
+  border-left-color: var(--warn);
+  cursor: pointer;
+  box-shadow: var(--lift);
+}
+
+.tg-tile.busy.active {
+  background: var(--sel);
+  border-color: var(--ink-60);
+  border-left-color: var(--warn);
+  box-shadow: none;
+}
+
+.tg-name {
+  font-family: var(--font-disp);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.tg-state {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tg-state small {
+  font-family: var(--font-body);
+  color: var(--ink-60);
+}
+
 .count {
   background: var(--panel);
   color: var(--ink);

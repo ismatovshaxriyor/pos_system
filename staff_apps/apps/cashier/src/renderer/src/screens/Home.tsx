@@ -6,6 +6,7 @@ import { DebtSheet } from '../components/DebtSheet';
 import { Flap } from '../components/Flap';
 import { MenuSheet } from '../components/MenuSheet';
 import { OrderList } from '../components/OrderList';
+import { TableGrid } from '../components/TableGrid';
 import { ShiftSheet } from '../components/ShiftSheet';
 import { Workspace } from '../components/Workspace';
 import { useBootstrap, useRealtimeStatus, useSession } from '../lib/hooks';
@@ -29,6 +30,8 @@ export function HomeScreen() {
   const rt = useRealtimeStatus();
   const { data, loading, error, refresh } = useBootstrap();
   const [selected, setSelected] = useState<number | null>(null);
+  /** Chap ustun: ochiq buyurtmalar yoki hamma stollar (bo'sh/band). */
+  const [leftTab, setLeftTab] = useState<'orders' | 'tables'>('orders');
   const [menuOpen, setMenuOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [debtsOpen, setDebtsOpen] = useState(false);
@@ -45,7 +48,9 @@ export function HomeScreen() {
   const totalDue = orders.reduce((s, o) => s + toTiyin(o.balance_due), 0);
   const closePanel = useCallback(() => setSelected(null), []);
   // Qidiruv maydoni faqat ro'yxat uzun bo'lganda ko'rinadi; yashirin bo'lsa eski so'rov ro'yxatni filtrlamasin.
-  const searchShown = orders.length > SEARCH_MIN_ORDERS;
+  const tables = data?.tables ?? [];
+  const activeTableCount = tables.filter((t) => t.is_active).length;
+  const searchShown = leftTab === 'orders' && orders.length > SEARCH_MIN_ORDERS;
   const activeQuery = searchShown ? query : '';
   const visible = useMemo(() => sortOpenOrders(filterOrders(orders, activeQuery)), [orders, activeQuery]);
   const sheetOpen = menuOpen || debtsOpen || shiftsOpen || dayEnd !== null;
@@ -131,9 +136,13 @@ export function HomeScreen() {
 
       <main className="main">
         <aside className="col-orders">
-          <div className="col-title">
-            <span>Ochiq buyurtmalar</span>
-            <span className="count">{orders.length}</span>
+          <div className="col-tabs tabs" role="tablist" aria-label="Chap ustun">
+            <button role="tab" aria-selected={leftTab === 'orders'} className={leftTab === 'orders' ? 'active' : ''} onClick={() => setLeftTab('orders')}>
+              Buyurtmalar <span className="count">{orders.length}</span>
+            </button>
+            <button role="tab" aria-selected={leftTab === 'tables'} className={leftTab === 'tables' ? 'active' : ''} onClick={() => setLeftTab('tables')}>
+              Stollar <span className="count">{activeTableCount}</span>
+            </button>
           </div>
           {searchShown && (
             <div className="orders-search">
@@ -148,7 +157,9 @@ export function HomeScreen() {
             </div>
           )}
           <div className="orders-scroll">
-            {loading && !data ? <div className="orders-empty muted">Yuklanmoqda...</div> : (
+            {loading && !data ? <div className="orders-empty muted">Yuklanmoqda...</div> : leftTab === 'tables' ? (
+              <TableGrid tables={tables} orders={orders} selectedId={current} onSelect={setSelected} />
+            ) : (
               <OrderList
                 orders={visible}
                 selectedId={current}
