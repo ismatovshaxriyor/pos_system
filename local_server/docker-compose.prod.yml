@@ -149,7 +149,7 @@ services:
   # ishlaydi) bilan esa web+celery_worker+celery_beat to'liq va toza qayta
   # yaratiladi.
   watchtower:
-    image: nickfedor/watchtower:latest
+    image: nickfedor/watchtower:1.24.1
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -207,7 +207,7 @@ services:
   # tunnel orqali 502 qaytaradi. `web`/`website` o'zgargan har safar
   # `docker compose restart cloudflared` ham qo'lda bajarilishi kerak.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.11.1
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:

@@ -33,7 +33,7 @@ Restoranlardagi lokal kompyuterlar odatda provayder tomonidan berilgan dinamik I
 **Docker-compose ga qo'shish:**
 yaml
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.11.1
     restart: always
     command: tunnel --no-autoupdate run --token YOUR_CLOUDFLARE_TUNNEL_TOKEN
 
