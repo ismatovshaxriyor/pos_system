@@ -245,7 +245,8 @@ export interface Paginated<T> {
 /** `GET /api/discovery/` - ochiq ping, topilgan manzil haqiqiy Bola ekanini tekshiradi. */
 export interface DiscoveryInfo {
   service: 'pos-bola';
-  version: string;
+  /** Eski serverlar yuboradi; yangilari ataylab yubormaydi (versiya begonaga kerak emas). */
+  version?: string;
   activated: boolean;
   restaurant_id: string | null;
   restaurant_name: string;

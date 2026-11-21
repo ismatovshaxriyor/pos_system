@@ -469,7 +469,18 @@ KITCHEN_DASHBOARD_ENABLED = os.environ.get('KITCHEN_DASHBOARD_ENABLED', '0') == 
 # `?ticket=` ishlatadi (POST /api/auth/ws-ticket/). Eski ilovalar yangilangach `WS_ALLOW_LEGACY_TOKEN=0` qiling.
 WS_ALLOW_LEGACY_TOKEN = os.environ.get('WS_ALLOW_LEGACY_TOKEN', '1') == '1'
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS: ilgari hamma origin'ga ochiq edi. Endi faqat kerakli brauzer-muhitli mijozlar:
+#  - 'null'  : Windows kassir ilovasi (Electron prod) renderer'i file:// dan yuklanadi -> Origin: null
+#  - localhost:5173 : kassir ilovasini dev rejimida (electron-vite) ishga tushirish
+# React Native mijozlar brauzer emas (Origin yuborilmaydi); QR-menyu/oshxona sahifalari serverning o'zidan
+# (same-origin) beriladi - ularga CORS kerak emas. Qo'shimcha origin kerak bo'lsa: CORS_ALLOWED_ORIGINS env.
+# Eslatma: autentifikatsiya cookie emas, `Authorization: Token` sarlavhasi bilan - ya'ni begona sayt
+# foydalanuvchi nomidan so'rov yubora olmaydi; bu cheklov chuqur himoya qatlami.
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    'null', 'http://localhost:5173', 'http://127.0.0.1:5173',
+    *[o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()],
+]
 
 # Brauzer muhitidagi mijozlar (Windows kassir ilovasi = Electron renderer) har bir
 # so'rovda `X-Device-ID` yuboradi (DeviceTokenAuthentication). corsheaders'ning

@@ -151,6 +151,12 @@ services:
   watchtower:
     image: nickfedor/watchtower:1.24.1
     restart: unless-stopped
+    # docker.sock baribir kuchli huquq (tekshirilgan: docker-socket-proxy ham exec/privileged create'ni to'sa
+    # olmaydi, shuning uchun qo'yilmadi) - lekin konteynerning o'zi imkon qadar toraytirilgan.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # REGISTRY_AUTH_FILE'ni scripts/install.sh|ps1 .env'ga yozadi: Docker Desktop

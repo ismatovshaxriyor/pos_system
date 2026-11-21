@@ -15,7 +15,8 @@ class DiscoveryViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['service'], 'pos-bola')
-        self.assertEqual(data['version'], getattr(settings, 'APP_VERSION', '0.3.2'))
+        # Versiya ataylab oshkor qilinmaydi (begona tarmoq a'zosiga zaif versiyani aniqlashga yordam beradi).
+        self.assertNotIn('version', data)
         self.assertFalse(data['activated'])
         self.assertIsNone(data['restaurant_id'])
         self.assertEqual(data['restaurant_name'], 'Faollashtirilmagan Server')

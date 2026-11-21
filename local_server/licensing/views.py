@@ -191,11 +191,26 @@ class ApplyOfflineTokenView(APIView):
 
 class StatusView(APIView):
     """
-    Litsenziya holatini diagnostika uchun qaytaradi. Maxfiy maydonlar
-    (kalit, token matni) hech qachon qaytarilmaydi.
+    Litsenziya holati. Autentifikatsiyasiz (ilovalar blok/faollashtirishni login'dan oldin ko'rishi kerak)
+    faqat minimal ma'lumot beriladi; token muddatlari/zaxira tokenlar soni kabi tafsilotlar faqat
+    menejer/admin uchun - ular tizimning qachon "o'chishini" oldindan bilishga yordam beradi, begonaga
+    esa kerak emas. Maxfiy maydonlar (kalit, token matni) hech qachon qaytarilmaydi.
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
+
+    @staticmethod
+    def _is_manager(request):
+        from rest_framework.exceptions import AuthenticationFailed
+        from core.authentication import DeviceTokenAuthentication
+        try:
+            res = DeviceTokenAuthentication().authenticate(request)
+        except AuthenticationFailed:
+            return False
+        if not res:
+            return False
+        user = res[0]
+        return bool(user.is_staff or getattr(user, 'role', '') == 'manager')
 
     def get(self, request):
         state = LicenseState.load()
@@ -205,17 +220,21 @@ class StatusView(APIView):
                 "detail": "Tizim hali faollashtirilmagan.",
             })
 
-        return Response({
+        data = {
             "activated": bool(state.activated_at),
             "restaurant_name": state.restaurant_name,
-            "token_expires_at": state.token_expires_at,
-            "furthest_token_expiry": state.furthest_expiry,
-            "pending_tokens_count": len(state.pending_tokens),
-            "last_renewed_at": state.last_renewed_at,
             "is_blocked": state.is_blocked,
-            "blocked_reason": state.blocked_reason,
             "server_time": timezone.now(),
-        })
+        }
+        if self._is_manager(request):
+            data.update({
+                "token_expires_at": state.token_expires_at,
+                "furthest_token_expiry": state.furthest_expiry,
+                "pending_tokens_count": len(state.pending_tokens),
+                "last_renewed_at": state.last_renewed_at,
+                "blocked_reason": state.blocked_reason,
+            })
+        return Response(data)
 
 
 class DiscoveryView(APIView):
@@ -231,7 +250,6 @@ class DiscoveryView(APIView):
         state = LicenseState.load()
         return Response({
             "service": "pos-bola",
-            "version": getattr(settings, 'APP_VERSION', '0.3.2'),
             "activated": bool(state and state.activated_at),
             "restaurant_id": str(state.restaurant_id) if state and state.restaurant_id else None,
             "restaurant_name": state.restaurant_name if state else "Faollashtirilmagan Server",
