@@ -312,3 +312,16 @@ Barchasi `GET`, **faqat menejer** (boshqalarga `403`), pul qiymatlari `"50000.00
 - `GET /api/reports/inventory/` — `ingredient_count`, `total_value`, `low_stock_count`, `low_stock[{id, name, unit, current_stock, min_stock}]`, `consumed_units_today`, `purchased_cost_today`.
 - `GET /api/reports/day-end/` — **kassir yoki menejer** (afitsiant `403`), faqat bugun (sana parametri yo'q). Kassir ilovasidagi "Kun yakuni": `date`, `generated_at`, `register{is_open, opened_at, closed_at}` (kassa sessiyasi yo'q bo'lsa `is_open: true`), `revenue{total, by_method{cash,card,other}, payment_count, order_count, avg_check, discount_total}`, `cash{sales, debt_repayments, expected}` (`expected` = naqd savdo + naqd qaytarilgan qarz — kassa tortmasida bo'lishi kerak pul), `debts{credit_sales, repayments}`, `voids{cancelled_orders, voided_items, voided_payments, voided_payments_total}`, `open_orders{count, items[{id, table, waiter, total, created_at}]}` (hali yopilmagan buyurtmalar, 20 tagacha).
 - `GET /api/reports/my-summary/?date=&waiter=` — har qanday xodim o'zining kunlik jamlanmasi; `waiter` (boshqa xodim) faqat menejer uchun.
+
+## Buyurtma shablonlari (Order Templates API)
+
+Ko'p takrorlanadigan buyurtma ("Osh + salat + choy") — menejer yaratadi, ofitsiant ilovada bir bosishda **hali tasdiqlanmagan qoralamaga (savatga)** qo'shadi, keyin miqdor/izohni o'zgartiradi, taom qo'shadi yoki almashtiradi. Shablon o'zi buyurtma yaratmaydi va oshxonaga chek chiqarmaydi.
+
+- **Ofitsiant/kassir uchun:** `GET /api/bootstrap/` javobida `order_templates` — faqat **faol** shablonlar, `sort_order` bo'yicha: `[{id, name, sort_order, is_active, items[{id, product_id, quantity, note}], created_at, updated_at}]`. Menyudan o'chirilgan (soft-delete) mahsulotlar qatori kelmaydi; mahsulot `products` ro'yxatida bo'lmasa (sotuvda emas) klient shu qatorni o'tkazib yuboradi. Eski server bu kalitni yubormaydi — `order_templates ?? []`.
+- `GET /api/order-templates/` — barcha shablonlar (faol emaslari ham), har qanday xodim o'qiy oladi (sahifalangan: `results`).
+- `POST /api/order-templates/` — **faqat menejer** (boshqalarga `403`). Body: `{"name": "Standart", "sort_order": 1, "is_active": true, "items": [{"product_id": 5, "quantity": 1, "note": ""}, ...]}`. `201` + shablon.
+- `PATCH|PUT /api/order-templates/<id>/` — **faqat menejer**. `items` yuborilsa taomlar **to'liq almashtiriladi**; yuborilmasa o'zgarmaydi.
+- `DELETE /api/order-templates/<id>/` — **faqat menejer**, `204`. Buyurtmalarga ta'sir qilmaydi.
+- Tekshiruvlar (`400`): `name` bo'sh; `items` bo'sh yoki 30 tadan ko'p; `quantity` 1–99 dan tashqari; `note` 100 belgidan uzun; mahsulot yo'q yoki menyudan o'chirilgan. Bir xil `product_id` + `note` takrorlansa miqdorlari qo'shiladi.
+- Realtime: o'zgarganda `menu_changed` (bootstrap'ni qayta so'rang).
+- Klientda qoida: shablon bosilganda taomlar savatga **qo'shiladi** (mavjud miqdorga ustiga); buyurtma serverga faqat ofitsiant tasdiqlagandan keyin yuboriladi (`POST /api/orders/` → `add_item` → `start`).
