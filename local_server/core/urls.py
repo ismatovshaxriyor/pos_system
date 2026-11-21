@@ -12,6 +12,7 @@ from .reports import (
     StaffReportView, InventoryReportView, DebtsReportView, DayEndReportView,
 )
 from .customers import CustomerViewSet
+from .order_templates import OrderTemplateViewSet
 from .inventory import (
     SupplierViewSet, IngredientViewSet, RecipeItemViewSet,
     PurchaseViewSet, StockMovementViewSet,
@@ -31,6 +32,7 @@ router.register(r'attendance', AttendanceViewSet, basename='attendance')
 router.register(r'register-session', RegisterSessionViewSet, basename='registersession')
 router.register(r'printers', PrinterViewSet, basename='printer')
 router.register(r'print-jobs', PrintJobViewSet, basename='printjob')
+router.register(r'order-templates', OrderTemplateViewSet, basename='ordertemplate')
 router.register(r'customers', CustomerViewSet, basename='customer')
 router.register(r'suppliers', SupplierViewSet, basename='supplier')
 router.register(r'ingredients', IngredientViewSet, basename='ingredient')

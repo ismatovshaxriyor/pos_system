@@ -25,6 +25,8 @@ EVENT_FOR_MODEL = {
     # Menyu va zal - ilova bootstrap'ida (DEFAULT_REFRESH_EVENTS).
     'Category': ('menu_changed', 'id'),
     'Product': ('menu_changed', 'id'),
+    'OrderTemplate': ('menu_changed', 'id'),
+    'OrderTemplateItem': ('menu_changed', 'id'),
     'Table': ('table_status_changed', 'table_id'),
     'TableZone': ('table_status_changed', 'table_id'),
     # Menejer ekranlari.

@@ -206,6 +206,37 @@ class Product(BaseModel):
     def __str__(self):
         return self.name
 
+class OrderTemplate(BaseModel):
+    """
+    Buyurtma shabloni: ko'p takrorlanadigan to'plam (masalan "Osh + salat + choy"). Ofitsiant bir bosishda
+    uning taomlarini hali TASDIQLANMAGAN qoralamaga qo'shadi (keyin miqdor/izohni o'zgartiradi, taom qo'shadi
+    yoki almashtiradi). Shablon o'zi buyurtma yaratmaydi - faqat ilovadagi savatni to'ldiradi.
+    """
+    name = models.CharField(max_length=100)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ('sort_order', 'id')
+
+    def __str__(self):
+        return self.name
+
+
+class OrderTemplateItem(BaseModel):
+    template = models.ForeignKey(OrderTemplate, related_name='items', on_delete=models.CASCADE)
+    # Mahsulot faqat soft-delete qilinadi (hard delete yo'q), shuning uchun CASCADE xavfsiz.
+    product = models.ForeignKey(Product, related_name='+', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    note = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        ordering = ('id',)
+
+    def __str__(self):
+        return f'{self.quantity}x {self.product_id} ({self.template_id})'
+
+
 class Order(BaseModel):
     STATUS_CHOICES = (
         ('new', 'New'),

@@ -25,6 +25,8 @@ import type {
   PaymentMethod,
   Payment,
   Printer,
+  OrderTemplate,
+  OrderTemplateInput,
   Product,
   RegisterSession,
   StaffDevice,
@@ -234,6 +236,15 @@ export function createApi(client: ApiClient) {
       addRecipeItem: (p: { product_id: number; ingredient_id: number; quantity: Decimal }) => client.post<RecipeItem>('/recipe-items/', p),
       updateRecipeItem: (id: number, p: { quantity: Decimal }) => client.patch<RecipeItem>(`/recipe-items/${id}/`, p),
       deleteRecipeItem: (id: number) => client.delete(`/recipe-items/${id}/`),
+    },
+
+    // ---- Buyurtma shablonlari (yozish: menejer; ofitsiant bootstrap'dan oladi) --------
+    templates: {
+      list: () => listAll<OrderTemplate>('/order-templates/'),
+      create: (p: OrderTemplateInput) => client.post<OrderTemplate>('/order-templates/', p),
+      /** `items` berilsa taomlar butunlay almashtiriladi. */
+      update: (id: number, p: Partial<OrderTemplateInput>) => client.patch<OrderTemplate>(`/order-templates/${id}/`, p),
+      delete: (id: number) => client.delete(`/order-templates/${id}/`),
     },
 
     // ---- Ombor (yozish: kassir yoki menejer; o'qish: hamma xodim) --------

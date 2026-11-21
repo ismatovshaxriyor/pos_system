@@ -7,6 +7,7 @@ import { useHand } from '@/ui/theme';
 
 const SECTIONS: { href: Href; title: string; hint: string }[] = [
   { href: '/menu', title: 'Menyu', hint: "Mahsulot, bo'lim, narx, retsept" },
+  { href: '/templates', title: 'Shablonlar', hint: 'Tez-tez buyurtmalar: bir bosishda savatga' },
   { href: '/inventory', title: 'Ombor', hint: 'Qoldiq, kirim, sanash, yo‘qotish' },
   { href: '/customers', title: 'Mijozlar', hint: 'Nasiya daftari, qarzni qaytarish' },
   { href: '/floor', title: 'Stollar', hint: 'Stol, zona, QR kod' },

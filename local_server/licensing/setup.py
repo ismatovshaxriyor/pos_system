@@ -31,6 +31,7 @@ PROTECTED_MODULES = [
     "core/reports.py",
     "core/inventory.py",
     "core/customers.py",
+    "core/order_templates.py",
     "core/escpos.py",
     "core/tasks.py",
     "core/consumers.py",

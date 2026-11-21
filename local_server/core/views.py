@@ -31,8 +31,9 @@ from .serializers import (
     RestaurantConfigSerializer, AttendanceSerializer, CheckInSerializer, CheckOutSerializer,
     RegisterSessionSerializer,
     TableZoneSerializer, PrinterSerializer, PrintJobSerializer, LiveTableSalesSerializer,
-    PublicCategorySerializer, PublicTableLiveSerializer,
+    PublicCategorySerializer, PublicTableLiveSerializer, OrderTemplateSerializer,
 )
+from .order_templates import templates_queryset
 
 ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
 
@@ -772,6 +773,7 @@ class BootstrapView(APIView):
             'user': UserSerializer(user, context=context).data,
             'categories': CategorySerializer(categories, many=True, context=context).data,
             'products': ProductSerializer(products, many=True, context=context).data,
+            'order_templates': OrderTemplateSerializer(templates_queryset(active_only=True), many=True, context=context).data,
             'table_zones': TableZoneSerializer(table_zones, many=True, context=context).data,
             'tables': TableSerializer(tables, many=True, context=context).data,
             'active_orders': OrderSerializer(orders_qs, many=True, context=context).data,

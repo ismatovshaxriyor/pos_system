@@ -1,5 +1,6 @@
 import {
   addProduct,
+  addTemplate,
   decreaseProduct,
   cartCount,
   describeError,
@@ -22,7 +23,7 @@ import { Alert, View } from 'react-native';
 import { useBootstrap, useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
-import { CartSheet, ConfirmOrderSheet, MenuPicker, TotalRow } from '@/ui/parts';
+import { CartSheet, ConfirmOrderSheet, MenuPicker, TemplateBar, TotalRow } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -236,6 +237,15 @@ export default function OrderScreen() {
       )}
       {showMenu && boot && !finished && (
         <>
+          <TemplateBar
+            templates={boot.order_templates ?? []}
+            products={boot.products}
+            onPick={(t) => {
+              const r = addTemplate(cart, t, boot.products);
+              setCart(r.cart);
+              return r;
+            }}
+          />
           <MenuPicker
             categories={boot.categories}
             products={boot.products}

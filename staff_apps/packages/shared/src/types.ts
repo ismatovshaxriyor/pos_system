@@ -195,6 +195,29 @@ export interface RegisterSession {
 }
 
 /** `GET /api/bootstrap/` - ilova ishga tushganda yagona yirik so'rov. */
+/** Buyurtma shabloni: ko'p takrorlanadigan taomlar to'plami (bir bosishda qoralamaga qo'shiladi). */
+export interface OrderTemplateItem {
+  id: number;
+  product_id: number;
+  quantity: number;
+  note: string;
+}
+
+export interface OrderTemplate {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  items: OrderTemplateItem[];
+}
+
+export interface OrderTemplateInput {
+  name: string;
+  sort_order?: number;
+  is_active?: boolean;
+  items: { product_id: number; quantity: number; note?: string }[];
+}
+
 export interface Bootstrap {
   user: User;
   categories: Category[];
@@ -207,6 +230,8 @@ export interface Bootstrap {
    */
   active_orders: Order[];
   register_open: boolean;
+  /** Faol shablonlar. Eski server (shablon qo'llab-quvvatlamaydigan) bu maydonni yubormaydi - `?? []`. */
+  order_templates?: OrderTemplate[];
 }
 
 /** DRF `PageNumberPagination` (sahifa hajmi 50). */

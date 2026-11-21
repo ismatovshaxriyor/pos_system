@@ -14,6 +14,7 @@ from .models import (
     RestaurantConfig, Attendance, RegisterSession, TableZone, Printer, PrintJob,
     Customer, DebtTransaction,
     Supplier, Ingredient, ProductIngredient, Purchase, PurchaseItem, StockMovement,
+    OrderTemplate, OrderTemplateItem,
 )
 
 
@@ -155,6 +156,20 @@ class ProductAdmin(SimpleHistoryAdmin):
     list_filter = ('category', 'is_available', 'is_synced')
     search_fields = ('name', 'barcode')
     inlines = [ProductIngredientInline]
+
+class OrderTemplateItemInline(admin.TabularInline):
+    model = OrderTemplateItem
+    extra = 1
+    autocomplete_fields = ('product',)
+
+
+@admin.register(OrderTemplate)
+class OrderTemplateAdmin(SimpleHistoryAdmin):
+    list_display = ('name', 'sort_order', 'is_active', 'is_synced')
+    list_editable = ('sort_order', 'is_active')
+    search_fields = ('name',)
+    inlines = [OrderTemplateItemInline]
+
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem

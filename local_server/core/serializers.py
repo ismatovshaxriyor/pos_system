@@ -8,6 +8,7 @@ from .models import (
     StaffDevice, Notification, RestaurantConfig, Attendance, RegisterSession, TableZone,
     Printer, PrintJob, Customer, DebtTransaction,
     Supplier, Ingredient, ProductIngredient, Purchase, PurchaseItem, StockMovement,
+    OrderTemplate, OrderTemplateItem,
 )
 
 TABLE_STATUS_CHOICES = ('free', 'occupied_by_me', 'occupied')
@@ -684,3 +685,80 @@ class PublicTableLiveSerializer(serializers.Serializer):
         return 0
 
 
+
+
+class OrderTemplateItemSerializer(serializers.ModelSerializer):
+    # Soft-delete qilingan mahsulotni shablonga qo'shib bo'lmaydi (menyudan olib tashlangan).
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_deleted=False), source='product',
+    )
+    quantity = serializers.IntegerField(min_value=1, max_value=99, default=1)
+    note = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+
+    class Meta:
+        model = OrderTemplateItem
+        fields = ('id', 'product_id', 'quantity', 'note')
+        read_only_fields = ('id',)
+
+
+class OrderTemplateSerializer(serializers.ModelSerializer):
+    """
+    Shablon + taomlari bir so'rovda. `items` yuborilsa to'liq ALMASHTIRILADI (PUT/PATCH'da ham): menejer
+    ilovasi tahrirlangan ro'yxatni butunligicha yuboradi - qator-ma'lumot bo'yicha diff kerak emas.
+    """
+    items = OrderTemplateItemSerializer(many=True)
+
+    class Meta:
+        model = OrderTemplate
+        fields = ('id', 'name', 'sort_order', 'is_active', 'items', 'created_at', 'updated_at')
+        read_only_fields = ('created_at', 'updated_at')
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Shablon nomi bo'sh bo'lmasligi kerak.")
+        return value
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Shablonda kamida bitta taom bo'lishi kerak.")
+        if len(value) > 30:
+            raise serializers.ValidationError("Shablonda 30 tadan ortiq taom bo'lmasin.")
+        # Bir xil mahsulot (va izoh) takrorlansa miqdorlari qo'shiladi - savatdagi `addProduct` qoidasi bilan bir xil.
+        merged = {}
+        for item in value:
+            key = (item['product'].pk, item.get('note', ''))
+            if key in merged:
+                merged[key]['quantity'] = min(99, merged[key]['quantity'] + item['quantity'])
+            else:
+                merged[key] = dict(item)
+        return list(merged.values())
+
+    @staticmethod
+    def _save_items(template, items):
+        template.items.all().delete()
+        OrderTemplateItem.objects.bulk_create([
+            OrderTemplateItem(template=template, product=i['product'], quantity=i['quantity'], note=i.get('note', ''))
+            for i in items
+        ])
+
+    def create(self, validated_data):
+        from django.db import transaction
+        items = validated_data.pop('items')
+        with transaction.atomic():
+            template = OrderTemplate.objects.create(**validated_data)
+            self._save_items(template, items)
+            # bulk_create signal yubormaydi: realtime (on_commit) uchun qatorlar yaratilgandan KEYIN saqlaymiz.
+            template.save()
+        return template
+
+    def update(self, instance, validated_data):
+        from django.db import transaction
+        items = validated_data.pop('items', None)
+        with transaction.atomic():
+            for attr, val in validated_data.items():
+                setattr(instance, attr, val)
+            if items is not None:
+                self._save_items(instance, items)
+            instance.save()
+        return instance

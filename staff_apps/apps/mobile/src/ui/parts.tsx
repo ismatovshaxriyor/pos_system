@@ -8,6 +8,7 @@ import {
   toggleNotePart,
   type Cart,
   type Category,
+  type OrderTemplate,
   type Product,
 } from '@pos/shared';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -62,6 +63,78 @@ export function QtyStepper({ value, onChange }: { value: number; onChange: (next
       <Pressable style={btn} onPress={() => onChange(value + 1)} accessibilityLabel="Ko'paytirish">
         <Txt size={24} weight={600}>+</Txt>
       </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Shablonlar paneli: bir bosishda shablon taomlari hali TASDIQLANMAGAN qoralamaga qo'shiladi (keyin o'zgartirish mumkin).
+ * `onPick` natijasi bo'yicha qisqa xabar ko'rsatiladi (sotuvda bo'lmagan taomlar haqida ogohlantirish bilan).
+ */
+export function TemplateBar({
+  templates,
+  products,
+  onPick,
+}: {
+  templates: readonly OrderTemplate[];
+  products: readonly Product[];
+  onPick: (t: OrderTemplate) => { added: number; skipped: number };
+}) {
+  const { c } = useTheme();
+  const lift = useLift();
+  const [msg, setMsg] = useState<string | null>(null);
+  const names = useMemo(() => new Map(products.map((p) => [p.id, p.name] as const)), [products]);
+  if (templates.length === 0) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      <Txt size={14} weight={500} tone="muted" upper>
+        Shablonlar
+      </Txt>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
+        {templates.map((t) => (
+          <Pressable
+            key={t.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${t.name} shablonini qo'shish`}
+            onPress={() => {
+              const r = onPick(t);
+              setMsg(
+                r.added === 0
+                  ? "Bu shablondagi taomlar hozir sotuvda yo'q."
+                  : `"${t.name}": ${r.added} ta taom qo'shildi${r.skipped > 0 ? `, ${r.skipped} tasi sotuvda yo'q` : ''}.`,
+              );
+            }}
+            style={({ pressed }) => [
+              {
+                width: 190,
+                minHeight: 76,
+                backgroundColor: c.card,
+                borderColor: c.ink60,
+                borderWidth: 1,
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                gap: 2,
+                justifyContent: 'center',
+              },
+              lift,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Txt size={16} weight={600} numberOfLines={1}>
+              ＋ {t.name}
+            </Txt>
+            <Txt size={13} tone="muted" numberOfLines={2}>
+              {t.items.map((i) => `${i.quantity > 1 ? `${i.quantity}× ` : ''}${names.get(i.product_id) ?? '…'}`).join(', ')}
+            </Txt>
+          </Pressable>
+        ))}
+      </ScrollView>
+      {msg ? (
+        <Txt size={13} tone="muted">
+          {msg}
+        </Txt>
+      ) : null}
     </View>
   );
 }

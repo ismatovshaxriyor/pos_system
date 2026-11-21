@@ -1,5 +1,6 @@
 import {
   addProduct,
+  addTemplate,
   decreaseProduct,
   describeError,
   emptyCart,
@@ -18,7 +19,7 @@ import { View } from 'react-native';
 import { useBootstrap } from '@/lib/hooks';
 import { newUuid, pos } from '@/lib/pos';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Screen, Title, Txt } from '@/ui/kit';
-import { CartSheet, Chip, ConfirmOrderSheet, MenuPicker } from '@/ui/parts';
+import { CartSheet, Chip, ConfirmOrderSheet, MenuPicker, TemplateBar } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
 /**
@@ -113,6 +114,18 @@ export default function NewOrderScreen() {
           <Field label="Boshqa son" value={guests} onChangeText={(v) => setGuests(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" />
           <Field label="Buyurtmaga izoh (ixtiyoriy)" value={note} onChangeText={setNote} autoCapitalize="sentences" />
         </Card>
+      )}
+
+      {data && (
+        <TemplateBar
+          templates={data.order_templates ?? []}
+          products={data.products}
+          onPick={(t) => {
+            const r = addTemplate(cart, t, data.products);
+            setCart(r.cart);
+            return r;
+          }}
+        />
       )}
 
       {data && (

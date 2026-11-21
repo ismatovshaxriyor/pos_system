@@ -1,5 +1,5 @@
 import { toTiyin } from './money';
-import type { Decimal, Product } from './types';
+import type { Decimal, OrderTemplate, Product } from './types';
 
 /**
  * Buyurtma qoralamasi (hali serverga yuborilmagan savat). Narx faqat ko'rsatish uchun:
@@ -87,4 +87,30 @@ export function decreaseProduct(cart: Cart, productId: number): Cart {
     if (l.productId === productId) return setQuantity(cart, productId, l.note, l.quantity - 1);
   }
   return cart;
+}
+
+/**
+ * Shablonni qoralamaga (hali tasdiqlanmagan savatga) qo'shadi: mavjud qatorlarga miqdori qo'shiladi, izoh bor
+ * taom alohida qator bo'ladi (`addProduct` qoidasi). Hozir sotuvda bo'lmagan (`products`da yo'q) taomlar
+ * o'tkazib yuboriladi va `skipped` da qaytariladi - ofitsiantga ogohlantirish uchun.
+ */
+export function addTemplate(
+  cart: Cart,
+  template: Pick<OrderTemplate, 'items'>,
+  products: readonly Pick<Product, 'id' | 'name' | 'price'>[],
+): { cart: Cart; added: number; skipped: number } {
+  const byId = new Map(products.map((p) => [p.id, p] as const));
+  let next = cart;
+  let added = 0;
+  let skipped = 0;
+  for (const item of template.items) {
+    const product = byId.get(item.product_id);
+    if (!product) {
+      skipped++;
+      continue;
+    }
+    next = addProduct(next, product, item.quantity, item.note);
+    added++;
+  }
+  return { cart: next, added, skipped };
 }
