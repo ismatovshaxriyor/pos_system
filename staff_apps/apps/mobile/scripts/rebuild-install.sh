@@ -39,6 +39,7 @@ rsync -a --delete \
   --exclude .expo \
   --exclude .git \
   --exclude 'apps/cashier/out' \
+  --exclude 'apps/cashier/release' \
   --exclude 'apps/mobile/android/build' \
   --exclude 'apps/mobile/android/.gradle' \
   --exclude 'apps/mobile/android/app/build' \
