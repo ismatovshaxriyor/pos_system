@@ -37,3 +37,19 @@ def check_license_private_key(app_configs, **kwargs):
             )
 
     return warnings
+
+
+@register(Tags.security)
+def check_insecure_secret_key(app_configs, **kwargs):
+    """
+    Prod'da SECRET_KEY default (ommaviy repo'dagi) qiymatda qolgan bo'lsa - sessiya/CSRF imzolari soxtalashtirilishi
+    mumkin. Ataylab Error emas, Warning: auto-deploy paytida .env'ni bilmasdan turib serverni yiqitmaslik uchun.
+    """
+    key = getattr(settings, 'SECRET_KEY', '')
+    if not settings.DEBUG and (key.startswith('django-insecure') or key.startswith('change-me') or len(key) < 32):
+        return [Warning(
+            "SECRET_KEY default/qisqa qiymatda - .env'da uzun tasodifiy SECRET_KEY o'rnating.",
+            hint="python -c \"import secrets; print(secrets.token_urlsafe(64))\"",
+            id='cloud_server.W003',
+        )]
+    return []

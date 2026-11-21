@@ -60,6 +60,8 @@ server {
     # Proxy API requests to Django backend (local_server: /api/public/*,
     # cloud_server: /api/sync/*).
     location /api/ {
+        # API so'rovlari (sync, buyurtmalar, rasmli mahsulot) kichik; 100M faqat /admin/ APK yuklash uchun kerak.
+        client_max_body_size 10M;
         proxy_pass http://$backend_web$request_uri;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

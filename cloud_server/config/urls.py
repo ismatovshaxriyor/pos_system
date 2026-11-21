@@ -26,12 +26,16 @@ urlpatterns = [
     # Cloud Sync API
     path('api/sync/', include('sync.urls')),
 
-    # Swagger API Docs
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 
     # MobileApp.apk_file (whitenoise faqat STATIC_ROOT'ni xizmat qiladi -
     # media alohida route talab qiladi, DEBUG'dan qat'i nazar - local_server
     # bilan bir xil sabab, gunicorn buni o'zi avtomatik qilmaydi).
     re_path(r'^media/(?P<path>.*)$', serve_static, {'document_root': settings.MEDIA_ROOT}),
 ]
+
+# Swagger/schema - to'liq endpoint xaritasi; prod'da begonalarga ko'rsatilmaydi (faqat dev).
+if settings.DEBUG:
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    ]

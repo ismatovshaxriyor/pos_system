@@ -1,6 +1,10 @@
+from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseForbidden
 from django.utils.html import escape
 from tenants.models import Restaurant
+
+from .ip import client_ip
 
 
 SYSTEM_SUBDOMAINS = {'admin', 'api', 'www', 'website', 'app', 'localhost', '127.0.0.1'}
@@ -85,3 +89,31 @@ class DomainRoutingMiddleware:
 </body>
 </html>"""
         return HttpResponse(html)
+
+
+class AdminLoginThrottleMiddleware:
+    """
+    Django admin login formasi DRF'dan tashqarida - unga hech qanday throttle ishlamaydi, ya'ni parolni
+    cheksiz tez-tez taxmin qilish mumkin. Bu yerda bitta IP'dan `ADMIN_LOGIN_MAX_ATTEMPTS` ta POST
+    (muvaffaqiyatli yoki yo'q) dan keyin `ADMIN_LOGIN_WINDOW` soniyaga 429 qaytariladi. 0 = o'chiq.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        limit = getattr(settings, 'ADMIN_LOGIN_MAX_ATTEMPTS', 0)
+        if limit and request.method == 'POST' and request.path.rstrip('/').endswith('/admin/login'):
+            window = getattr(settings, 'ADMIN_LOGIN_WINDOW', 600)
+            key = f'admin_login:{client_ip(request)}'
+            if cache.add(key, 1, window) is False:
+                try:
+                    attempts = cache.incr(key)
+                except ValueError:
+                    cache.set(key, 1, window)
+                    attempts = 1
+                if attempts > limit:
+                    return HttpResponse(
+                        "Juda ko'p urinish. Birozdan keyin qayta urining.",
+                        status=429, content_type='text/plain; charset=utf-8',
+                    )
+        return self.get_response(request)

@@ -37,7 +37,7 @@ class ErrorLogEventSerializer(serializers.Serializer):
     # kichik bo'lsa, uzunroq xabar butun partiyani 400 bilan qaytarib,
     # error-log navbatini abadiy tiqilib qolishiga olib kelardi.
     message = serializers.CharField(max_length=5000)
-    traceback = serializers.CharField(required=False, allow_blank=True, default='')
+    traceback = serializers.CharField(required=False, allow_blank=True, default='', max_length=20000)
     module = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
     func_name = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
     line_no = serializers.IntegerField(required=False, allow_null=True, default=None)
@@ -79,8 +79,9 @@ class SyncedOrderSerializer(serializers.Serializer):
     waiter_name = serializers.CharField(max_length=100, allow_blank=True, default='')
     closed_at = serializers.DateTimeField(required=False, allow_null=True)
     
-    items = SyncedOrderItemSerializer(many=True)
-    payments = SyncedPaymentSerializer(many=True)
+    # Bitta buyurtmaga yuzlab emas, o'nlab qator bo'ladi - cheksiz massiv bilan bazani shishirib bo'lmasin.
+    items = SyncedOrderItemSerializer(many=True, max_length=500)
+    payments = SyncedPaymentSerializer(many=True, max_length=100)
 
 class OrderSyncBatchSerializer(serializers.Serializer):
     orders = SyncedOrderSerializer(many=True, allow_empty=False)
@@ -100,7 +101,7 @@ class DemoRequestSerializer(serializers.Serializer):
     contact_name = serializers.CharField(max_length=200)
     phone = serializers.CharField(max_length=50)
     branch_count = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
-    note = serializers.CharField(required=False, allow_blank=True, default='')
+    note = serializers.CharField(required=False, allow_blank=True, default='', max_length=2000)
 
 
 class PublicMobileAppSerializer(serializers.ModelSerializer):

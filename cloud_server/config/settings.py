@@ -40,7 +40,14 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 if not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = ['https://*.hamrohpos.uz', 'https://*.ismatov.uz', 'https://*.example.uz', 'http://localhost', 'http://127.0.0.1']
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS: veb-sayt (hamrohpos.uz) API'ni bir xil origin orqali (nginx proxy) chaqiradi, Bola esa brauzer emas -
+# ya'ni CORS umuman kerak emas. Ataylab yopiq; zarur bo'lsa CORS_ALLOWED_ORIGINS env (vergul bilan) orqali.
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+
+# Throttle/brute-force limitlari uchun mijoz IP'si qaysi sarlavhadan olinadi (qarang: sync/ip.py).
+# Cloudflare buni har doim o'zi yozadi; bo'sh qiymat = faqat REMOTE_ADDR.
+CLIENT_IP_HEADER = os.environ.get('CLIENT_IP_HEADER', 'HTTP_CF_CONNECTING_IP')
 
 # Prod'da Django hech qachon to'g'ridan-to'g'ri TLS bilan gaplashmaydi (TLS
 # Cloudflare chekkasida tugaydi, `web` esa 127.0.0.1'da ochiq, faqat
@@ -80,6 +87,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'sync.middleware.DomainRoutingMiddleware',
+    'sync.middleware.AdminLoginThrottleMiddleware',
     # gunicorn'ning o'zi static fayllarni xizmat qilmaydi va bu yerda
     # nginx yo'q (docs/3'dagi reja hali amalga oshirilmagan) - whitenoise
     # ularni to'g'ridan-to'g'ri WSGI qatlamida siqib/keshlab beradi.
@@ -208,14 +216,21 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+        'sync.throttling.AnonThrottle',
+        'sync.throttling.UserThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '10/minute',
         'user': '100/minute',
+        'demo': '5/hour',
+        'license_check': '10/minute',
     }
 }
+
+# Noto'g'ri litsenziya kaliti bilan urinishlar (bitta IP, 10 daqiqada) va admin login POST'lari chegarasi.
+LICENSE_AUTH_FAIL_LIMIT = 20
+ADMIN_LOGIN_MAX_ATTEMPTS = 10
+ADMIN_LOGIN_WINDOW = 600
 
 # Test rejimida throttling o'chiriladi - suite bitta manzildan yuzlab so'rov
 # yuboradi, throttle hisoblagichlari esa Redis'da test yugurishlari orasida
@@ -225,10 +240,16 @@ REST_FRAMEWORK = {
 # qilmaydi - rate None esa har qanday SimpleRateThrottle'ni o'chiradi.
 if 'test' in sys.argv:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
-    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': None, 'user': None}
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {k: None for k in REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']}
+    LICENSE_AUTH_FAIL_LIMIT = 0
+    ADMIN_LOGIN_MAX_ATTEMPTS = 0
 
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+# Hamma domen (admin/api/tenant subdomenlar) Cloudflare orqali faqat HTTPS - brauzer HTTP'ga qaytmasin.
+# includeSubdomains/preload ataylab YO'Q: noto'g'ri sozlanganda orqaga qaytarib bo'lmaydi.
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
 
 # Celery settings
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:26379/0')

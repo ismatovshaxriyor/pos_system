@@ -2,12 +2,13 @@ import logging
 import os
 import urllib.request
 import urllib.parse
+from html import escape as html_escape
 
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions, throttling
+from rest_framework import status, permissions
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.core.cache import cache
@@ -17,6 +18,7 @@ from tenants.models import (
     ErrorLog, SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest, MobileApp,
     PricingPlan, validate_subdomain,
 )
+from .throttling import AnonThrottle, DemoRequestThrottle, LicenseCheckThrottle
 from .authentication import LicenseAuthentication, HeartbeatAuthentication
 from .jwt_utils import issue_license_token_batch, get_public_key_pem
 from .serializers import (
@@ -40,7 +42,7 @@ class ActivationView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [AnonThrottle]
 
     def post(self, request):
         serializer = ActivationSerializer(data=request.data)
@@ -441,15 +443,18 @@ def _send_telegram_lead_notification(demo_request):
     if not bot_token or not chat_id:
         return
 
+    # parse_mode=HTML: mijoz kiritgan matn escape qilinmasa, Telegram xabariga soxta havola/teg
+    # kiritish (fishing) yoki xabar yuborilmay qolishi (noto'g'ri HTML) mumkin.
+    e = html_escape
     text = (
         f"🚨 <b>YANGI DEMO SO'ROV (hamrohpos.uz)</b>\n\n"
-        f"🏢 <b>Restoran:</b> {demo_request.restaurant_name}\n"
-        f"👤 <b>Aloqa shaxsi:</b> {demo_request.contact_name}\n"
-        f"📞 <b>Telefon:</b> {demo_request.phone}\n"
-        f"📊 <b>Kassa soni:</b> {demo_request.branch_count or '1 ta'}\n"
+        f"🏢 <b>Restoran:</b> {e(demo_request.restaurant_name)}\n"
+        f"👤 <b>Aloqa shaxsi:</b> {e(demo_request.contact_name)}\n"
+        f"📞 <b>Telefon:</b> {e(demo_request.phone)}\n"
+        f"📊 <b>Kassa soni:</b> {e(demo_request.branch_count) or '1 ta'}\n"
     )
     if demo_request.note:
-        text += f"📝 <b>Izoh:</b> {demo_request.note}\n"
+        text += f"📝 <b>Izoh:</b> {e(demo_request.note)}\n"
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = urllib.parse.urlencode({
@@ -470,7 +475,7 @@ class PublicStatsView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [AnonThrottle]
 
     def get(self, request):
         active_count = Restaurant.objects.filter(is_active=True).count()
@@ -491,7 +496,7 @@ class PublicLicenseCheckView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [LicenseCheckThrottle]
 
     def post(self, request):
         serializer = PublicLicenseCheckSerializer(data=request.data)
@@ -530,7 +535,7 @@ class PublicDemoRequestView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [DemoRequestThrottle]
 
     def post(self, request):
         serializer = DemoRequestSerializer(data=request.data)
@@ -561,7 +566,7 @@ class PublicSubdomainCheckView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [AnonThrottle]
 
     def get(self, request):
         subdomain = request.query_params.get('subdomain', '').strip().lower()
@@ -595,7 +600,7 @@ class PublicAppsView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [AnonThrottle]
 
     def get(self, request):
         apps = MobileApp.objects.filter(is_active=True)
@@ -610,7 +615,7 @@ class PublicPricingView(APIView):
     """
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [throttling.AnonRateThrottle]
+    throttle_classes = [AnonThrottle]
 
     def get(self, request):
         plans = PricingPlan.objects.filter(is_active=True).prefetch_related('features')

@@ -1,7 +1,21 @@
 from rest_framework import authentication
 from rest_framework import exceptions
 from tenants.models import License
+from django.conf import settings
+from django.core.cache import cache
 from django.utils import timezone
+
+from .ip import client_ip
+
+FAIL_WINDOW_SECONDS = 600
+
+
+class UnknownLicenseKey(exceptions.AuthenticationFailed):
+    """Bazada yo'q kalit - faqat shu holat brute-force hisoblagichiga yoziladi."""
+
+
+def _fail_key(ip):
+    return f'licauth_fail:{ip}'
 
 
 class DummyUser:
@@ -53,13 +67,29 @@ class LicenseAuthentication(authentication.BaseAuthentication):
             msg = "Litsenziya kaliti sarlavhasi noto'g'ri (yaroqsiz belgilar bor)."
             raise exceptions.AuthenticationFailed(msg)
 
-        return self.authenticate_credentials(token)
+        # DRF throttle'lari autentifikatsiyadan KEYIN ishlaydi, shuning uchun noto'g'ri kalit
+        # bilan urinish ularga umuman tushmaydi - brute-force'ga qarshi alohida hisoblagich.
+        limit = getattr(settings, 'LICENSE_AUTH_FAIL_LIMIT', 0)
+        ip = client_ip(request)
+        if limit and cache.get(_fail_key(ip), 0) >= limit:
+            raise exceptions.Throttled(wait=FAIL_WINDOW_SECONDS)
+        try:
+            return self.authenticate_credentials(token)
+        except UnknownLicenseKey:
+            if limit:
+                key = _fail_key(ip)
+                if cache.add(key, 1, FAIL_WINDOW_SECONDS) is False:
+                    try:
+                        cache.incr(key)
+                    except ValueError:
+                        cache.set(key, 1, FAIL_WINDOW_SECONDS)
+            raise
 
     def authenticate_credentials(self, key):
         try:
             license_obj = License.objects.get(key=key)
         except License.DoesNotExist:
-            raise exceptions.AuthenticationFailed("Litsenziya kaliti noto'g'ri.")
+            raise UnknownLicenseKey("Litsenziya kaliti noto'g'ri.")
 
         if not license_obj.is_active:
             raise exceptions.AuthenticationFailed('Litsenziya faol emas.')
@@ -84,6 +114,6 @@ class HeartbeatAuthentication(LicenseAuthentication):
         try:
             license_obj = License.objects.get(key=key)
         except License.DoesNotExist:
-            raise exceptions.AuthenticationFailed("Litsenziya kaliti noto'g'ri.")
+            raise UnknownLicenseKey("Litsenziya kaliti noto'g'ri.")
 
         return (DummyUser(license_obj.id), license_obj)
