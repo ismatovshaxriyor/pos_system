@@ -61,6 +61,9 @@ class User(AbstractUser, BaseModel):
         # is_staff foydalanuvchi uchun kod berishni allaqachon rad etadi).
         if self.role == 'manager':
             self.is_staff = True
+        # Telefon username'ni yagona `+998XXXXXXXXX` ko'rinishga keltiramiz (ilova shunday yuboradi).
+        from .phone import normalize_phone
+        self.username = normalize_phone(self.username)
         super().save(*args, **kwargs)
 
     def __str__(self):

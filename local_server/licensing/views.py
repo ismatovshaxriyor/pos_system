@@ -30,8 +30,9 @@ def _provision_admin_user(admin_data):
     (Ona'da make_password() bilan yaratilgan) - shuning uchun to'g'ridan-to'g'ri
     `password` maydoniga yoziladi, qayta xeshланмайди.
     """
+    from core.phone import normalize_phone
     User.objects.update_or_create(
-        username=admin_data['phone'],
+        username=normalize_phone(admin_data['phone']),
         defaults={
             'role': 'manager',
             'is_staff': True,

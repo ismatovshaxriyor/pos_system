@@ -452,3 +452,21 @@ class OpsDashboardTests(TestCase):
             ops.record_server_sample()
         self.assertEqual(len(ops.server_history()), 3)
         self.assertIn('cpu', ops.server_history()[-1])
+
+
+class AdminPhoneNormalizationTests(TestCase):
+    """Ona'da telefon qanday kiritilsa ham Bola username'i ilova yuboradigan +998XXXXXXXXX bo'lishi kerak."""
+
+    def test_normalize_variants(self):
+        from .models import normalize_phone
+        for raw in ('901234567', '998901234567', '+998901234567', '+998 90 123 45 67', '90-123-45-67'):
+            self.assertEqual(normalize_phone(raw), '+998901234567', raw)
+        self.assertEqual(normalize_phone('admin'), 'admin')
+        self.assertEqual(normalize_phone('12345'), '12345')
+
+    def test_account_saved_in_canonical_form(self):
+        from .models import RestaurantAdminAccount
+        r = Restaurant.objects.create(name='Rohat', subdomain='rohat')
+        acc = RestaurantAdminAccount.objects.create(restaurant=r, phone='901234567')
+        acc.refresh_from_db()
+        self.assertEqual(acc.phone, '+998901234567')

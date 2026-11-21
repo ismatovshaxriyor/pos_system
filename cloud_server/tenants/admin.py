@@ -72,6 +72,14 @@ class RestaurantAdminAccountForm(forms.ModelForm):
         model = RestaurantAdminAccount
         fields = ('restaurant', 'phone', 'full_name', 'password')
 
+    def clean_phone(self):
+        from .models import normalize_phone
+        phone = normalize_phone(self.cleaned_data['phone'])
+        clash = RestaurantAdminAccount.objects.filter(phone=phone).exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise forms.ValidationError("Bu telefon raqam boshqa restoran adminida allaqachon bor.")
+        return phone
+
     def clean(self):
         cleaned_data = super().clean()
         if not cleaned_data.get('password') and not self.instance.pk:

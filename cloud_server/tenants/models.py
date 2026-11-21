@@ -6,6 +6,16 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 
+def normalize_phone(value):
+    """`xxxxxxxxx` / `998xxxxxxxxx` / `+998xxxxxxxxx` -> `+998xxxxxxxxx` (telefonga o'xshamasa o'zgarmaydi)."""
+    if not isinstance(value, str):
+        return value
+    compact = re.sub(r'[\s\-()]', '', value)
+    if not re.match(r'^\+?(998)?\d{9}$', compact):
+        return value
+    return '+998' + compact[-9:]
+
+
 RESERVED_SUBDOMAINS = {
     'admin', 'api', 'www', 'website', 'app', 'static', 'media',
     'public', 'test', 'dev', 'staging', 'mail', 'blog', 'support',
@@ -123,6 +133,12 @@ class RestaurantAdminAccount(models.Model):
     password_hash = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # Bola bu qiymatni username qilib yozadi, ilova esa har doim +998XXXXXXXXX yuboradi - shuning uchun
+        # saqlashda yagona ko'rinishga keltiramiz (aks holda ilovada "parol xato" chiqadi).
+        self.phone = normalize_phone(self.phone)
+        super().save(*args, **kwargs)
 
     def set_password(self, raw_password):
         from django.contrib.auth.hashers import make_password
