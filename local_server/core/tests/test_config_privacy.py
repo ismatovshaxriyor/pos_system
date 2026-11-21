@@ -30,3 +30,13 @@ class RestaurantConfigPrivacyTests(APITestCase):
         self.client.force_authenticate(self.waiter)
         res = self.client.patch('/api/restaurant-config/1/', {'name': 'Hack'}, format='json')
         self.assertEqual(res.status_code, 403)
+
+    def test_restore_stock_rule_defaults_off_and_only_manager_toggles_it(self):
+        self.client.force_authenticate(self.waiter)
+        self.assertFalse(self.client.get('/api/restaurant-config/1/').data['restore_stock_on_cancel'])
+        res = self.client.patch('/api/restaurant-config/1/', {'restore_stock_on_cancel': True}, format='json')
+        self.assertEqual(res.status_code, 403)
+        self.client.force_authenticate(self.manager)
+        res = self.client.patch('/api/restaurant-config/1/', {'restore_stock_on_cancel': True}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(RestaurantConfig.objects.get(pk=1).restore_stock_on_cancel)

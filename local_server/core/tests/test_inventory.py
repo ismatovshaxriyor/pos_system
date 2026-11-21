@@ -6,7 +6,7 @@ from rest_framework.authtoken.models import Token
 
 from core.models import (
     Category, Ingredient, Notification, Order, OrderItem, Product,
-    ProductIngredient, StockMovement, Supplier, Table, User,
+    ProductIngredient, RestaurantConfig, StockMovement, Supplier, Table, User,
 )
 
 
@@ -144,6 +144,51 @@ class InventoryTests(TestCase):
         OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
         url = reverse('order-start', args=[order.id])
         self.client.post(url, content_type='application/json', **_auth_header(self.manager))
+        self.ingredient.refresh_from_db()
+        self.assertEqual(self.ingredient.current_stock, Decimal('10'))
+
+    # ---- Bekor qilinganda qoldiqni qaytarish (restoran qoidasi) ----
+    def _set_restore_rule(self, on):
+        cfg, _ = RestaurantConfig.objects.get_or_create(pk=1)
+        cfg.restore_stock_on_cancel = on
+        cfg.save()
+
+    def _start_then_cancel(self, order):
+        self.client.post(reverse('order-start', args=[order.id]), content_type='application/json', **_auth_header(self.manager))
+        return self.client.post(reverse('order-cancel', args=[order.id]), content_type='application/json', **_auth_header(self.manager))
+
+    def test_cancel_does_not_restore_stock_by_default(self):
+        order = self._order_with_recipe(recipe_qty='2', item_qty=2)  # 4 kg ketadi
+        self.assertEqual(self._start_then_cancel(order).status_code, 200)
+        self.ingredient.refresh_from_db()
+        self.assertEqual(self.ingredient.current_stock, Decimal('6'))
+        self.assertFalse(StockMovement.objects.filter(movement_type='return').exists())
+
+    def test_cancel_restores_stock_when_rule_enabled(self):
+        self._set_restore_rule(True)
+        order = self._order_with_recipe(recipe_qty='2', item_qty=2)
+        self.assertEqual(self._start_then_cancel(order).status_code, 200)
+        self.ingredient.refresh_from_db()
+        self.assertEqual(self.ingredient.current_stock, Decimal('10'))  # 10 - 4 + 4
+        self.assertTrue(StockMovement.objects.filter(
+            ingredient=self.ingredient, movement_type='return', quantity=Decimal('4'), order=order).exists())
+
+    def test_restore_is_idempotent(self):
+        from core import services
+        self._set_restore_rule(True)
+        order = self._order_with_recipe(recipe_qty='2', item_qty=2)
+        self._start_then_cancel(order)
+        self.assertEqual(services.restore_stock_for_order(order), 0)  # ikkinchi marta hech narsa qaytarilmaydi
+        self.ingredient.refresh_from_db()
+        self.assertEqual(self.ingredient.current_stock, Decimal('10'))
+
+    def test_cancel_with_rule_but_nothing_consumed_changes_nothing(self):
+        self._set_restore_rule(True)
+        table = Table.objects.create(name='Stol 9')
+        order = Order.objects.create(table=table, waiter=self.cashier, status='new')
+        OrderItem.objects.create(order=order, product=self.product, quantity=1, price=self.product.price)
+        resp = self.client.post(reverse('order-cancel', args=[order.id]), content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(resp.status_code, 200)
         self.ingredient.refresh_from_db()
         self.assertEqual(self.ingredient.current_stock, Decimal('10'))
 

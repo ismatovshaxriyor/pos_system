@@ -180,3 +180,88 @@ class AttendanceListFilterTests(APITestCase):
     def test_bad_date_is_ignored(self):
         self.client.force_authenticate(self.manager)
         self.assertEqual(len(self._ids(date='nonsense')), 2)
+
+
+class AttendanceOverviewTests(APITestCase):
+    """`/api/attendance/me|on-shift|summary/` - smena holati, hozir kim ishda, ish soatlari."""
+
+    def setUp(self):
+        self.manager = User.objects.create_user(username='+998901111111', password='x', role='manager')
+        self.cashier = User.objects.create_user(username='+998902222222', password='x', role='cashier')
+        self.waiter = User.objects.create_user(username='+998903333333', password='x', role='waiter')
+        self.waiter2 = User.objects.create_user(username='+998904444444', password='x', role='waiter')
+
+    def _shift(self, user, start_ago_min, end_ago_min=None):
+        now = timezone.now()
+        a = Attendance.objects.create(user=user)
+        # check_in auto_now_add - qiymatni update bilan o'rnatamiz (signal/tarix kerak emas)
+        Attendance.objects.filter(pk=a.pk).update(
+            check_in=now - timezone.timedelta(minutes=start_ago_min),
+            check_out=(now - timezone.timedelta(minutes=end_ago_min)) if end_ago_min is not None else None,
+        )
+        return a
+
+    def test_me_reports_open_shift(self):
+        self.client.force_authenticate(user=self.waiter)
+        r = self.client.get('/api/attendance/me/')
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data['on_shift'])
+        self.assertIsNone(r.data['attendance'])
+        self._shift(self.waiter, 30)
+        r = self.client.get('/api/attendance/me/')
+        self.assertTrue(r.data['on_shift'])
+        self.assertIsNotNone(r.data['attendance']['check_in'])
+
+    def test_me_ignores_closed_and_others_shifts(self):
+        self._shift(self.waiter, 120, 60)
+        self._shift(self.waiter2, 30)
+        self.client.force_authenticate(user=self.waiter)
+        self.assertFalse(self.client.get('/api/attendance/me/').data['on_shift'])
+
+    def test_on_shift_visible_to_cashier_and_manager_not_waiter(self):
+        self._shift(self.waiter, 30)
+        self._shift(self.waiter2, 90, 10)  # yopilgan - ro'yxatda bo'lmasligi kerak
+        for u, code in ((self.cashier, 200), (self.manager, 200), (self.waiter, 403)):
+            self.client.force_authenticate(user=u)
+            r = self.client.get('/api/attendance/on-shift/')
+            self.assertEqual(r.status_code, code, u.role)
+            if code == 200:
+                self.assertEqual([x['user']['id'] for x in r.data], [self.waiter.id])
+
+    def test_summary_is_manager_only(self):
+        for u in (self.cashier, self.waiter):
+            self.client.force_authenticate(user=u)
+            self.assertEqual(self.client.get('/api/attendance/summary/').status_code, 403)
+
+    def test_summary_sums_minutes_and_marks_open_shift(self):
+        self._shift(self.waiter, 300, 240)   # 60 daqiqa
+        self._shift(self.waiter, 120, 90)    # 30 daqiqa
+        self._shift(self.waiter2, 45)        # ochiq: ~45 daqiqa
+        self.client.force_authenticate(user=self.manager)
+        r = self.client.get('/api/attendance/summary/')
+        self.assertEqual(r.status_code, 200)
+        by_id = {x['user']['id']: x for x in r.data['staff']}
+        self.assertEqual(by_id[self.waiter.id]['minutes'], 90)
+        self.assertEqual(by_id[self.waiter.id]['shifts'], 2)
+        self.assertFalse(by_id[self.waiter.id]['on_shift'])
+        self.assertTrue(by_id[self.waiter2.id]['on_shift'])
+        self.assertIn(by_id[self.waiter2.id]['minutes'], (44, 45, 46))
+        # eng ko'p ishlagan birinchi
+        self.assertEqual(r.data['staff'][0]['user']['id'], self.waiter.id)
+
+    def test_summary_caps_forgotten_open_shift(self):
+        """Unutilgan check-out kunlab hisoblanib ketmaydi - MAX_OPEN_SHIFT_HOURS bilan chegaralanadi."""
+        self.client.force_authenticate(user=self.manager)
+        self._shift(self.waiter, 3 * 24 * 60)  # 3 kun oldin boshlangan, hech qachon yopilmagan
+        r = self.client.get('/api/attendance/summary/')
+        row = next(x for x in r.data['staff'] if x['user']['id'] == self.waiter.id)
+        self.assertEqual(row['minutes'], 16 * 60)
+        self.assertTrue(row['on_shift'])
+
+    def test_summary_date_range_filters(self):
+        self._shift(self.waiter, 60 * 24 * 10, 60 * 24 * 10 - 60)  # 10 kun oldin
+        self.client.force_authenticate(user=self.manager)
+        self.assertEqual(self.client.get('/api/attendance/summary/').data['staff'], [])
+        day = (timezone.now() - timezone.timedelta(days=10)).date().isoformat()
+        r = self.client.get(f'/api/attendance/summary/?from={day}&to={day}')
+        self.assertEqual(len(r.data['staff']), 1)

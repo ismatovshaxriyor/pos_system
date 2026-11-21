@@ -882,6 +882,41 @@ def consume_stock_for_items(items, *, order=None, created_by=None):
         _notify_low_stock(ingredient)
 
 
+def restore_stock_for_order(order, *, created_by=None):
+    """
+    Bekor qilingan buyurtma uchun `consume_stock_for_items` yozgan sarfni omborga qaytaradi:
+    buyurtmaning `sale` harakatlari ingredient bo'yicha yig'iladi, avval qaytarilgani (`return`) ayriladi
+    (idempotent), qolgan miqdor `StockMovement(return, +)` bilan qaytariladi. Faqat
+    `RestaurantConfig.restore_stock_on_cancel` yoqilganda chaqiriladi (qarang `OrderViewSet.cancel`).
+    Qaytarilgan ingredientlar soni qaytariladi.
+    """
+    from django.db.models import Sum
+    from .models import Ingredient, StockMovement
+
+    net = {}
+    rows = (
+        StockMovement.objects.filter(order=order, movement_type__in=('sale', 'return'))
+        .values('ingredient_id').annotate(total=Sum('quantity'))
+    )
+    for row in rows:
+        net[row['ingredient_id']] = row['total']  # sale manfiy, return musbat: yig'indi = hali qaytarilmagan sarf (manfiy)
+
+    restored = 0
+    with transaction.atomic():
+        for ingredient_id, total in net.items():
+            if total >= 0:
+                continue
+            ingredient = Ingredient.objects.select_for_update().get(pk=ingredient_id)
+            ingredient.current_stock = ingredient.current_stock - total  # total manfiy -> qo'shiladi
+            ingredient.save(update_fields=['current_stock', 'updated_at'])
+            StockMovement.objects.create(
+                ingredient=ingredient, quantity=-total, movement_type='return',
+                order=order, created_by=created_by, note="Buyurtma bekor qilindi",
+            )
+            restored += 1
+    return restored
+
+
 def apply_purchase(purchase, *, created_by=None):
     """
     Kirim hujjatini qo'llaydi: har `PurchaseItem` uchun `StockMovement(purchase, +)`

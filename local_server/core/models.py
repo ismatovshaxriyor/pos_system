@@ -412,6 +412,12 @@ class RestaurantConfig(BaseModel):
         verbose_name="Restoran telefon raqami",
         help_text="To'lov chekining pastida ko'rsatiladi (masalan +998901234567)"
     )
+    restore_stock_on_cancel = models.BooleanField(
+        default=False,
+        verbose_name="Bekor qilinganda ombor qoldig'ini qaytarish",
+        help_text="Yoqilsa: buyurtma bekor qilinganda oshxonaga yuborilgan taomlar uchun sarflangan ingredientlar omborga "
+                  "qaytariladi. O'chiq bo'lsa (standart) qoldiq qaytarilmaydi - taom allaqachon tayyorlangan bo'lishi mumkin.",
+    )
 
     class Meta:
         verbose_name = "Restoran Sozlamasi"
@@ -605,13 +611,14 @@ class PurchaseItem(BaseModel):
 class StockMovement(BaseModel):
     """
     Ombor harakati - append-only ledger. `Ingredient.current_stock = Σ quantity`.
-    `quantity` ishorali: purchase = +, sale = −, adjustment = ±, waste = −.
+    `quantity` ishorali: purchase = +, sale = −, adjustment = ±, waste = −, return = + (bekor qilingan buyurtma sarfi qaytarilishi).
     """
     MOVEMENT_TYPE_CHOICES = (
         ('purchase', 'Kirim'),
         ('sale', 'Sotuv'),
         ('adjustment', 'Tuzatish'),
         ('waste', 'Yoqotish'),
+        ('return', 'Qaytarish'),
     )
     ingredient = models.ForeignKey(Ingredient, related_name='movements', on_delete=models.CASCADE)
     quantity = models.DecimalField(max_digits=12, decimal_places=3)  # ishorali

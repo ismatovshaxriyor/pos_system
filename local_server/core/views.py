@@ -43,6 +43,9 @@ ORDER_FINISHED_STATUSES = ('completed', 'cancelled')
 # har doim shu zonada hisoblaydi, saqlangan created_at UTC bo'lib qolaveradi.
 RESTAURANT_TZ = zoneinfo.ZoneInfo('Asia/Tashkent')
 
+# Unutilgan check-out'li smena davomat xulosasida shundan ortiq hisoblanmaydi.
+MAX_OPEN_SHIFT_HOURS = 16
+
 class TableZoneViewSet(viewsets.ModelViewSet):
     queryset = TableZone.objects.all()
     serializer_class = TableZoneSerializer
@@ -458,6 +461,9 @@ class OrderViewSet(viewsets.ModelViewSet):
 
             order.status = 'cancelled'
             order.save(update_fields=['status', 'updated_at'])
+            # Restoran qoidasi (admin yoqadi/o'chiradi): bekor qilingan buyurtma sarfini omborga qaytarish.
+            if RestaurantConfig.objects.get_or_create(pk=1)[0].restore_stock_on_cancel:
+                services.restore_stock_for_order(order, created_by=request.user)
         broadcast_event('order_updated', {'order_id': order.id})
         if order.table_id:
             broadcast_event('table_status_changed', {'table_id': order.table_id})
@@ -939,6 +945,64 @@ class AttendanceViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': exc.message}, status=exc.status)
             
         return Response(AttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
+
+    @extend_schema(responses={200: OpenApiResponse(description="{on_shift, attendance}")})
+    @action(detail=False, methods=['get'], url_path='me')
+    def me(self, request):
+        """Joriy xodimning ochiq smenasi (ilova bosh ekranidagi "Smena" kartasi uchun)."""
+        open_row = Attendance.objects.filter(user=request.user, check_out__isnull=True).select_related('user').first()
+        return Response({
+            'on_shift': open_row is not None,
+            'attendance': AttendanceSerializer(open_row).data if open_row else None,
+        })
+
+    @extend_schema(responses={200: AttendanceSerializer(many=True)})
+    @action(detail=False, methods=['get'], url_path='on-shift', permission_classes=[permissions.IsAuthenticated, IsCashierOrManager])
+    def on_shift(self, request):
+        """Hozir smenada (check-out qilmagan) xodimlar - kassir ham ko'ra oladi (faqat ism/kelgan vaqt)."""
+        rows = Attendance.objects.filter(check_out__isnull=True).select_related('user').order_by('check_in')
+        return Response(AttendanceSerializer(rows, many=True).data)
+
+    @extend_schema(responses={200: OpenApiResponse(description="Xodim bo'yicha ish soatlari")})
+    @action(detail=False, methods=['get'], url_path='summary', permission_classes=[permissions.IsAuthenticated, IsAdminStaff])
+    def summary(self, request):
+        """
+        Menejer uchun: ?from=YYYY-MM-DD&to=YYYY-MM-DD (ikkalasi ham ixtiyoriy, default - oxirgi 7 kun)
+        oralig'ida har bir xodim bo'yicha kelgan kunlar soni va jami ishlagan daqiqalari.
+        Hali yopilmagan smena "hozirgacha" hisoblanadi, lekin eng ko'pi bilan MAX_OPEN_SHIFT_HOURS (unutilgan
+        check-out bir necha kunlik soat bo'lib ketmasin).
+        """
+        today = timezone.localdate()
+        d_to = parse_date(request.query_params.get('to') or '') or today
+        d_from = parse_date(request.query_params.get('from') or '') or (d_to - timedelta(days=6))
+        if d_from > d_to:
+            d_from, d_to = d_to, d_from
+        now = timezone.now()
+        rows = Attendance.objects.filter(check_in__date__gte=d_from, check_in__date__lte=d_to).select_related('user')
+        agg = {}
+        for a in rows:
+            # Yopilmagan (unutilgan) smena kunlab hisoblanib ketmasin: eng ko'pi bilan MAX_OPEN_SHIFT_HOURS.
+            end = a.check_out or min(now, a.check_in + timedelta(hours=MAX_OPEN_SHIFT_HOURS))
+            minutes = max(0, int((end - a.check_in).total_seconds() // 60))
+            u = a.user
+            item = agg.setdefault(u.id, {
+                'user': UserSerializer(u).data,
+                'shifts': 0,
+                'days': set(),
+                'minutes': 0,
+                'on_shift': False,
+            })
+            item['shifts'] += 1
+            item['days'].add(timezone.localtime(a.check_in).date())
+            item['minutes'] += minutes
+            if a.check_out is None:
+                item['on_shift'] = True
+        result = []
+        for item in agg.values():
+            item['days'] = len(item['days'])
+            result.append(item)
+        result.sort(key=lambda x: -x['minutes'])
+        return Response({'from': d_from.isoformat(), 'to': d_to.isoformat(), 'staff': result})
 
 
 class PrinterViewSet(viewsets.ModelViewSet):
