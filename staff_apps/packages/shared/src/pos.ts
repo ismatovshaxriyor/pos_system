@@ -33,6 +33,8 @@ export interface Pos {
   refreshServerState(): Promise<void>;
   /** Bloklangan ekranda "Qayta tekshirish": `true` - blok olingan. */
   recheckLicense(): Promise<boolean>;
+  /** Oflayn litsenziya tokenini qo'llaydi (internetsiz yangilash); `true` - tizim blokdan chiqdi. */
+  applyOfflineToken(token: string): Promise<boolean>;
 }
 
 const FATAL_NOTICE: Record<FatalCloseReason, string> = {
@@ -78,6 +80,12 @@ export function createPos(opts: PosOptions): Pos {
   });
 
   const deviceId = () => session.getDeviceId() ?? '';
+
+  async function recheckLicense() {
+    const info = await api.discovery();
+    if (!info.is_blocked) session.clearLicenseBlocked();
+    return !info.is_blocked;
+  }
 
   return {
     session,
@@ -174,10 +182,12 @@ export function createPos(opts: PosOptions): Pos {
       }
     },
 
-    async recheckLicense() {
-      const info = await api.discovery();
-      if (!info.is_blocked) session.clearLicenseBlocked();
-      return !info.is_blocked;
+    recheckLicense,
+
+    async applyOfflineToken(token) {
+      // Token ichki bo'shliq/yangi qatorsiz bo'lishi kerak: chatdan nusxalashda ko'pincha qatorlarga bo'linib qoladi.
+      await api.license.applyOfflineToken(token.replace(/\s+/g, ''));
+      return recheckLicense();
     },
   };
 }

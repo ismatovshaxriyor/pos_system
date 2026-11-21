@@ -127,6 +127,12 @@ export function createApi(client: ApiClient) {
       /** Yangi serverni litsenziya kaliti bilan faollashtirish (Bola Ona bilan gaplashadi - sekinroq bo'lishi mumkin). */
       activate: (licenseKey: string) =>
         client.post<{ restaurant: { id: string; name: string } }>('/license/activate/', { license_key: licenseKey }, { anonymous: true }),
+      /**
+       * Internet bo'lmaganda litsenziyani qo'lda yangilash: Ona admini bergan (Telegram/SMS) uzun token. Bola uni
+       * butunlay oflayn tekshiradi (Ona'ga so'rov yo'q) va muvaffaqiyatda `license_inactive` blokini ham olib tashlaydi.
+       */
+      applyOfflineToken: (token: string) =>
+        client.post<{ detail?: string }>('/license/apply-offline-token/', { token }, { anonymous: true }),
     },
 
     /**

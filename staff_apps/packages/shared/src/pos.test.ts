@@ -85,6 +85,31 @@ describe('createPos.connectToServer', () => {
     expect(pos.session.getState().status).toBe('signed_out');
   });
 
+  it('oflayn token qoʼllanganda boʼsh joylar olib tashlanadi, soʼng blok qayta tekshiriladi', async () => {
+    let blocked = true;
+    const calls: { url: string; body?: string }[] = [];
+    const pos = createPos({
+      app: 'mobile',
+      storage: memoryStorage(),
+      generateId: () => 'd',
+      fetchImpl: (async (url: string, init?: { body?: string }) => {
+        calls.push({ url, body: init?.body });
+        if (url.includes('/license/apply-offline-token/')) {
+          blocked = false;
+          return ok({ detail: 'ok' });
+        }
+        return ok(discovery({ is_blocked: blocked }));
+      }) as unknown as typeof fetch,
+    });
+    await pos.session.load();
+    await pos.connectToServer('10.0.0.1');
+    expect(pos.session.getState().status).toBe('license_blocked');
+    await expect(pos.applyOfflineToken('eyJabc.def\n ghi.jkl')).resolves.toBe(true);
+    const apply = calls.find((c) => c.url.includes('apply-offline-token'));
+    expect(JSON.parse(apply?.body ?? '{}')).toEqual({ token: 'eyJabc.defghi.jkl' });
+    expect(pos.session.getState().status).toBe('signed_out');
+  });
+
   it('401 kelganda sessiya avtomatik tugaydi (qurilma revoke qilingan)', async () => {
     const storage = memoryStorage();
     const fetchImpl = vi.fn(async (url: string) => {

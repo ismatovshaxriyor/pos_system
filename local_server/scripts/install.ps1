@@ -14,7 +14,8 @@
 # qayta yoqilgach xuddi shu buyruqni yana ishga tushiring - .env dagi javoblar saqlangan,
 # qayta ishga tushirish xavfsiz (sirlar va qurilma izi o'zgarmaydi).
 #
-# Savollarga avtomatik javob (env): POS_MODE=pull|build, POS_IMAGE, POS_GHCR_USER, POS_GHCR_TOKEN,
+# Foydalanuvchidan FAQAT bittasi so'raladi: online rejimga ruxsat (va ruxsat bo'lsa Cloudflare Tunnel tokeni).
+# Qolgan hamma narsa avtomatik. Ixtiyoriy env: POS_ONLINE=1|0, POS_MODE=pull|build, POS_IMAGE, POS_GHCR_USER, POS_GHCR_TOKEN,
 #   POS_LICENSE_KEY, POS_ONA_URL, POS_PUBLIC_DOMAIN, POS_CF_TOKEN, POS_PUBLIC_KEY_FILE
 # (Administrator oynasi qayta ochilganda env o'zgaruvchilari o'tmasligi mumkin - shunda savollar so'raladi.)
 # ==============================================================================
@@ -141,14 +142,19 @@ if (-not $ConfigOnly) {
     if ($free -lt 5GB) { Warn "Bo'sh joy 5 GB dan kam ($([int]($free / 1MB)) MB) - Docker image'lar uchun kam bo'lishi mumkin." }
 }
 
-# ============================================================== 1. savollar
-Step "1/6 Savollar (hammasi shu yerda, keyin o'zi davom etadi)"
+# ============================================================== 1. sozlamalar
+Step '1/6 Sozlamalar'
 $existingEnv = Test-Path '.env'
-if ($existingEnv) { Info "Mavjud .env topildi - undagi qiymatlar default sifatida olinadi, sirlar o'zgarmaydi." }
+if ($existingEnv) { Info "Mavjud .env topildi - undagi qiymatlar saqlanadi, sirlar o'zgarmaydi." }
+
+# Hamma narsa avtomatik: sirlar (SECRET_KEY, DB paroli, Watchtower tokeni), qurilma izi, image manzili (git remote'dan),
+# image olish usuli (avval ghcr'dan tortadi, bo'lmasa o'zi quradi), Ona manzili, litsenziya ochiq kaliti
+# (Ona uni faollashtirishda o'zi yuboradi). Istisno kerak bo'lsa - POS_* env'lar (qarang fayl boshi).
+# FAQAT bitta qaror foydalanuvchidan so'raladi: online rejimga ruxsat.
 
 $mode = Get-EnvVar 'POS_MODE'
+if (-not $mode) { $mode = 'pull' }
 if ($Build) { $mode = 'build' }
-if (-not $mode) { $mode = Ask 'POS_MODE' "Image qayerdan olinsin? pull = ghcr'dan tortish (tez, tavsiya), build = shu yerda manba koddan qurish" 'pull' }
 if ($mode -ne 'pull' -and $mode -ne 'build') { Fail "POS_MODE 'pull' yoki 'build' bo'lishi kerak." }
 
 function Derive-Image {
@@ -158,76 +164,84 @@ function Derive-Image {
     } catch {}
     return ''
 }
-$imgDef = Env-Get 'POS_IMAGE'
-if (Is-Placeholder $imgDef) { $imgDef = Derive-Image }
-$image = (Ask 'POS_IMAGE' 'Image manzili' $imgDef)
-if (-not $image) { Fail 'Image manzili kerak (masalan ghcr.io/<owner>/pos-local).' }
+$image = Get-EnvVar 'POS_IMAGE'
+if (-not $image) {
+    $image = Env-Get 'POS_IMAGE'
+    if (Is-Placeholder $image) { $image = Derive-Image }
+}
+if (-not $image) { Fail "Image manzili aniqlanmadi (git remote yo'q). POS_IMAGE=ghcr.io/<owner>/pos-local bilan qayta ishga tushiring." }
 $image = $image.ToLower()
 $channel = Env-Get 'RELEASE_CHANNEL'; if (-not $channel) { $channel = 'stable' }
 $imageRef = "${image}:${channel}"
 
-$ghUser = ''; $ghToken = ''
-$haveAuth = (Test-Path '.registry-auth.json') -and ((Get-Content '.registry-auth.json' -Raw) -match 'ghcr\.io')
-if ($mode -eq 'pull') {
-    if ((Get-EnvVar 'POS_GHCR_TOKEN')) { $ghUser = Get-EnvVar 'POS_GHCR_USER'; $ghToken = Get-EnvVar 'POS_GHCR_TOKEN' }
-    elseif ($haveAuth) { Info "Saqlangan ghcr.io kirish ma'lumoti bor - qayta so'ralmaydi." }
-    else {
-        Info "Image PRIVATE bo'lsa GitHub kirishi kerak (token: read:packages huquqi). Image ochiq bo'lsa - bo'sh qoldiring."
-        $ghUser = Ask 'POS_GHCR_USER' 'GitHub foydalanuvchi nomi' ''
-        if ($ghUser) { $ghToken = Ask-Secret 'POS_GHCR_TOKEN' "GitHub token (kiritganda ko'rinmaydi)" }
-    }
-}
+# ghcr kirishi (private image): so'ralmaydi. POS_GHCR_USER/POS_GHCR_TOKEN env yoki avval saqlangan .registry-auth.json
+# bo'lsa ishlatiladi; yo'q bo'lsa tortish muvaffaqiyatsiz bo'ladi va image shu yerda quriladi.
+$ghUser = Get-EnvVar 'POS_GHCR_USER'; $ghToken = Get-EnvVar 'POS_GHCR_TOKEN'
+if (-not $ghUser) { $ghUser = '' }; if (-not $ghToken) { $ghToken = '' }
 
-$licenseKey = (Ask 'POS_LICENSE_KEY' "Litsenziya kaliti (XXXX-XXXX-XXXX; bo'sh = keyin ilovadan faollashtiraman)" '') -replace '\s', ''
+# Litsenziya kaliti: so'ralmaydi - ilova (QR/kalit kiritish) orqali yoki POS_LICENSE_KEY bilan faollashtiriladi.
+$licenseKey = "$(Get-EnvVar 'POS_LICENSE_KEY')" -replace '\s', ''
 if ($licenseKey -and $licenseKey -notmatch '^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$' -and $licenseKey -notmatch '^[A-Fa-f0-9]{40}$') {
     Warn "Kalit formati odatiy emas (XXXX-XXXX-XXXX kutilgandi) - baribir urinib ko'riladi."
 }
 
-$onaDef = Env-Get 'ONA_SERVER_URL'; if (-not $onaDef) { $onaDef = $DefaultOnaUrl }
-$onaUrl = (Ask 'POS_ONA_URL' 'Ona (markaziy server) manzili' $onaDef).TrimEnd('/')
+# Ona manzili va tashqi domen: .env'dagi yoki default qiymat.
+$onaUrl = Get-EnvVar 'POS_ONA_URL'
+if (-not $onaUrl) { $onaUrl = Env-Get 'ONA_SERVER_URL' }
+if (-not $onaUrl) { $onaUrl = $DefaultOnaUrl }
+$onaUrl = $onaUrl.TrimEnd('/')
 if (-not $onaUrl.StartsWith('https://')) { Fail "Ona manzili https:// bilan boshlanishi shart (aks holda server ishga tushmaydi)." }
-
-$domDef = (Env-Get 'CSRF_TRUSTED_ORIGINS') -replace '^https://', ''
-if ($domDef -like '*tizimingiz.uz*') { $domDef = '' }
-$domain = Ask 'POS_PUBLIC_DOMAIN' "Tashqaridan kirish domeni (Cloudflare Public Hostname, masalan filial1.hamrohpos.uz; bo'sh = faqat restoran ichida)" $domDef
+$domain = Get-EnvVar 'POS_PUBLIC_DOMAIN'
+if (-not $domain) {
+    $domain = (Env-Get 'CSRF_TRUSTED_ORIGINS') -replace '^https://', ''
+    if ($domain -like '*tizimingiz.uz*') { $domain = '' }
+}
 $domain = ($domain -replace '^https?://', '') -replace '/.*$', ''
 
-$cfToken = ''
-if (Is-Placeholder (Env-Get 'CLOUDFLARE_TUNNEL_TOKEN')) { $cfToken = Ask-Secret 'POS_CF_TOKEN' "Cloudflare Tunnel tokeni (bo'sh = tunnel yoqilmaydi)" }
+# --- YAGONA SAVOL: online rejim
+# Restoran WiFi'sida internet bo'lmasligi mumkin. Online rejimsiz server to'liq ishlaydi (buyurtma, to'lov, chop etish,
+# ilovalar - hammasi lokal tarmoqda), faqat 'cloudflared' (tashqaridan kirish) va 'watchtower' (avto-yangilanish)
+# ishga tushirilmaydi - ular internetsiz foydasiz va log'ni to'ldiradi.
+$online = Get-EnvVar 'POS_ONLINE'
+if (-not $online -and (Get-EnvVar 'POS_CF_TOKEN')) { $online = '1' }
+if (-not $online) { $online = Env-Get 'ONLINE_MODE' }
+if (-not $online) {
+    Info "Online rejim: tashqaridan masofadan kirish (Cloudflare Tunnel) va avto-yangilanish. Restoran tarmog'ida internet yo'q bo'lsa - 'n'."
+    if (Confirm-Yes 'Online rejimga ruxsat beraymi?' $false) { $online = '1' } else { $online = '0' }
+}
+if ($online -ne '1' -and $online -ne '0') { Fail 'POS_ONLINE 1 yoki 0 bo''lishi kerak.' }
+$cfToken = "$(Get-EnvVar 'POS_CF_TOKEN')"
+if ($online -eq '1' -and -not $cfToken -and (Is-Placeholder (Env-Get 'CLOUDFLARE_TUNNEL_TOKEN'))) {
+    $cfToken = Ask-Secret 'POS_CF_TOKEN' "Cloudflare Tunnel tokeni (bo'sh = tunnelsiz, faqat avto-yangilanish)"
+}
 
-# --- litsenziya ommaviy kaliti
+# --- litsenziya ommaviy kaliti (ixtiyoriy zaxira): asosiy yo'l - Ona faollashtirishda kalitni o'zi yuboradi va u bazada saqlanadi.
+New-Item -ItemType Directory -Force -Path (Join-Path $LocalServerDir 'keys') | Out-Null
 $keyPath = Join-Path $LocalServerDir 'keys\license_public.pem'
-if (-not (Test-Path $keyPath) -or (Get-Item $keyPath).Length -eq 0) {
-    Info "keys\license_public.pem topilmadi (Ona'dagi 'generate_signing_keys' chiqargan PUBLIC kalit)."
-    $src = Ask 'POS_PUBLIC_KEY_FILE' "Kalit fayli yo'li (bo'sh = matnni shu yerga yopishtiraman)" ''
-    New-Item -ItemType Directory -Force -Path (Join-Path $LocalServerDir 'keys') | Out-Null
-    if ($src) {
-        if (-not (Test-Path $src)) { Fail "Kalit fayli topilmadi: $src" }
-        Copy-Item $src $keyPath -Force
-    } elseif (-not $Yes) {
-        Info "PEM matnini yopishtiring (-----BEGIN PUBLIC KEY----- dan -----END PUBLIC KEY----- gacha), tugagach Enter:"
-        $pem = New-Object System.Collections.Generic.List[string]
-        while ($true) { $l = Read-Host; $pem.Add($l); if ($l -like '*END PUBLIC KEY*') { break } }
-        [IO.File]::WriteAllText($keyPath, (($pem -join "`n") + "`n"), $Utf8NoBom)
-    }
+$keySrc = Get-EnvVar 'POS_PUBLIC_KEY_FILE'
+if ((Test-Path $keyPath) -and (Get-Item $keyPath).Length -gt 0) {
+    if (-not ((Get-Content $keyPath -Raw) -match 'BEGIN PUBLIC KEY')) { Fail "keys\license_public.pem noto'g'ri (BEGIN PUBLIC KEY topilmadi)." }
+    Ok 'litsenziya ommaviy kaliti (zaxira) joyida'
+} elseif ($keySrc) {
+    if (-not (Test-Path $keySrc)) { Fail "Kalit fayli topilmadi: $keySrc" }
+    Copy-Item $keySrc $keyPath -Force
+    Ok 'litsenziya ommaviy kaliti nusxalandi'
+} else {
+    Info "Litsenziya ommaviy kaliti faylda yo'q - Ona uni faollashtirishda o'zi yuboradi (qo'lda nusxalash shart emas)."
 }
-if (-not (Test-Path $keyPath) -or -not ((Get-Content $keyPath -Raw) -match 'BEGIN PUBLIC KEY')) {
-    Fail "keys\license_public.pem yo'q yoki noto'g'ri (BEGIN PUBLIC KEY topilmadi). Kalitsiz litsenziya tekshirilmaydi."
-}
-Ok 'litsenziya ommaviy kaliti joyida'
 
+# --- tizim sozlamalari: hammasi avtomatik; o'chirish: POS_MDNS=0 / POS_NO_SLEEP=0
 $doMdns = $false; $doSleep = $false
 if (-not $ConfigOnly) {
-    $doMdns = Confirm-Yes "Firewall'da server portlari (8000, mDNS 5353) ochilsinmi?" $true
-    $doSleep = Confirm-Yes "Kompyuter uxlab qolmasligi/qopqoq yopilganda o'chmasligi sozlansinmi? (server uchun juda muhim)" $true
+    if ((Get-EnvVar 'POS_MDNS') -ne '0') { $doMdns = $true }
+    if ((Get-EnvVar 'POS_NO_SLEEP') -ne '0') { $doSleep = $true }
 }
 Write-Host ""
-$tunnelTxt = 'yoq'; if ($cfToken) { $tunnelTxt = 'bor' }
-$licTxt = 'keyin'; if ($licenseKey) { $licTxt = 'kiritildi' }
-$domTxt = 'yoq'; if ($domain) { $domTxt = $domain }
-Info "Xulosa: rejim=$mode, image=$imageRef, Ona=$onaUrl"
-Info "litsenziya=$licTxt  tashqi domen=$domTxt  tunnel=$tunnelTxt  firewall=$doMdns  uxlamaslik=$doSleep"
-if (-not (Confirm-Yes 'Davom etamizmi?' $true)) { Fail 'Bekor qilindi.' }
+$onTxt = 'OFLAYN'; if ($online -eq '1') { $onTxt = 'ONLINE' }
+$tunnelTxt = 'yoq'; if ($cfToken -or -not (Is-Placeholder (Env-Get 'CLOUDFLARE_TUNNEL_TOKEN'))) { $tunnelTxt = 'bor' }
+$licTxt = "ilovadan"; if ($licenseKey) { $licTxt = 'kiritilgan' }
+Info "Xulosa: image=$imageRef ($mode), Ona=$onaUrl"
+Info "rejim=$onTxt  tunnel=$tunnelTxt  litsenziya=$licTxt  firewall=$doMdns  uxlamaslik=$doSleep"
 
 # ============================================================== 2. konfiguratsiya
 Step '2/6 Konfiguratsiya (.env, fayllar)'
@@ -257,6 +271,7 @@ Env-Set 'RELEASE_CHANNEL' $channel
 Env-Set 'LICENSE_ENFORCEMENT' '1'
 Env-Set 'REGISTRY_AUTH_FILE' './.registry-auth.json'
 if ($domain) { Env-Set 'CSRF_TRUSTED_ORIGINS' "https://$domain" } else { Env-Set 'CSRF_TRUSTED_ORIGINS' '' }
+Env-Set 'ONLINE_MODE' $online
 if ($cfToken) { Env-Set 'CLOUDFLARE_TUNNEL_TOKEN' $cfToken }
 
 # Qurilma barmoq izi: Docker Desktop konteynerida barqaror ID yo'q, shuning uchun host'ning
@@ -356,6 +371,19 @@ try {
 
     # ============================================================== 4. image va ko'tarish
     Step '4/6 Image va servislar'
+    # Image'lar (postgres, redis, ghcr, QR-menyu build) birinchi o'rnatishda yuklanadi - keyin server internetsiz ishlaydi.
+    function Have-Internet {
+        try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 6 'https://registry-1.docker.io/v2/' | Out-Null; return $true }
+        catch { return ($null -ne $_.Exception.Response) }   # 401 ham javob: internet bor
+    }
+    if (-not (Have-Internet)) {
+        if ((Native-Ok { docker image inspect $imageRef }) -and (Native-Ok { docker image inspect postgres:15 })) {
+            Warn "Internet yo'q, lekin kerakli image'lar mashinada bor - mavjudlari bilan davom etiladi."
+            $mode = 'skip'
+        } else {
+            Fail "Internet yo'q: birinchi o'rnatishda image'larni yuklash uchun internet kerak (telefon hotspot ham bo'ladi). O'rnatilgach server internetsiz ishlaydi."
+        }
+    }
     if ($mode -eq 'pull' -and $ghUser -and $ghToken) {
         if (Native-Ok { $ghToken | docker login ghcr.io -u $ghUser --password-stdin }) { Ok 'ghcr.io ga kirildi' } else { Warn "ghcr.io ga kirib bo'lmadi (token/huquqni tekshiring) - tortish muvaffaqiyatsiz bo'lishi mumkin." }
     }
@@ -364,21 +392,28 @@ try {
         $pulled = $true
         try { Run-Native { docker pull $imageRef } 'docker pull' } catch { $pulled = $false }
         if (-not $pulled) {
-            Warn "Tortib bo'lmadi (private image uchun token kerak yoki hali reliz chiqarilmagan)."
-            if (Confirm-Yes "Buning o'rniga shu yerda manba koddan qursinmi? (5-10 daqiqa)" $true) { $mode = 'build' } else { Fail "Image yo'q - to'xtatildi." }
+            Warn "Tortib bo'lmadi (private image uchun token kerak yoki hali reliz chiqarilmagan) - o'rniga shu yerda quriladi."
+            $mode = 'build'
         }
     }
     if ($mode -eq 'build') {
         Info "Image qurilmoqda (Cython kompilyatsiyasi bilan, 5-10 daqiqa)..."
         Run-Native { docker build -t $imageRef . } 'docker build'
     }
-    $scale = @()
-    if (Is-Placeholder (Env-Get 'CLOUDFLARE_TUNNEL_TOKEN')) {
-        Info "Cloudflare tokeni yo'q - 'cloudflared' ishga tushirilmaydi (crash-loop bo'lmasligi uchun)."
-        $scale = @('--scale', 'cloudflared=0')
+
+    # Servislar aniq ro'yxat bilan ko'tariladi: oflayn rejimda cloudflared/watchtower image'lari umuman tortilmaydi.
+    $services = @('db', 'db_backup', 'redis', 'web', 'celery_worker', 'celery_beat', 'website')
+    if ($online -ne '1') {
+        Info "OFLAYN rejim: 'cloudflared' va 'watchtower' ishga tushirilmaydi (internetsiz foydasiz, log'ni to'ldiradi)."
+        # Avval online rejimda o'rnatilgan bo'lsa, ularni to'xtatib olib tashlaymiz.
+        try { Dc rm -sf cloudflared watchtower 2>$null | Out-Null } catch {}
+    } else {
+        $services += 'watchtower'
+        if (Is-Placeholder (Env-Get 'CLOUDFLARE_TUNNEL_TOKEN')) { Info "Cloudflare tokeni yo'q - 'cloudflared' ishga tushirilmaydi." }
+        else { $services += 'cloudflared' }
     }
     Info "Servislar ko'tarilmoqda (birinchi marta QR-menyu saytini ham quradi - bir necha daqiqa)..."
-    Dc up -d @scale
+    Dc up -d @services
     if ($LASTEXITCODE -ne 0) { throw 'docker compose up muvaffaqiyatsiz' }
 
     # ============================================================== 5. kutish
@@ -405,7 +440,13 @@ try {
         Dc exec -T web python manage.py activate_license $licenseKey
         if ($LASTEXITCODE -eq 0) { $activated = $true; Ok 'faollashtirildi' }
         else { Warn "Faollashtirib bo'lmadi (kalit xato, internet yo'q yoki Ona javob bermadi). Keyin qo'lda: docker compose -f $ComposeFile exec web python manage.py activate_license <KALIT>" }
-    } else { Info "Kalit kiritilmadi - faollashtirishni ilova orqali (yoki 'activate_license' bilan) qiling." }
+    } else {
+        Info "Litsenziya faollashtirilmagan: ilovadagi sozlash ekranida kalitni kiriting/QR'ni skanerlang (yoki 'activate_license <KALIT>')."
+        Info "Faollashtirish BIR MARTA internet talab qiladi (Bola Ona bilan gaplashadi) - keyin haftalar davomida internetsiz ishlaydi."
+        if ($online -ne '1') {
+            Warn "OFLAYN rejim va litsenziya hali faollashtirilmagan: hozir internet bor, shu paytda faollashtirib qo'ying (POS_LICENSE_KEY=<KALIT> bilan qayta ishga tushiring yoki 'activate_license <KALIT>'). Restoranga o'rnatilgach internet bo'lmasa, faollashtirib bo'lmaydi."
+        }
+    }
 
     $lan = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object { $_.InterfaceAlias -notmatch 'vEthernet|Loopback|WSL|Docker' -and $_.IPAddress -match '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)' } |

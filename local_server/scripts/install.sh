@@ -10,7 +10,7 @@
 #                                         # tizimga TEGMAYDI - sinash va oldindan tayyorlash uchun)
 #
 # Nima qiladi:
-#   1. Hamma savolni boshida bir marta so'raydi (litsenziya kaliti, ghcr token, Cloudflare...)
+#   1. Faqat online rejim ruxsatini (va Cloudflare tokenini) so'raydi; qolganini o'zi aniqlaydi
 #   2. Yetishmayotgan dasturlarni o'zi o'rnatadi (Docker, curl, avahi), ruxsatlarni sozlaydi
 #      (docker guruhi, firewall, uxlamaslik) - Linux distributiv/macOS'ga qarab
 #   3. .env ni to'ldiradi (tasodifiy sirlar, qurilma barmoq izi, LICENSE_ENFORCEMENT=1)
@@ -19,8 +19,10 @@
 #
 # Qayta ishga tushirsa xavfsiz (idempotent): mavjud .env sirlari va qurilma izi O'ZGARMAYDI.
 #
-# Savollarga avtomatik javob (env): POS_MODE=pull|build, POS_IMAGE, POS_GHCR_USER, POS_GHCR_TOKEN,
-#   POS_LICENSE_KEY, POS_ONA_URL, POS_PUBLIC_DOMAIN, POS_CF_TOKEN, POS_PUBLIC_KEY_FILE
+# Foydalanuvchidan FAQAT bittasi so'raladi: online rejimga ruxsat (va ruxsat bo'lsa Cloudflare Tunnel tokeni).
+# Qolgan hamma narsa (sirlar, DB paroli, qurilma izi, image, Ona manzili, ochiq kalit) avtomatik.
+# Ixtiyoriy env: POS_ONLINE=1|0, POS_CF_TOKEN, POS_LICENSE_KEY, POS_MODE=pull|build, POS_IMAGE, POS_GHCR_USER,
+#   POS_GHCR_TOKEN, POS_ONA_URL, POS_PUBLIC_DOMAIN, POS_PUBLIC_KEY_FILE, POS_MDNS=0, POS_NO_SLEEP=0, POS_PRINTER_SUBNETS=1
 # ==============================================================================
 set -Eeuo pipefail
 trap 'echo "XATO: $0, $LINENO-qator (chiqish kodi $?)" >&2' ERR
@@ -165,15 +167,18 @@ if (( ! CONFIG_ONLY )); then
   fi
 fi
 
-# ============================================================== 1. savollar
-step "1/6 Savollar (hammasi shu yerda, keyin o'zi davom etadi)"
+# ============================================================== 1. sozlamalar
+step "1/6 Sozlamalar"
 EXISTING_ENV=0; [[ -f .env ]] && EXISTING_ENV=1
-(( EXISTING_ENV )) && info "Mavjud .env topildi - undagi qiymatlar default sifatida olinadi, sirlar o'zgarmaydi."
+(( EXISTING_ENV )) && info "Mavjud .env topildi - undagi qiymatlar saqlanadi, sirlar o'zgarmaydi."
 
-# --- image manbai
-POS_MODE="${POS_MODE:-}"
+# Hamma narsa avtomatik: sirlar (SECRET_KEY, DB paroli, Watchtower tokeni), qurilma izi, image manzili (git remote'dan),
+# image olish usuli (avval ghcr'dan tortadi, bo'lmasa o'zi quradi), Ona manzili, litsenziya ochiq kaliti
+# (Ona uni faollashtirishda o'zi yuboradi). Istisno kerak bo'lsa - POS_* env'lar (qarang fayl boshi).
+# FAQAT bitta qaror foydalanuvchidan so'raladi: internetga chiqish (online) rejimiga ruxsat berilsinmi.
+
+POS_MODE="${POS_MODE:-pull}"
 if (( FORCE_BUILD )); then POS_MODE=build; fi
-ask POS_MODE "Image qayerdan olinsin? pull = ghcr'dan tortish (tez, tavsiya), build = shu yerda manba koddan qurish" "pull"
 [[ "$POS_MODE" == pull || "$POS_MODE" == build ]] || die "POS_MODE 'pull' yoki 'build' bo'lishi kerak."
 
 derive_image() {
@@ -182,87 +187,79 @@ derive_image() {
   owner="$(printf '%s' "$url" | sed -nE 's#.*[:/]([A-Za-z0-9_.-]+)/[A-Za-z0-9_.-]+(\.git)?$#\1#p')"
   [[ -n "$owner" ]] && printf 'ghcr.io/%s/pos-local' "$(lower "$owner")"
 }
-IMG_DEF="$(env_get POS_IMAGE)"
-if is_placeholder "$IMG_DEF"; then IMG_DEF="$(derive_image || true)"; fi
-ask POS_IMAGE "Image manzili" "$IMG_DEF"
-[[ -n "$POS_IMAGE" ]] || die "Image manzili kerak (masalan ghcr.io/<owner>/pos-local)."
+POS_IMAGE="${POS_IMAGE:-}"
+if [[ -z "$POS_IMAGE" ]]; then
+  POS_IMAGE="$(env_get POS_IMAGE)"
+  if is_placeholder "$POS_IMAGE"; then POS_IMAGE="$(derive_image || true)"; fi
+fi
+[[ -n "$POS_IMAGE" ]] || die "Image manzili aniqlanmadi (git remote yo'q). POS_IMAGE=ghcr.io/<owner>/pos-local bilan qayta ishga tushiring."
 POS_IMAGE="$(lower "$POS_IMAGE")"
 CHANNEL="$(env_get RELEASE_CHANNEL)"; CHANNEL="${CHANNEL:-stable}"
 
-# --- ghcr kirishi (private image)
-HAVE_AUTH=0
-[[ -f .registry-auth.json ]] && grep -q 'ghcr.io' .registry-auth.json 2>/dev/null && HAVE_AUTH=1
-if [[ "$POS_MODE" == pull && ( -z "${POS_GHCR_TOKEN:-}" ) ]]; then
-  if (( HAVE_AUTH )); then
-    info "Saqlangan ghcr.io kirish ma'lumoti bor - qayta so'ralmaydi."
-  else
-    info "Image PRIVATE bo'lsa GitHub kirishi kerak (token: read:packages huquqi). Image ochiq bo'lsa - bo'sh qoldiring."
-    ask POS_GHCR_USER "GitHub foydalanuvchi nomi" ""
-    if [[ -n "${POS_GHCR_USER:-}" ]]; then ask_secret POS_GHCR_TOKEN "GitHub token (kiritganda ko'rinmaydi)"; fi
-  fi
-fi
+# ghcr kirishi (private image): so'ralmaydi. POS_GHCR_USER/POS_GHCR_TOKEN env yoki avval saqlangan .registry-auth.json
+# bo'lsa ishlatiladi; yo'q bo'lsa tortish muvaffaqiyatsiz bo'ladi va image shu yerda quriladi.
 POS_GHCR_USER="${POS_GHCR_USER:-}"; POS_GHCR_TOKEN="${POS_GHCR_TOKEN:-}"
 
-# --- litsenziya
-# (litsenziya kaliti sir emas - QR/xabar orqali beriladi - shuning uchun ko'rinib turadi, xato kiritishni oson topish uchun)
-ask POS_LICENSE_KEY "Litsenziya kaliti (XXXX-XXXX-XXXX; bo'sh = keyin ilovadan faollashtiraman)" ""
-POS_LICENSE_KEY="$(printf '%s' "$POS_LICENSE_KEY" | tr -d '[:space:]')"
+# Litsenziya kaliti: so'ralmaydi - ilova (QR/kalit kiritish) orqali yoki POS_LICENSE_KEY bilan faollashtiriladi.
+POS_LICENSE_KEY="$(printf '%s' "${POS_LICENSE_KEY:-}" | tr -d '[:space:]')"
 if [[ -n "$POS_LICENSE_KEY" && ! "$POS_LICENSE_KEY" =~ ^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$ && ! "$POS_LICENSE_KEY" =~ ^[A-Fa-f0-9]{40}$ ]]; then
   warn "Kalit formati odatiy emas (XXXX-XXXX-XXXX kutilgandi) - baribir urinib ko'riladi."
 fi
 
-# --- Ona manzili
-ONA_DEF="$(env_get ONA_SERVER_URL)"; ONA_DEF="${ONA_DEF:-$DEFAULT_ONA_URL}"
-ask POS_ONA_URL "Ona (markaziy server) manzili" "$ONA_DEF"
-POS_ONA_URL="${POS_ONA_URL%/}"
+# Ona manzili va tashqi domen: .env'dagi yoki default qiymat.
+POS_ONA_URL="${POS_ONA_URL:-$(env_get ONA_SERVER_URL)}"; POS_ONA_URL="${POS_ONA_URL:-$DEFAULT_ONA_URL}"; POS_ONA_URL="${POS_ONA_URL%/}"
 [[ "$POS_ONA_URL" == https://* ]] || die "Ona manzili https:// bilan boshlanishi shart (aks holda server ishga tushmaydi)."
-
-# --- tashqi kirish
 DOM_DEF="$(env_get CSRF_TRUSTED_ORIGINS)"; DOM_DEF="${DOM_DEF#https://}"; [[ "$DOM_DEF" == *tizimingiz.uz* ]] && DOM_DEF=""
-ask POS_PUBLIC_DOMAIN "Tashqaridan kirish domeni (Cloudflare Public Hostname, masalan filial1.hamrohpos.uz; bo'sh = faqat restoran ichida)" "$DOM_DEF"
+POS_PUBLIC_DOMAIN="${POS_PUBLIC_DOMAIN:-$DOM_DEF}"
 POS_PUBLIC_DOMAIN="$(printf '%s' "$POS_PUBLIC_DOMAIN" | sed -E 's#^https?://##; s#/.*$##')"
-CF_DEF="$(env_get CLOUDFLARE_TUNNEL_TOKEN)"
-if is_placeholder "$CF_DEF" && [[ -z "${POS_CF_TOKEN:-}" ]]; then
-  ask_secret POS_CF_TOKEN "Cloudflare Tunnel tokeni (bo'sh = tunnel yoqilmaydi)"
-fi
-POS_CF_TOKEN="${POS_CF_TOKEN:-}"
 
-# --- litsenziya ommaviy kaliti
-POS_PUBLIC_KEY_FILE="${POS_PUBLIC_KEY_FILE:-}"
-if [[ ! -s keys/license_public.pem ]]; then
-  info "keys/license_public.pem topilmadi (Ona'dagi 'generate_signing_keys' chiqargan PUBLIC kalit)."
-  ask POS_PUBLIC_KEY_FILE "Kalit fayli yo'li (bo'sh = matnni shu yerga yopishtiraman)" ""
-  if [[ -z "$POS_PUBLIC_KEY_FILE" ]] && (( ! YES )); then
-    info "PEM matnini yopishtiring (-----BEGIN PUBLIC KEY----- dan -----END PUBLIC KEY----- gacha), tugagach Enter:"
-    PEM=""
-    while IFS= read -r line; do
-      PEM+="$line"$'\n'
-      [[ "$line" == *"END PUBLIC KEY"* ]] && break
-    done
-    mkdir -p keys; printf '%s' "$PEM" > keys/license_public.pem
-  elif [[ -n "$POS_PUBLIC_KEY_FILE" ]]; then
-    [[ -f "$POS_PUBLIC_KEY_FILE" ]] || die "Kalit fayli topilmadi: $POS_PUBLIC_KEY_FILE"
-    mkdir -p keys; cp "$POS_PUBLIC_KEY_FILE" keys/license_public.pem
+# --- YAGONA SAVOL: online rejim
+# Restoran WiFi'sida internet bo'lmasligi mumkin. Online rejimsiz server to'liq ishlaydi (buyurtma, to'lov, chop etish,
+# ilovalar - hammasi lokal tarmoqda), faqat 'cloudflared' (tashqaridan kirish) va 'watchtower' (avto-yangilanish)
+# ishga tushirilmaydi - ular internetsiz foydasiz va log'ni to'ldiradi.
+POS_ONLINE="${POS_ONLINE:-}"
+if [[ -z "$POS_ONLINE" && -n "${POS_CF_TOKEN:-}" ]]; then POS_ONLINE=1; fi
+if [[ -z "$POS_ONLINE" ]]; then POS_ONLINE="$(env_get ONLINE_MODE)"; fi
+if [[ -z "$POS_ONLINE" ]]; then
+  info "Online rejim: tashqaridan masofadan kirish (Cloudflare Tunnel) va avto-yangilanish. Restoran tarmog'ida internet yo'q bo'lsa - 'n'."
+  if confirm "Online rejimga ruxsat beraymi?" n; then POS_ONLINE=1; else POS_ONLINE=0; fi
+fi
+[[ "$POS_ONLINE" == 1 || "$POS_ONLINE" == 0 ]] || die "POS_ONLINE 1 yoki 0 bo'lishi kerak."
+POS_CF_TOKEN="${POS_CF_TOKEN:-}"
+if [[ "$POS_ONLINE" == 1 ]]; then
+  CF_DEF="$(env_get CLOUDFLARE_TUNNEL_TOKEN)"
+  if is_placeholder "$CF_DEF" && [[ -z "$POS_CF_TOKEN" ]]; then
+    ask_secret POS_CF_TOKEN "Cloudflare Tunnel tokeni (bo'sh = tunnelsiz, faqat avto-yangilanish)"
   fi
 fi
-grep -q "BEGIN PUBLIC KEY" keys/license_public.pem 2>/dev/null || die "keys/license_public.pem yo'q yoki noto'g'ri (BEGIN PUBLIC KEY topilmadi). Kalitsiz litsenziya tekshirilmaydi."
-if command -v openssl >/dev/null 2>&1 && ! openssl pkey -pubin -in keys/license_public.pem -noout >/dev/null 2>&1; then
-  die "keys/license_public.pem ochiq kalit sifatida o'qilmadi - matn to'liq/to'g'ri nusxalanganini tekshiring."
-fi
-ok "litsenziya ommaviy kaliti joyida"
 
-# --- tizim sozlamalari
+# --- litsenziya ommaviy kaliti (ixtiyoriy zaxira): asosiy yo'l - Ona faollashtirishda kalitni o'zi yuboradi va u bazada saqlanadi.
+mkdir -p keys
+if [[ -s keys/license_public.pem ]]; then
+  grep -q "BEGIN PUBLIC KEY" keys/license_public.pem || die "keys/license_public.pem noto'g'ri (BEGIN PUBLIC KEY topilmadi)."
+  if command -v openssl >/dev/null 2>&1 && ! openssl pkey -pubin -in keys/license_public.pem -noout >/dev/null 2>&1; then
+    die "keys/license_public.pem ochiq kalit sifatida o'qilmadi - matn to'liq/to'g'ri nusxalanganini tekshiring."
+  fi
+  ok "litsenziya ommaviy kaliti (zaxira) joyida"
+elif [[ -n "${POS_PUBLIC_KEY_FILE:-}" ]]; then
+  [[ -f "$POS_PUBLIC_KEY_FILE" ]] || die "Kalit fayli topilmadi: $POS_PUBLIC_KEY_FILE"
+  cp "$POS_PUBLIC_KEY_FILE" keys/license_public.pem
+  ok "litsenziya ommaviy kaliti nusxalandi"
+else
+  info "Litsenziya ommaviy kaliti faylda yo'q - Ona uni faollashtirishda o'zi yuboradi (qo'lda nusxalash shart emas)."
+fi
+
+# --- tizim sozlamalari: hammasi avtomatik (server mashinasi uchun to'g'ri default'lar); o'chirish: POS_MDNS=0 / POS_NO_SLEEP=0
 DO_MDNS=0; DO_SLEEP=0; DO_PRINTER=0
 if (( ! CONFIG_ONLY )); then
-  confirm "Tarmoqda avtomatik topilish (mDNS: ilovalar IP so'ramasdan serverni topadi) yoqilsinmi?" y && DO_MDNS=1
-  confirm "Kompyuter uxlab qolmasligi/qopqoq yopilganda o'chmasligi sozlansinmi? (server uchun juda muhim)" y && DO_SLEEP=1
-  [[ $PLATFORM == linux ]] && confirm "Termoprinter uchun zavod subnet'lari (192.168.123.x va h.k.) qo'shilsinmi?" n && DO_PRINTER=1
+  [[ "${POS_MDNS:-1}" == 1 ]] && DO_MDNS=1
+  [[ "${POS_NO_SLEEP:-1}" == 1 ]] && DO_SLEEP=1
+  [[ $PLATFORM == linux && "${POS_PRINTER_SUBNETS:-0}" == 1 ]] && DO_PRINTER=1
 fi
 
 echo
-info "${B}Xulosa:${N} rejim=$POS_MODE, image=$POS_IMAGE:$CHANNEL, Ona=$POS_ONA_URL"
-info "litsenziya=$([[ -n $POS_LICENSE_KEY ]] && echo kiritildi || echo 'keyin')  tashqi domen=${POS_PUBLIC_DOMAIN:-yoq}  tunnel=$([[ -n $POS_CF_TOKEN ]] && echo bor || echo yoq)  mDNS=$DO_MDNS  uxlamaslik=$DO_SLEEP"
-confirm "Davom etamizmi?" y || die "Bekor qilindi."
+info "${B}Xulosa:${N} image=$POS_IMAGE:$CHANNEL ($POS_MODE), Ona=$POS_ONA_URL"
+info "rejim=$([[ $POS_ONLINE == 1 ]] && echo ONLINE || echo OFLAYN)  tunnel=$([[ -n $POS_CF_TOKEN ]] && echo bor || echo yoq)  litsenziya=$([[ -n $POS_LICENSE_KEY ]] && echo kiritilgan || echo 'ilovadan')  mDNS=$DO_MDNS  uxlamaslik=$DO_SLEEP"
 need_sudo   # parolni shu yerda, bir marta so'raymiz (keyingi uzoq qadamlar o'rtasida emas)
 
 # ============================================================== 2. konfiguratsiya
@@ -292,6 +289,7 @@ env_set RELEASE_CHANNEL "$CHANNEL"
 env_set LICENSE_ENFORCEMENT 1
 env_set REGISTRY_AUTH_FILE ./.registry-auth.json
 if [[ -n "$POS_PUBLIC_DOMAIN" ]]; then env_set CSRF_TRUSTED_ORIGINS "https://$POS_PUBLIC_DOMAIN"; else env_set CSRF_TRUSTED_ORIGINS ""; fi
+env_set ONLINE_MODE "$POS_ONLINE"
 [[ -n "$POS_CF_TOKEN" ]] && env_set CLOUDFLARE_TUNNEL_TOKEN "$POS_CF_TOKEN"
 
 # Qurilma barmoq izi. Bir marta belgilangach O'ZGARTIRILMAYDI (litsenziya shu izga bog'lanadi).
@@ -403,24 +401,40 @@ if [[ "$POS_MODE" == pull && -n "$POS_GHCR_USER" && -n "$POS_GHCR_TOKEN" ]]; the
   printf '%s' "$POS_GHCR_TOKEN" | dk login ghcr.io -u "$POS_GHCR_USER" --password-stdin >/dev/null 2>&1 \
     && ok "ghcr.io ga kirildi" || warn "ghcr.io ga kirib bo'lmadi (token/huquqni tekshiring) - tortish muvaffaqiyatsiz bo'lishi mumkin."
 fi
+have_internet() { local c; c="$(curl -s -o /dev/null -m 6 -w '%{http_code}' https://registry-1.docker.io/v2/ 2>/dev/null || true)"; [[ -n "$c" && "$c" != 000 ]]; }
+if ! have_internet; then
+  # Image'lar (postgres, redis, ghcr, QR-menyu build) birinchi o'rnatishda yuklanadi - keyin server internetsiz ishlaydi.
+  if dk image inspect "$POS_IMAGE:$CHANNEL" >/dev/null 2>&1 && dk image inspect postgres:15 >/dev/null 2>&1; then
+    warn "Internet yo'q, lekin kerakli image'lar mashinada bor - mavjudlari bilan davom etiladi."
+    POS_MODE=skip
+  else
+    die "Internet yo'q: birinchi o'rnatishda image'larni yuklash uchun internet kerak (telefon hotspot ham bo'ladi). O'rnatilgach server internetsiz ishlaydi."
+  fi
+fi
 if [[ "$POS_MODE" == pull ]]; then
   info "Image tortilmoqda: $POS_IMAGE:$CHANNEL"
   if ! dk pull "$POS_IMAGE:$CHANNEL"; then
-    warn "Tortib bo'lmadi (private image uchun token kerak yoki hali reliz chiqarilmagan)."
-    if confirm "Buning o'rniga shu yerda manba koddan qursinmi? (5-10 daqiqa)" y; then POS_MODE=build; else die "Image yo'q - to'xtatildi."; fi
+    warn "Tortib bo'lmadi (private image uchun token kerak yoki hali reliz chiqarilmagan) - o'rniga shu yerda quriladi."
+    POS_MODE=build
   fi
 fi
 if [[ "$POS_MODE" == build ]]; then
   info "Image qurilmoqda (Cython kompilyatsiyasi bilan, 5-10 daqiqa)..."
   dk build -t "$POS_IMAGE:$CHANNEL" .
 fi
-SCALE=()
-if is_placeholder "$(env_get CLOUDFLARE_TUNNEL_TOKEN)"; then
-  info "Cloudflare tokeni yo'q - 'cloudflared' ishga tushirilmaydi (qayta ishga tushganda yig'ilib crash-loop bo'lmasligi uchun)."
-  SCALE=(--scale cloudflared=0)
+# Servislar aniq ro'yxat bilan ko'tariladi: oflayn rejimda cloudflared/watchtower image'lari umuman tortilmaydi.
+SERVICES=(db db_backup redis web celery_worker celery_beat website)
+if [[ "$POS_ONLINE" != 1 ]]; then
+  info "OFLAYN rejim: 'cloudflared' va 'watchtower' ishga tushirilmaydi (internetsiz foydasiz, log'ni to'ldiradi)."
+  # Avval online rejimda o'rnatilgan bo'lsa, ularni to'xtatib olib tashlaymiz.
+  dc rm -sf cloudflared watchtower >/dev/null 2>&1 || true
+else
+  SERVICES+=(watchtower)
+  if is_placeholder "$(env_get CLOUDFLARE_TUNNEL_TOKEN)"; then info "Cloudflare tokeni yo'q - 'cloudflared' ishga tushirilmaydi."
+  else SERVICES+=(cloudflared); fi
 fi
 info "Servislar ko'tarilmoqda (birinchi marta QR-menyu saytini ham quradi - bir necha daqiqa)..."
-dc up -d ${SCALE[@]+"${SCALE[@]}"}
+dc up -d "${SERVICES[@]}"
 
 # ============================================================== 5. kutish va litsenziya
 step "5/6 Server tayyor bo'lishini kutish"
@@ -445,7 +459,11 @@ elif [[ -n "$POS_LICENSE_KEY" ]]; then
   if dc exec -T web python manage.py activate_license "$POS_LICENSE_KEY"; then ACTIVATED=1; ok "faollashtirildi"
   else warn "Faollashtirib bo'lmadi (kalit xato, internet yo'q yoki Ona javob bermadi). Keyin qo'lda: docker compose -f $COMPOSE_FILE exec web python manage.py activate_license <KALIT>"; fi
 else
-  info "Kalit kiritilmadi - faollashtirishni ilova orqali (yoki 'activate_license' bilan) qiling."
+  info "Litsenziya faollashtirilmagan: ilovadagi sozlash ekranida kalitni kiriting/QR'ni skanerlang (yoki 'activate_license <KALIT>')."
+  info "Faollashtirish BIR MARTA internet talab qiladi (Bola Ona bilan gaplashadi) - keyin haftalar davomida internetsiz ishlaydi."
+  if [[ "$POS_ONLINE" != 1 ]]; then
+    warn "OFLAYN rejim va litsenziya hali faollashtirilmagan: hozir internet bor, shu paytda faollashtirib qo'ying (POS_LICENSE_KEY=<KALIT> bilan qayta ishga tushiring yoki 'activate_license <KALIT>'). Restoranga o'rnatilgach internet bo'lmasa, faollashtirib bo'lmaydi."
+  fi
 fi
 
 # LAN orqali ham javob berishini tekshirish (telefonlar shu yo'l bilan ulanadi). Bu yerda xato bo'lsa -
