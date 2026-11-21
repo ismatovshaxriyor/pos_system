@@ -16,6 +16,11 @@ export interface RealtimeConfig {
   getBaseUrl: () => string | null;
   getToken: () => string | null;
   getDeviceId: () => string | null;
+  /**
+   * Bir martalik WS biletini oladi (`POST /auth/ws-ticket/`). Berilsa, doimiy token URL'ga YOZILMAYDI.
+   * Xato qaytarsa (eski server: 404) yoki `null` bo'lsa - eski `?token=` usuliga qaytiladi.
+   */
+  getTicket?: () => Promise<string | null>;
   /** Sukut bo'yicha global `WebSocket` (React Native va Electron brauzer muhitida bor). */
   webSocketImpl?: typeof WebSocket;
   onFatalClose?: (reason: FatalCloseReason) => void;
@@ -30,8 +35,10 @@ export interface RealtimeConfig {
 
 type Handler = (event: WsEvent) => void;
 
-export function buildWsUrl(baseUrl: string, token: string, deviceId: string | null): string {
+export function buildWsUrl(baseUrl: string, token: string, deviceId: string | null, ticket?: string | null): string {
   const ws = baseUrl.replace(/^http/i, 'ws'); // http→ws, https→wss
+  // Bilet bor bo'lsa doimiy token URL'ga tushmaydi (jurnal/tarixda qolmasligi uchun).
+  if (ticket) return `${ws}/ws/events/?${new URLSearchParams({ ticket }).toString()}`;
   const qs = new URLSearchParams({ token });
   if (deviceId) qs.set('device_id', deviceId);
   return `${ws}/ws/events/?${qs.toString()}`;
@@ -49,6 +56,7 @@ export class RealtimeClient {
   private attempt = 0;
   private lastMessageAt = 0;
   private hasConnectedBefore = false;
+  private connectGen = 0;
 
   constructor(config: RealtimeConfig) {
     this.cfg = {
@@ -83,6 +91,7 @@ export class RealtimeClient {
   }
 
   stop(): void {
+    this.connectGen += 1;
     this.clearTimers();
     this.setStatus('stopped');
     const s = this.socket;
@@ -122,7 +131,29 @@ export class RealtimeClient {
     }
 
     this.setStatus(this.hasConnectedBefore ? 'reconnecting' : 'connecting');
-    const socket = new WS(buildWsUrl(base, token, this.cfg.getDeviceId()));
+    const gen = ++this.connectGen;
+    const getTicket = this.cfg.getTicket;
+    if (!getTicket) {
+      this.openSocket(WS, buildWsUrl(base, token, this.cfg.getDeviceId()));
+      return;
+    }
+    getTicket()
+      .catch(() => null)
+      .then((ticket) => {
+        // Kutish paytida stop() yoki yangi connect() bo'lgan bo'lsa - bu urinish eskirgan.
+        if (gen !== this.connectGen || this.status === 'stopped') return;
+        const freshToken = this.cfg.getToken();
+        const freshBase = this.cfg.getBaseUrl();
+        if (!freshToken || !freshBase) {
+          this.setStatus('stopped');
+          return;
+        }
+        this.openSocket(WS, buildWsUrl(freshBase, freshToken, this.cfg.getDeviceId(), ticket));
+      });
+  }
+
+  private openSocket(WS: typeof WebSocket, url: string): void {
+    const socket = new WS(url);
     this.socket = socket;
 
     socket.onopen = () => {

@@ -465,6 +465,10 @@ JAZZMIN_UI_TWEAKS = {
 # shuning uchun prod'da standart holatda YOPIQ (qarang core/authentication.py).
 KITCHEN_DASHBOARD_ENABLED = os.environ.get('KITCHEN_DASHBOARD_ENABLED', '0') == '1'
 
+# WebSocket'ga doimiy tokenni URL (`?token=`) orqali yuborishga ruxsat. Yangi ilovalar bir martalik
+# `?ticket=` ishlatadi (POST /api/auth/ws-ticket/). Eski ilovalar yangilangach `WS_ALLOW_LEGACY_TOKEN=0` qiling.
+WS_ALLOW_LEGACY_TOKEN = os.environ.get('WS_ALLOW_LEGACY_TOKEN', '1') == '1'
+
 CORS_ALLOW_ALL_ORIGINS = True
 
 # Brauzer muhitidagi mijozlar (Windows kassir ilovasi = Electron renderer) har bir

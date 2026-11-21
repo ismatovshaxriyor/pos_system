@@ -1,3 +1,6 @@
+import secrets
+
+from django.core.cache import cache
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import permissions, status
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -125,3 +128,32 @@ class AdminLoginView(ObtainAuthToken):
     parolni cheksiz taxmin qilish mumkin edi - bu yerda IP bo'yicha daqiqasiga cheklangan.
     """
     throttle_classes = [LoginRateThrottle]
+
+
+WS_TICKET_TTL_SECONDS = 30
+WS_TICKET_PREFIX = 'wsticket:'
+
+
+class WsTicketView(APIView):
+    """
+    WebSocket uchun bir martalik qisqa muddatli "bilet".
+
+    Ilgari klient doimiy API tokenini `ws://.../ws/events/?token=...` URL'iga yozardi - URL'lar server/proksi
+    jurnallarida, brauzer tarixida qoladi, ya'ni doimiy token sizib chiqardi. Endi klient avval shu
+    endpointdan (token Authorization sarlavhasida, URL'da emas) 30 soniyalik bir martalik bilet oladi va
+    WS'ga `?ticket=` bilan ulanadi: jurnalga tushgan bilet allaqachon yaroqsiz.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiResponse(description="{ticket, expires_in}")})
+    def post(self, request):
+        token_key = getattr(request.auth, 'key', None)
+        if not token_key:
+            return Response({'detail': "Sessiya yaroqsiz yoki tugagan. Qaytadan kiring."}, status=status.HTTP_401_UNAUTHORIZED)
+        ticket = secrets.token_urlsafe(32)
+        cache.set(
+            f'{WS_TICKET_PREFIX}{ticket}',
+            {'token': token_key, 'device_id': request.META.get('HTTP_X_DEVICE_ID') or None},
+            WS_TICKET_TTL_SECONDS,
+        )
+        return Response({'ticket': ticket, 'expires_in': WS_TICKET_TTL_SECONDS})

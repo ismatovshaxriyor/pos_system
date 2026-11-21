@@ -126,3 +126,55 @@ class EventsOriginTests(TransactionTestCase):
     async def test_foreign_origin_is_rejected(self):
         self.assertFalse(await self._connect([(b'origin', b'http://evil.example.com')]))
         self.assertFalse(await self._connect([(b'origin', b'http://8.8.8.8:8000')]))
+
+
+@override_settings(CHANNEL_LAYERS=IN_MEMORY_CHANNEL_LAYERS)
+class WsTicketTests(TransactionTestCase):
+    """Bir martalik bilet: doimiy token URL'ga tushmaydi, bilet bir marta va qisqa muddatga yaroqli."""
+
+    def setUp(self):
+        import unittest.mock as mock
+        self.license_patcher = mock.patch('licensing.middleware.is_license_blocked', return_value=False)
+        self.license_patcher.start()
+        self.addCleanup(self.license_patcher.stop)
+        self.user = User.objects.create_user(username='+998900000200', role='manager', is_staff=True)
+        self.token = Token.objects.create(user=self.user)
+
+    def _ticket(self):
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        res = c.post('/api/auth/ws-ticket/', HTTP_HOST='localhost')
+        self.assertEqual(res.status_code, 200, res.content)
+        return res.json()['ticket']
+
+    def test_ticket_requires_authentication(self):
+        from rest_framework.test import APIClient
+        res = APIClient().post('/api/auth/ws-ticket/', HTTP_HOST='localhost')
+        self.assertIn(res.status_code, (401, 403))
+
+    async def test_ticket_connects_once_only(self):
+        from asgiref.sync import sync_to_async
+        ticket = await sync_to_async(self._ticket)()
+        first = WebsocketCommunicator(application, f"/ws/events/?ticket={ticket}", headers=ORIGIN_HEADERS)
+        connected, _ = await first.connect()
+        self.assertTrue(connected)
+        await first.disconnect()
+
+        second = WebsocketCommunicator(application, f"/ws/events/?ticket={ticket}", headers=ORIGIN_HEADERS)
+        connected, _ = await second.connect()
+        self.assertFalse(connected)
+        await second.disconnect()
+
+    async def test_unknown_ticket_rejected(self):
+        c = WebsocketCommunicator(application, "/ws/events/?ticket=nope", headers=ORIGIN_HEADERS)
+        connected, _ = await c.connect()
+        self.assertFalse(connected)
+        await c.disconnect()
+
+    async def test_legacy_token_can_be_disabled(self):
+        with self.settings(WS_ALLOW_LEGACY_TOKEN=False):
+            c = WebsocketCommunicator(application, f"/ws/events/?token={self.token.key}", headers=ORIGIN_HEADERS)
+            connected, _ = await c.connect()
+            self.assertFalse(connected)
+            await c.disconnect()

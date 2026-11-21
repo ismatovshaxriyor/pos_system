@@ -147,3 +147,49 @@ describe('RealtimeClient', () => {
     expect(FakeSocket.instances).toHaveLength(0);
   });
 });
+
+describe('RealtimeClient: bir martalik bilet', () => {
+  const withTicket = (getTicket: () => Promise<string | null>) =>
+    new RealtimeClient({
+      getBaseUrl: () => 'http://10.0.0.5:8000',
+      getToken: () => 'secret-token',
+      getDeviceId: () => 'dev1',
+      getTicket,
+      webSocketImpl: FakeSocket as unknown as typeof WebSocket,
+    });
+
+  it("buildWsUrl: bilet bor bo'lsa doimiy token URL'ga yozilmaydi", () => {
+    const url = buildWsUrl('http://h:8000', 'secret-token', 'dev1', 'T1');
+    expect(url).toBe('ws://h:8000/ws/events/?ticket=T1');
+    expect(url).not.toContain('secret-token');
+  });
+
+  it('bilet olinsa socket shu bilet bilan ochiladi', async () => {
+    const c = withTicket(async () => 'T1');
+    c.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeSocket.instances).toHaveLength(1);
+    expect(FakeSocket.instances[0]?.url).toBe('ws://10.0.0.5:8000/ws/events/?ticket=T1');
+    c.stop();
+  });
+
+  it("bilet olib bo'lmasa (eski server) eski ?token= usuliga qaytadi", async () => {
+    const c = withTicket(async () => {
+      throw new Error('404');
+    });
+    c.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeSocket.instances[0]?.url).toContain('token=secret-token');
+    c.stop();
+  });
+
+  it("bilet kutilayotganda stop() bo'lsa socket umuman ochilmaydi", async () => {
+    let resolve!: (t: string) => void;
+    const c = withTicket(() => new Promise<string>((r) => (resolve = r)));
+    c.start();
+    c.stop();
+    resolve('T1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeSocket.instances).toHaveLength(0);
+  });
+});

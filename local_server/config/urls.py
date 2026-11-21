@@ -20,7 +20,7 @@ from django.urls import path, include, re_path
 from django.views.static import serve as serve_static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-from core.auth_views import AdminLoginView, DeviceRegisterView, PinLoginView, WaiterLoginView
+from core.auth_views import AdminLoginView, DeviceRegisterView, PinLoginView, WaiterLoginView, WsTicketView
 from core.views import KitchenDashboardView, QRAppView
 from licensing.views import DiscoveryView
 
@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/auth/device/register/', DeviceRegisterView.as_view(), name='auth-device-register'),
     path('api/auth/pin-login/', PinLoginView.as_view(), name='auth-pin-login'),
     path('api/auth/waiter-login/', WaiterLoginView.as_view(), name='auth-waiter-login'),
+    path('api/auth/ws-ticket/', WsTicketView.as_view(), name='auth-ws-ticket'),
     path('api/license/', include('licensing.urls')),
 
 

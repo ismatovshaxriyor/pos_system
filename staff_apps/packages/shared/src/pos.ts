@@ -72,6 +72,7 @@ export function createPos(opts: PosOptions): Pos {
     getBaseUrl: session.getBaseUrl,
     getToken: session.getToken,
     getDeviceId: session.getDeviceId,
+    getTicket: async () => (await api.wsTicket()).ticket,
     webSocketImpl: opts.webSocketImpl,
     onFatalClose: (reason) => {
       if (reason === 'license_blocked') session.markLicenseBlocked();

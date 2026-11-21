@@ -123,6 +123,9 @@ export function createApi(client: ApiClient) {
 
     discovery: () => client.get<DiscoveryInfo>('/discovery/', { anonymous: true }),
 
+    /** WebSocket uchun bir martalik bilet (30 s): doimiy token URL'ga yozilmasligi uchun. */
+    wsTicket: () => client.post<{ ticket: string; expires_in: number }>('/auth/ws-ticket/'),
+
     license: {
       /** Yangi serverni litsenziya kaliti bilan faollashtirish (Bola Ona bilan gaplashadi - sekinroq bo'lishi mumkin). */
       activate: (licenseKey: string) =>
