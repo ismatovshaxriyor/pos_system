@@ -16,7 +16,8 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
   - `public_domain`: Mijozlar stoldagi QR kodni skanerlaganda o'tadigan domen
   - `phone`: Restoran telefon raqami - to'lov chekining pastida ko'rsatiladi (masalan `"+998901234567"`)
   - `latitude` / `longitude`: Restoran koordinatalari
-  - `attendance_radius`: Davomat radiusi (metrlarda)
+  - `attendance_radius`: Davomat radiusi (metrlarda, yozishda 20–5000 oralig'i; aks holda 400)
+  - `require_check_in_for_orders`: boolean (standart `true`). `true` va restoran koordinatalari kiritilgan bo'lsa, check-in qilmagan (smenada bo'lmagan) **ofitsiant** `POST /api/orders/` da `403` oladi ("smenani boshlang" xabari). Koordinata yo'q bo'lsa majburlash ishlamaydi. Kassir/menejer/admin bu qoidaga bo'ysunmaydi.
   - `restore_stock_on_cancel`: Ombor qoidasi (boolean, standart `false`). `true` bo'lsa, buyurtma bekor qilinganda (`POST /api/orders/<id>/cancel/`) oshxonaga yuborilgan taomlar uchun sarflangan ingredientlar omborga qaytariladi va `StockMovement` ro'yxatida `movement_type = "return"` ("Qaytarish") yozuvi paydo bo'ladi. Faqat menejer/admin o'zgartiradi.
 
 ### 2. Restoran sozlamalarini yangilash
@@ -265,7 +266,7 @@ Bugungi savdoni **to'liq yopish/ochish** uchun - `Attendance` (xodimning shaxsiy
 Har bir restoranning o'z Bola'si endi restoranning ochiq domenida (`https://<restoran-subdomeni>.hamrohpos.uz` - `RestaurantConfig.public_domain`dagi domen) ham to'liq ochiq - avval bu manzil faqat mijozga ko'rinadigan QR-menyu sahifasi (`/table/<qr_code>/`) uchun ishlatilgan, endi shu domen orqali **to'liq xodimlar API'si** va **real-vaqt WebSocket kanali** ham ishlaydi.
 
 - **REST API:** ilova bazaviy URL sifatida `https://<subdomen>.hamrohpos.uz` ni ishlatishi mumkin - `/api/...` yo'li mahalliy WiFi'dagi bilan (masalan `http://192.168.1.50:8000` yoki mDNS orqali topilgan manzil) **bir xil ishlaydi**, faqat domen farqlanadi. Autentifikatsiya (`Token` + `X-Device-ID`) va ruxsatlar (kim nima qila oladi) tarmoq yo'liga bog'liq emas - WiFi'da ham, onlaynda ham bir xil.
-- **WebSocket:** `wss://<subdomen>.hamrohpos.uz/ws/events/?token=...&device_id=...` - xuddi mahalliy `ws://.../ws/events/...` bilan bir xil protokol/eventlar, faqat manzil.
+- **WebSocket:** `wss://<subdomen>.hamrohpos.uz/ws/events/?ticket=...` (qarang: "WebSocket ulanishi (bir martalik bilet)") - xuddi mahalliy `ws://.../ws/events/...` bilan bir xil protokol/eventlar, faqat manzil.
 - **Muhim:** bu cheklov ilova darajasida, backend darajasida emas - qaysi ilova shu domenga murojaat qilsa (admin, kassir, ofitsiant ilovasi), o'shanga ishlaydi. Agar faqat ma'lum bir ilova (masalan admin) WiFi'dan tashqarida ham ishlashi kerak bo'lsa, buni o'sha ilovaning tarmoq qatlamida hal qilish kerak (masalan: avval mahalliy manzilni sinab ko'rish, muvaffaqiyatsiz bo'lsa shu domenga fallback qilish).
 - Bu funksiya faqat restoranning `website` konteyneri ishga tushirilgan va Cloudflare Tunnel ingress qoidasi (`<subdomen>.hamrohpos.uz` → `http://website:80`) shu restoran uchun sozlangan bo'lsa ishlaydi - har bir restoran uchun alohida, avtomatlashtirilmagan.
 
@@ -325,3 +326,28 @@ Ko'p takrorlanadigan buyurtma ("Osh + salat + choy") — menejer yaratadi, ofits
 - Tekshiruvlar (`400`): `name` bo'sh; `items` bo'sh yoki 30 tadan ko'p; `quantity` 1–99 dan tashqari; `note` 100 belgidan uzun; mahsulot yo'q yoki menyudan o'chirilgan. Bir xil `product_id` + `note` takrorlansa miqdorlari qo'shiladi.
 - Realtime: o'zgarganda `menu_changed` (bootstrap'ni qayta so'rang).
 - Klientda qoida: shablon bosilganda taomlar savatga **qo'shiladi** (mavjud miqdorga ustiga); buyurtma serverga faqat ofitsiant tasdiqlagandan keyin yuboriladi (`POST /api/orders/` → `add_item` → `start`).
+
+
+---
+
+## Xavfsizlik bo'yicha o'zgarishlar (mobil/kassir ilovalariga ta'siri)
+
+### WebSocket ulanishi (bir martalik bilet)
+Doimiy tokenni URL'ga yozish (`?token=`) eskirdi (URL'lar jurnallarda qoladi). Yangi usul:
+1. `POST /api/auth/ws-ticket/` (odatdagi `Authorization: Token ...` + `X-Device-ID` bilan) → `{"ticket": "<tasodifiy>", "expires_in": 30}`.
+2. `wss://<host>/ws/events/?ticket=<ticket>` ga ulaning. Bilet **30 soniya** yaroqli va **faqat bir marta** ishlaydi; har qayta ulanishda yangisini oling.
+3. Eski server (`404` qaytarsa) yoki bilet olinmasa - eski `?token=...&device_id=...` usuliga qayting (server `WS_ALLOW_LEGACY_TOKEN=1` bo'lsa ishlaydi; barcha ilovalar yangilangach o'chiriladi).
+`@pos/shared::RealtimeClient` buni o'zi bajaradi (`getTicket`).
+
+### Ombor (Inventory) endpointlari - ruxsatlar
+`/api/ingredients/`, `/api/stock-movements/`, `/api/suppliers/` va boshqa ombor endpointlari endi **faqat kassir/menejer/admin** uchun (ofitsiant `403`). `ProductSerializer` javobida `cost_price` **ofitsiantga ko'rsatilmaydi**. `POST .../adjust/` da `new_quantity` manfiy bo'lsa `400`.
+
+### Login cheklovi
+`POST /api/auth/login/` bitta IP'dan **5 ta/daqiqa** (aks holda `429`). Swagger (`/api/docs/`) faqat dev (`DEBUG`) rejimida.
+
+### `GET /api/discovery/` va `GET /api/license/status/`
+- `discovery` javobidan `version` olib tashlandi (maydon ixtiyoriy deb hisoblang).
+- `license/status` autentifikatsiyasiz faqat `activated`, `restaurant_name`, `is_blocked`, `server_time` qaytaradi. Menejer/admin tokeni bilan qo'shimcha: `token_expires_at`, `furthest_token_expiry`, `pending_tokens_count`, `last_renewed_at`, `blocked_reason`.
+
+### Oflayn litsenziya tokeni
+`POST /api/license/apply-offline-token/` (autentifikatsiyasiz) tanasi `{"token": "<JWT>"}` - Ona admini bergan token internetsiz tekshiriladi; muvaffaqiyatda `license_inactive` bloki olib tashlanadi. Kassir va mobil ilovaning "Tizim bloklangan" ekranida shu uchun maydon bor.
