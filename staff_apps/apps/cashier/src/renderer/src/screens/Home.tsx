@@ -45,6 +45,12 @@ export function HomeScreen() {
   const [dayEnd, setDayEnd] = useState<null | 'view' | 'close'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Himoya: real-time (WebSocket) uzilsa ham ro'yxat eskirib qolmasin - har 30 soniyada jim yangilanadi.
+  useEffect(() => {
+    const t = setInterval(() => void refresh(), 30_000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
   const roleLabel = user?.role === 'manager' ? 'Menejer' : 'Kassir';
   const orders = data?.active_orders ?? [];
   const current = selected;

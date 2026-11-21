@@ -134,6 +134,9 @@ function createWindow(): void {
       sandbox: true,
       devTools: isDev,
       spellcheck: false,
+      // Kassa terminali boshqa oyna orqasida qolsa ham real-time yangilanish (bekor qilingan buyurtma, yangi chek)
+      // kechikmasin: Chromium yashirin oynada taymerlarni daqiqalab sekinlashtiradi.
+      backgroundThrottling: false,
     },
   });
   mainWindow = win;

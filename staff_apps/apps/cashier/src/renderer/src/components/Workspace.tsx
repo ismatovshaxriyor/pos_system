@@ -11,7 +11,7 @@ import {
   type PaymentMethod,
   type PaymentPlan,
 } from '@pos/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useRealtimeRefresh, useSession } from '../lib/hooks';
 import { pos } from '../lib/pos';
@@ -23,6 +23,8 @@ import { PayPanel } from './PayPanel';
 import { Receipt } from './Receipt';
 
 const REFRESH = ['order_updated'] as const;
+/** Real-time zaxirasi: ochiq chek shu oraliqda serverdan qayta o'qiladi. */
+const POLL_MS = 15_000;
 
 interface Done {
   table: string;
@@ -60,6 +62,17 @@ export function Workspace({ orderId, onChanged, onClose }: { orderId: number; on
     void load();
   }, [load]);
   useRealtimeRefresh(REFRESH, load);
+
+  // Himoya: WebSocket uzilib qolsa (zombi ulanish, server qayta ishga tushishi) ham ochiq chek eskirib turmasin -
+  // bekor qilingan/boshqa terminalda yopilgan buyurtma o'zi yangilansin.
+  const stale = useRef({ busy: false, finished: false });
+  stale.current = { busy, finished: order?.status === 'completed' || order?.status === 'cancelled' };
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (!stale.current.busy && !stale.current.finished) void load();
+    }, POLL_MS);
+    return () => clearInterval(t);
+  }, [load]);
 
   // "To'landi" oynasi o'zi yopiladi.
   useEffect(() => {
