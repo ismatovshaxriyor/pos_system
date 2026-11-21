@@ -1,7 +1,9 @@
 import {
   DEFAULT_HAND_LAYOUT,
+  DEFAULT_MENU_STYLE,
   handRules,
   isHandLayout,
+  isMenuStyle,
   isTextScale,
   isThemePref,
   paletteFor,
@@ -9,6 +11,7 @@ import {
   textScaleFactor,
   type HandLayout,
   type HandRules,
+  type MenuStyle,
   type Palette,
   type TextScale,
   type ThemeName,
@@ -24,9 +27,20 @@ export interface Appearance {
   reduceMotion: boolean;
   /** Qo'lga moslash: elementlar joylashuvi (o'ng / chap / ikki qo'l). */
   hand: HandLayout;
+  /** Buyurtma olishda menyu ko'rinishi: ro'yxat / ixcham / rasmli kartochkalar. */
+  menuStyle: MenuStyle;
+  /** Taom rasmlari ko'rinsinmi (sekin internet yoki ixcham ko'rinish uchun o'chirish mumkin). */
+  showImages: boolean;
 }
 
-export const DEFAULT_APPEARANCE: Appearance = { theme: 'auto', textScale: 'normal', reduceMotion: false, hand: DEFAULT_HAND_LAYOUT };
+export const DEFAULT_APPEARANCE: Appearance = {
+  theme: 'auto',
+  textScale: 'normal',
+  reduceMotion: false,
+  hand: DEFAULT_HAND_LAYOUT,
+  menuStyle: DEFAULT_MENU_STYLE,
+  showImages: true,
+};
 
 const KEY = 'pos.mobile.appearance.v1';
 
@@ -39,6 +53,8 @@ function parse(raw: string | null): Appearance {
       textScale: isTextScale(v.textScale) ? v.textScale : DEFAULT_APPEARANCE.textScale,
       reduceMotion: v.reduceMotion === true,
       hand: isHandLayout(v.hand) ? v.hand : DEFAULT_APPEARANCE.hand,
+      menuStyle: isMenuStyle(v.menuStyle) ? v.menuStyle : DEFAULT_APPEARANCE.menuStyle,
+      showImages: typeof v.showImages === 'boolean' ? v.showImages : DEFAULT_APPEARANCE.showImages,
     };
   } catch {
     return DEFAULT_APPEARANCE;

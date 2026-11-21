@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   CASHIER_LAYOUTS,
+  DEFAULT_MENU_STYLE,
   HAND_LAYOUTS,
+  isMenuStyle,
+  MENU_STYLES,
   cashierMirrorsActions,
   handRules,
   isCashierLayout,
@@ -39,5 +42,15 @@ describe('layout', () => {
     expect(handRules('left')).toMatchObject({ headerDirection: 'row-reverse', addDirection: 'row-reverse' });
     expect(handRules('both-edges').edgeMinus).toBe(true);
     expect(handRules('both-split').splitStepper).toBe(true);
+  });
+});
+
+describe('menyu uslublari', () => {
+  it("uchta uslub, standart ro'yxat, tekshiruv", () => {
+    expect(MENU_STYLES.map((m) => m.id)).toEqual(['list', 'compact', 'grid']);
+    expect(DEFAULT_MENU_STYLE).toBe('list');
+    expect(isMenuStyle('grid')).toBe(true);
+    expect(isMenuStyle('table')).toBe(false);
+    expect(isMenuStyle(undefined)).toBe(false);
   });
 });

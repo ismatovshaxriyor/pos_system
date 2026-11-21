@@ -1,4 +1,4 @@
-import { HAND_LAYOUTS, type HandLayout, type TextScale, type ThemePref } from '@pos/design';
+import { HAND_LAYOUTS, MENU_STYLES, type HandLayout, type MenuStyle, type TextScale, type ThemePref } from '@pos/design';
 import { Modal, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -38,6 +38,32 @@ function HandDiagram({ id }: { id: HandLayout }) {
             <View style={{ flex: 1, height: 14, borderRadius: 4, backgroundColor: c.ink60 }} />
           </View>
         </>
+      )}
+    </View>
+  );
+}
+
+/** Mini-chizma: menyu uslubi qanday ko'rinishi. */
+function MenuStyleDiagram({ id }: { id: MenuStyle }) {
+  const { c } = useTheme();
+  const box = { backgroundColor: c.edge, borderRadius: 3 } as const;
+  const row = (h: number, k: number) => (
+    <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: h }}>
+      <View style={[box, { width: h - 2, height: h - 2 }]} />
+      <View style={[box, { flex: 1, height: 6 }]} />
+      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink60 }} />
+    </View>
+  );
+  return (
+    <View style={{ width: 84, gap: 4 }}>
+      {id === 'list' && [0, 1, 2].map((k) => row(16, k))}
+      {id === 'compact' && [0, 1, 2, 3, 4].map((k) => row(10, k))}
+      {id === 'grid' && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+          {[0, 1, 2, 3].map((k) => (
+            <View key={k} style={{ width: 40, height: 22, borderRadius: 4, backgroundColor: c.panel, borderWidth: 1, borderColor: c.edge }} />
+          ))}
+        </View>
       )}
     </View>
   );
@@ -124,6 +150,71 @@ export function SettingsSheet({
                 </Pressable>
               );
             })}
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <Txt size={17} weight={500}>
+              Buyurtma olish ko'rinishi
+            </Txt>
+            <Txt size={14} tone="muted">
+              Menyu qanday ko'rinsin: o'zingizga qulayini tanlang
+            </Txt>
+            {MENU_STYLES.map((m) => {
+              const on = appearance.menuStyle === m.id;
+              return (
+                <Pressable
+                  key={m.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => setAppearance({ menuStyle: m.id })}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 14,
+                    minHeight: 64,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: on ? c.ink60 : c.grid,
+                    backgroundColor: on ? c.sel : c.card,
+                  }}
+                >
+                  <MenuStyleDiagram id={m.id} />
+                  <View style={{ flex: 1 }}>
+                    <Txt size={16} weight={600}>
+                      {m.label}
+                    </Txt>
+                    <Txt size={13} tone="muted">
+                      {m.hint}
+                    </Txt>
+                  </View>
+                </Pressable>
+              );
+            })}
+            {appearance.menuStyle !== 'list' && appearance.hand === 'both-split' && (
+              <Txt size={13} tone="muted">
+                "Ikki qo'l · katta" tugmalari faqat "Ro'yxat" ko'rinishida ishlaydi.
+              </Txt>
+            )}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 56 }}>
+            <View style={{ flex: 1 }}>
+              <Txt size={17} weight={500}>
+                Taom rasmlari
+              </Txt>
+              <Txt size={14} tone="muted">
+                Menyuda taomlarning rasmi ko'rinsin
+              </Txt>
+            </View>
+            <Switch
+              value={appearance.showImages}
+              onValueChange={(showImages) => setAppearance({ showImages })}
+              trackColor={{ false: c.grid, true: c.ok }}
+              thumbColor={c.card}
+              accessibilityLabel="Taom rasmlari"
+            />
           </View>
 
           <View style={{ gap: 8 }}>

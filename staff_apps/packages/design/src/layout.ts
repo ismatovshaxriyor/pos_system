@@ -78,3 +78,28 @@ export function handRules(layout: HandLayout): HandRules {
     edgeMinus: layout === 'both-edges',
   };
 }
+
+/**
+ * Buyurtma olishda menyu ko'rinishi (ofitsiant o'ziga yoqqanini tanlaydi; har qurilmada alohida).
+ * `list` - hozirgi (qo'lga moslash faqat shunda to'liq ishlaydi), `compact` - bir ekranda ko'proq taom,
+ * `grid` - rasmli kartochkalar (2 ustun).
+ */
+export type MenuStyle = 'list' | 'compact' | 'grid';
+
+export interface MenuStyleInfo {
+  id: MenuStyle;
+  label: string;
+  hint: string;
+}
+
+export const MENU_STYLES: readonly MenuStyleInfo[] = [
+  { id: 'list', label: "Ro'yxat", hint: 'Katta qatorlar, bosish oson' },
+  { id: 'compact', label: 'Ixcham', hint: "Bir ekranda ko'proq taom" },
+  { id: 'grid', label: 'Kartochkalar', hint: "Rasmli, 2 ustun" },
+];
+
+export const DEFAULT_MENU_STYLE: MenuStyle = 'list';
+
+export function isMenuStyle(v: unknown): v is MenuStyle {
+  return MENU_STYLES.some((m) => m.id === v);
+}

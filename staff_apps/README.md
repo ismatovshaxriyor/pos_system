@@ -91,6 +91,10 @@ Bosh ekrandagi "Hisobotlar" kartochkasi (`/reports`). Bo'limlar: **Panel** (bir 
 
 Menejer: ☰ Boshqaruv → **Shablonlar** (`app/(app)/templates.tsx`) — nom + menyudan taomlar (savat kabi: miqdor, izoh), faol/faol emas, o'chirish. Ofitsiant: yangi buyurtma va mavjud buyurtmaga qo'shish ekranida menyu ustidagi **Shablonlar** qatori; bosilsa taomlar hali tasdiqlanmagan qoralamaga **qo'shiladi** (`@pos/shared` `addTemplate`: mavjud miqdorga ustiga, sotuvda yo'q taom o'tkazib yuboriladi va xabar chiqadi), keyin odatdagidek o'zgartiriladi; oshxonaga chek faqat tasdiqlash oynasidan keyin. Backend: `/api/order-templates/` + `bootstrap.order_templates` (**local_server >= 0.3.26** kerak; eski serverda qator shunchaki chiqmaydi). Menejer ro'yxati `menu_changed` bilan jonli yangilanadi.
 
+## Buyurtma olish ko'rinishi va taom rasmlari (mobil, har qurilmada alohida)
+
+☰ Sozlamalar → **Buyurtma olish ko'rinishi**: `Ro'yxat` (katta qatorlar, qo'lga moslash to'liq ishlaydi), `Ixcham` (past qatorlar, bir ekranda ko'proq taom), `Kartochkalar` (2 ustun, rasmli). **Taom rasmlari** yoqgich — o'chirilsa hamma ko'rinishda rasm chiqmaydi (standart: yoqilgan; rasm yo'q taomda nomning bosh harfi). Sozlama `Appearance.menuStyle`/`showImages` (`ui/theme.tsx`, `pos.mobile.appearance.v1`), turlar `@pos/design` `MENU_STYLES`. Tanlov `MenuPicker`ga (`ui/parts.tsx`) ta'sir qiladi: yangi buyurtma, mavjud buyurtmaga qo'shish va shablon tahrirlash ekranlari. Rasm URL'lari serverdan `bootstrap`da allaqachon keladi (`Product.image`); `expo-image` diskda keshlaydi.
+
 ## Ilovani yangilash
 
 Ilovalar yangilanishni **faqat Bola'dan** oladi (`GET /api/license/app-updates/`): Ona'dagi `MobileApp` (Ona admin → Mobil ilovalar) o'rnatuvchisi heartbeat orqali Bola'ga yetkaziladi, sha256 tekshiriladi va LAN'dan tarqatiladi. `slug`: kassir ilovasi `kassir`, mobil ilova `ofitsiant`/`manager` (admin shu nom bilan yuklashi kerak). `is_required` belgilangan bo'lsa eski versiya bloklanadi (to'liq ekran), aks holda pastda "Yangilash / Keyinroq" eslatmasi chiqadi.

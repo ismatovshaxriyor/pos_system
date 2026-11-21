@@ -12,6 +12,7 @@ import {
   type Product,
 } from '@pos/shared';
 import { useMemo, useState, type ReactNode } from 'react';
+import { Image } from 'expo-image';
 import { Modal, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -158,9 +159,8 @@ export function MenuPicker({
   onDecrease?: (p: Product) => void;
   counts?: ReadonlyMap<number, number>;
 }) {
-  const { c, scale } = useTheme();
-  const hand = useHand();
-  const lift = useLift();
+  const { c, scale, appearance } = useTheme();
+  const { menuStyle, showImages } = appearance;
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
 
@@ -198,109 +198,276 @@ export function MenuPicker({
         ))}
       </ScrollView>
       {visible.length === 0 && <Txt tone="muted">Mahsulot topilmadi.</Txt>}
-      {visible.map((p) => {
-        const n = counts?.get(p.id) ?? 0;
-        const canMinus = !!onDecrease;
-        const split = hand.splitStepper && canMinus && n > 0;
-        const edgeMinus = hand.edgeMinus && canMinus;
-        const info = (
-          <View style={{ flex: 1 }}>
-            <Txt size={17} weight={500}>
-              {p.name}
-            </Txt>
-            <Txt family="mono" size={14} tone="muted">
-              {formatMoney(p.price)}
-            </Txt>
-          </View>
-        );
-        const badge = n > 0 && (
-          <View style={{ backgroundColor: c.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 }}>
-            <Txt family="mono" weight={500} size={14}>
-              {n}×
-            </Txt>
-          </View>
-        );
-        const circle = {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: c.panel,
-          alignItems: 'center',
-          justifyContent: 'center',
-        } as const;
-        return (
-          <View
-            key={p.id}
-            style={[
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: n > 0 ? c.sel : c.card,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: n > 0 ? c.ink60 : c.grid,
-                paddingHorizontal: 16,
-                minHeight: 64,
-                gap: 12,
-              },
-              n === 0 && lift,
-              split && { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 10, gap: 8 },
-            ]}
-          >
-            {split ? (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  {info}
-                  {badge}
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Pressable
-                    accessibilityLabel="Kamaytirish"
-                    onPress={() => onDecrease?.(p)}
-                    style={({ pressed }) => [bigBtn(c.panel), pressed && { opacity: 0.85 }]}
-                  >
-                    <Txt size={30} weight={500}>−</Txt>
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel="Ko'paytirish"
-                    onPress={() => onPick(p)}
-                    style={({ pressed }) => [bigBtn(c.card), { borderWidth: 1, borderColor: c.ink60 }, pressed && { opacity: 0.85 }]}
-                  >
-                    <Txt size={30} weight={500}>+</Txt>
-                  </Pressable>
-                </View>
-              </>
+      {menuStyle === 'grid' ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {visible.map((p) => (
+            <GridCard key={p.id} p={p} n={counts?.get(p.id) ?? 0} showImage={showImages} onPick={onPick} onDecrease={onDecrease} />
+          ))}
+          {visible.length % 2 === 1 && <View style={{ flexBasis: '47%', flexGrow: 1 }} />}
+        </View>
+      ) : (
+        visible.map((p) => {
+          const Row = menuStyle === 'compact' ? CompactRow : ListRow;
+          return <Row key={p.id} p={p} n={counts?.get(p.id) ?? 0} showImage={showImages} onPick={onPick} onDecrease={onDecrease} />;
+        })
+      )}
+    </View>
+  );
+}
+
+interface RowProps {
+  p: Product;
+  /** Savatdagi miqdor. */
+  n: number;
+  showImage: boolean;
+  onPick: (p: Product) => void;
+  onDecrease?: (p: Product) => void;
+}
+
+/** Taom rasmi (kichik kvadrat); rasm bo'lmasa nomining bosh harfi. `expo-image` o'zi diskda keshlaydi. */
+function Thumb({ p, size }: { p: Product; size: number }) {
+  const { c } = useTheme();
+  const box = { width: size, height: size, borderRadius: Math.round(size / 5), backgroundColor: c.panel } as const;
+  if (p.image) return <Image source={{ uri: p.image }} style={box} contentFit="cover" transition={120} accessibilityIgnoresInvertColors />;
+  return (
+    <View style={[box, { alignItems: 'center', justifyContent: 'center' }]}>
+      <Txt size={Math.round(size * 0.42)} weight={600} tone="muted">
+        {p.name.trim().charAt(0).toUpperCase()}
+      </Txt>
+    </View>
+  );
+}
+
+function CountBadge({ n }: { n: number }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ backgroundColor: c.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2, borderWidth: 1, borderColor: c.grid }}>
+      <Txt family="mono" weight={500} size={14}>
+        {n}×
+      </Txt>
+    </View>
+  );
+}
+
+/** "Ixcham" uslubi: past qatorlar (bir ekranda ko'proq taom), "+"/"−" qo'lga moslashuvdagi tomonda. */
+function CompactRow({ p, n, showImage, onPick, onDecrease }: RowProps) {
+  const { c } = useTheme();
+  const hand = useHand();
+  const circle = { width: 42, height: 42, borderRadius: 21, backgroundColor: c.panel, alignItems: 'center', justifyContent: 'center' } as const;
+  return (
+    <View
+      style={{
+        flexDirection: hand.addDirection,
+        alignItems: 'center',
+        gap: 8,
+        minHeight: 54,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: n > 0 ? c.ink60 : c.grid,
+        backgroundColor: n > 0 ? c.sel : c.card,
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${p.name} qo'shish`}
+        onPress={() => onPick(p)}
+        style={({ pressed }) => [{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 54 }, pressed && { opacity: 0.85 }]}
+      >
+        {showImage && <Thumb p={p} size={36} />}
+        <View style={{ flex: 1 }}>
+          <Txt size={16} weight={500} numberOfLines={1}>
+            {p.name}
+          </Txt>
+          <Txt family="mono" size={13} tone="muted">
+            {formatMoney(p.price)}
+          </Txt>
+        </View>
+        {n > 0 && <CountBadge n={n} />}
+      </Pressable>
+      {n > 0 && onDecrease && (
+        <Pressable accessibilityLabel="Kamaytirish" onPress={() => onDecrease(p)} style={circle}>
+          <Txt size={24} weight={500}>−</Txt>
+        </Pressable>
+      )}
+      <Pressable accessibilityLabel="Ko'paytirish" onPress={() => onPick(p)} style={circle}>
+        <Txt size={24} weight={500}>+</Txt>
+      </Pressable>
+    </View>
+  );
+}
+
+/** "Kartochkalar" uslubi: 2 ustun, yuqorida rasm (o'chirilgan bo'lsa rasmsiz), pastda nom/narx; tanlanganda "−"/"+" qatori. */
+function GridCard({ p, n, showImage, onPick, onDecrease }: RowProps) {
+  const { c } = useTheme();
+  const lift = useLift();
+  const step = { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' } as const;
+  return (
+    <View
+      style={[
+        {
+          flexBasis: '47%',
+          flexGrow: 1,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: n > 0 ? c.ink60 : c.grid,
+          backgroundColor: n > 0 ? c.sel : c.card,
+          overflow: 'hidden',
+        },
+        n === 0 && lift,
+      ]}
+    >
+      <Pressable accessibilityRole="button" accessibilityLabel={`${p.name} qo'shish`} onPress={() => onPick(p)} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+        {showImage && (
+          <View>
+            {p.image ? (
+              <Image source={{ uri: p.image }} style={{ width: '100%', height: 96, backgroundColor: c.panel }} contentFit="cover" transition={120} accessibilityIgnoresInvertColors />
             ) : (
-              <>
-                {edgeMinus && (
-                  <Pressable
-                    accessibilityLabel="Kamaytirish"
-                    disabled={n === 0}
-                    onPress={() => onDecrease?.(p)}
-                    style={[circle, { opacity: n === 0 ? 0 : 1 }]}
-                  >
-                    <Txt size={26} weight={500}>−</Txt>
-                  </Pressable>
-                )}
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => onPick(p)}
-                  style={({ pressed }) => [
-                    { flex: 1, flexDirection: hand.addDirection, alignItems: 'center', gap: 12, minHeight: 62 },
-                    pressed && { opacity: 0.85 },
-                  ]}
-                >
-                  {info}
-                  {badge}
-                  <View style={circle}>
-                    <Txt size={26} weight={500}>+</Txt>
-                  </View>
-                </Pressable>
-              </>
+              <View style={{ width: '100%', height: 96, backgroundColor: c.panel, alignItems: 'center', justifyContent: 'center' }}>
+                <Txt size={34} weight={600} tone="muted">
+                  {p.name.trim().charAt(0).toUpperCase()}
+                </Txt>
+              </View>
+            )}
+            {n > 0 && (
+              <View style={{ position: 'absolute', top: 6, right: 6 }}>
+                <CountBadge n={n} />
+              </View>
             )}
           </View>
-        );
-      })}
+        )}
+        <View style={{ padding: 10, gap: 2, minHeight: 62 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+            <Txt size={15} weight={500} numberOfLines={2} style={{ flex: 1 }}>
+              {p.name}
+            </Txt>
+            {!showImage && n > 0 && <CountBadge n={n} />}
+          </View>
+          <Txt family="mono" size={13} tone="muted">
+            {formatMoney(p.price)}
+          </Txt>
+        </View>
+      </Pressable>
+      {n > 0 && onDecrease && (
+        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: c.grid }}>
+          <Pressable accessibilityLabel="Kamaytirish" onPress={() => onDecrease(p)} style={step}>
+            <Txt size={24} weight={500}>−</Txt>
+          </Pressable>
+          <View style={{ width: 1, backgroundColor: c.grid }} />
+          <Pressable accessibilityLabel="Ko'paytirish" onPress={() => onPick(p)} style={step}>
+            <Txt size={24} weight={500}>+</Txt>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** "Ro'yxat" uslubi: katta qatorlar; qo'lga moslash (+/− joyi, ikki qo'l) to'liq shu yerda ishlaydi. */
+function ListRow({ p, n, showImage, onPick, onDecrease }: RowProps) {
+  const { c } = useTheme();
+  const hand = useHand();
+  const lift = useLift();
+  const canMinus = !!onDecrease;
+  const thumb = showImage ? <Thumb p={p} size={52} /> : null;
+  const split = hand.splitStepper && canMinus && n > 0;
+  const edgeMinus = hand.edgeMinus && canMinus;
+  const info = (
+    <View style={{ flex: 1 }}>
+      <Txt size={17} weight={500}>
+        {p.name}
+      </Txt>
+      <Txt family="mono" size={14} tone="muted">
+        {formatMoney(p.price)}
+      </Txt>
+    </View>
+  );
+  const badge = n > 0 && (
+    <View style={{ backgroundColor: c.card, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 2 }}>
+      <Txt family="mono" weight={500} size={14}>
+        {n}×
+      </Txt>
+    </View>
+  );
+  const circle = {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: c.panel,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as const;
+  return (
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: n > 0 ? c.sel : c.card,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: n > 0 ? c.ink60 : c.grid,
+          paddingHorizontal: 16,
+          minHeight: 64,
+          gap: 12,
+        },
+        n === 0 && lift,
+        split && { flexDirection: 'column', alignItems: 'stretch', paddingVertical: 10, gap: 8 },
+      ]}
+    >
+      {split ? (
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {thumb}
+            {info}
+            {badge}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable
+              accessibilityLabel="Kamaytirish"
+              onPress={() => onDecrease?.(p)}
+              style={({ pressed }) => [bigBtn(c.panel), pressed && { opacity: 0.85 }]}
+            >
+              <Txt size={30} weight={500}>−</Txt>
+            </Pressable>
+            <Pressable
+              accessibilityLabel="Ko'paytirish"
+              onPress={() => onPick(p)}
+              style={({ pressed }) => [bigBtn(c.card), { borderWidth: 1, borderColor: c.ink60 }, pressed && { opacity: 0.85 }]}
+            >
+              <Txt size={30} weight={500}>+</Txt>
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <>
+          {edgeMinus && (
+            <Pressable
+              accessibilityLabel="Kamaytirish"
+              disabled={n === 0}
+              onPress={() => onDecrease?.(p)}
+              style={[circle, { opacity: n === 0 ? 0 : 1 }]}
+            >
+              <Txt size={26} weight={500}>−</Txt>
+            </Pressable>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onPick(p)}
+            style={({ pressed }) => [
+              { flex: 1, flexDirection: hand.addDirection, alignItems: 'center', gap: 12, minHeight: 62 },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            {thumb}
+            {info}
+            {badge}
+            <View style={circle}>
+              <Txt size={26} weight={500}>+</Txt>
+            </View>
+          </Pressable>
+        </>
+      )}
     </View>
   );
 }
