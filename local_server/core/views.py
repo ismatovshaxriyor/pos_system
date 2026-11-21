@@ -588,7 +588,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             _, _, balance_due = services.calculate_order_financials(order)
             if amount > balance_due:
                 return Response(
-                    {'detail': f"To'lov summasi qolgan qarzdan ({balance_due} so'm) oshib ketdi."},
+                    {'detail': f"To'lov summasi qolgan qarzdan ({int(balance_due):,} so'm) oshib ketdi.".replace(',', ' ')},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -831,14 +831,21 @@ class RestaurantConfigViewSet(
             if res.status_code == 200:
                 return Response({'status': 'Telegram test message sent successfully'})
             else:
+                reasons = {
+                    401: "bot tokeni noto'g'ri. @BotFather bergan tokenni qayta tekshiring",
+                    403: "bot bu chatga xabar yubora olmaydi. Botni guruhga qo'shing yoki botga /start yozing",
+                    404: "bot tokeni noto'g'ri. @BotFather bergan tokenni qayta tekshiring",
+                    400: "chat ID noto'g'ri yoki bot bu chatni topa olmadi",
+                    429: "Telegram vaqtincha cheklov qo'ydi. Birozdan keyin urinib ko'ring",
+                }
                 return Response(
-                    {'detail': f"Telegram API xatosi ({res.status_code}): {res.text}"},
+                    {'detail': f"Telegram xabar yubormadi: {reasons.get(res.status_code, 'kutilmagan javob (kod ' + str(res.status_code) + ')')}."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         except Exception as e:
             return Response(
-                {'detail': f"Telegram ulanishida xatolik: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {'detail': "Telegramga ulanib bo'lmadi. Server internetga ulanganini tekshiring."},
+                status=status.HTTP_502_BAD_GATEWAY
             )
 
 
@@ -1077,7 +1084,7 @@ class PrinterViewSet(viewsets.ModelViewSet):
             escpos.send_tcp(printer.ip_address.strip(), printer.port, payload, timeout=5.0)
         except OSError as exc:
             return Response(
-                {'detail': f"Printerga ulanib bo'lmadi ({printer.ip_address}:{printer.port}): {exc}"},
+                {'detail': f"Printerga ulanib bo'lmadi ({printer.ip_address}:{printer.port}): {services.describe_network_error(exc)}."},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
         return Response({'status': 'Test chek yuborildi'})

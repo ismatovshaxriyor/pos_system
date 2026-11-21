@@ -77,3 +77,18 @@ class ApiErrorResponseTests(APITestCase):
         res = self.client.get('/api/orders/999999/')
         self.assertEqual(res.status_code, 404)
         self.assertEqual(res.data['detail'], 'Topilmadi.')
+
+
+class NetworkErrorDescriptionTests(SimpleTestCase):
+    def test_connection_errors_are_explained_in_uzbek(self):
+        import errno
+        import socket
+
+        from core.services import describe_network_error
+
+        self.assertIn('vaqt tugadi', describe_network_error(socket.timeout('timed out')))
+        self.assertIn('rad etdi', describe_network_error(ConnectionRefusedError(errno.ECONNREFUSED, 'Connection refused')))
+        self.assertIn("yo'l topilmadi", describe_network_error(OSError(errno.EHOSTUNREACH, 'No route to host')))
+        self.assertIn('manzil topilmadi', describe_network_error(socket.gaierror(-2, 'Name or service not known')))
+        # Inglizcha tizim matni foydalanuvchiga oqib chiqmasligi kerak
+        self.assertNotIn('Errno', describe_network_error(OSError(errno.EIO, 'boom')))

@@ -1012,6 +1012,23 @@ def get_restaurant_phone():
     return config.phone if (config and config.phone) else ''
 
 
+def describe_network_error(exc):
+    """Tarmoq/socket xatosini (inglizcha `[Errno 111] ...`) foydalanuvchiga tushunarli o'zbekcha sababga aylantiradi."""
+    import errno
+    import socket
+
+    if isinstance(exc, (socket.timeout, TimeoutError)) or 'timed out' in str(exc).lower():
+        return "javob kelmadi (vaqt tugadi). Qurilma o'chiq yoki boshqa tarmoqda bo'lishi mumkin"
+    if isinstance(exc, socket.gaierror):
+        return "manzil topilmadi. Manzil to'g'ri yozilganini tekshiring"
+    code = getattr(exc, 'errno', None)
+    if code in (errno.ECONNREFUSED,):
+        return "qurilma ulanishni rad etdi. Port to'g'riligini va qurilma yoqilganini tekshiring"
+    if code in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EHOSTDOWN):
+        return "qurilmaga yo'l topilmadi. Tarmoq/Wi-Fi va IP manzilni tekshiring"
+    return "ulanishda noma'lum xatolik yuz berdi"
+
+
 def send_telegram_notification(text, parse_mode='HTML'):
     """
     RestaurantConfig dagi telegram_bot_token va telegram_chat_id orqali Telegram xabar yuboradi.

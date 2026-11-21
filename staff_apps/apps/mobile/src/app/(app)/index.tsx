@@ -182,7 +182,7 @@ export default function TablesScreen() {
             // Chap chiziq = holat: bo'sh - neytral, men band qilgan - yashil, boshqa band - sariq.
             const edge = t.status === 'free' ? c.edge : t.status === 'occupied_by_me' ? c.ok : c.warn;
             return (
-              <Pressable key={t.id} disabled={blocked} onPress={() => open(t)} style={{ width: '48.6%', opacity: blocked ? 0.55 : 1 }}>
+              <Pressable key={t.id} disabled={blocked} onPress={() => open(t)} style={{ flexBasis: '47%', flexGrow: 1, opacity: blocked ? 0.55 : 1 }}>
                 <Card edge={edge} style={{ minHeight: 112, gap: 4 }}>
                   <Txt family="disp" size={34}>
                     {t.name}
@@ -206,6 +206,8 @@ export default function TablesScreen() {
               </Pressable>
             );
           })}
+          {/* Toq sonda oxirgi karta butun qatorga cho'zilib ketmasin. Foiz+gap kichik ekranda (<357dp) ikkinchi kartani tushirib yuborardi. */}
+          {tables.length % 2 === 1 && <View style={{ flexBasis: '47%', flexGrow: 1 }} />}
         </View>
         {data && tables.length === 0 && <Muted>Stol topilmadi.</Muted>}
 

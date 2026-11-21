@@ -101,6 +101,20 @@ function RegisterForm() {
 
   const normalized = normalizePhone(phone);
   const valid = !!normalized && /^\d{6}$/.test(code) && /^\d{6}$/.test(pin);
+  // Tugma nega o'chiqligi aniq aytilsin (faqat foydalanuvchi biror narsa yozgandan keyin).
+  const hint = !normalized
+    ? phone.replace(/\D/g, '').length > 3
+      ? "Telefon raqam noto'g'ri. Masalan: +998 90 123 45 67"
+      : null
+    : !/^\d{6}$/.test(code)
+      ? code
+        ? `Menejer kodi 6 ta raqam bo'lishi kerak (hozir ${code.length} ta).`
+        : null
+      : !/^\d{6}$/.test(pin)
+        ? pin
+          ? `PIN 6 ta raqam bo'lishi kerak (hozir ${pin.length} ta).`
+          : null
+        : null;
 
   async function submit() {
     if (!normalized) return;
@@ -135,6 +149,7 @@ function RegisterForm() {
         <label htmlFor="r-pin">Yangi PIN (6 xona)</label>
         <input id="r-pin" type="password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" />
       </div>
+      {hint && !error && <div className="muted">{hint}</div>}
       {error && <div className="error">{error}</div>}
       <button className="btn" type="submit" disabled={busy || !valid}>
         {busy ? 'Yuborilmoqda...' : "Ro'yxatdan o'tish"}
