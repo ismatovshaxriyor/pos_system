@@ -42,11 +42,12 @@ export function PayPanel({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const due = toTiyin(order.balance_due);
-  // Boshqa buyurtmaga o'tilganda kiritilgan summa tozalansin.
+  // Boshqa buyurtmaga o'tilganda YOKI qolgan summa o'zgarganda (qisman to'lov, boshqa terminal taom qo'shdi) kiritilgan
+  // summa tozalansin: aks holda eski "Mijoz berdi" qolib, noto'g'ri qaytim ko'rsatardi.
   useEffect(() => {
     setInput('');
     setLocalError(null);
-  }, [order.id]);
+  }, [order.id, due]);
 
   const plan = useMemo(
     () => planPayment({ method, dueTiyin: due, enteredTiyin: input === '' ? null : enteredTiyin(input) }),

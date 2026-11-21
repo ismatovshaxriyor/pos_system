@@ -9,6 +9,13 @@ export function orderLabel(o: Pick<Order, 'id' | 'table' | 'order_type'>): strin
   return `#${o.id}`;
 }
 
+/** Gap ichida ishlatiladigan nom: stolli buyurtma "Stol 3" ("3" yolg'iz tushunarsiz), qolganlari `orderLabel` kabi. */
+export function orderTitle(o: Pick<Order, 'id' | 'table' | 'order_type'>): string {
+  const name = o.table?.name;
+  if (!name) return orderLabel(o);
+  return /^stol\b/i.test(name) ? name : `Stol ${name}`;
+}
+
 /** Ochiq buyurtmalar: eng eskisi birinchi (kutib qolgan mijoz tepada). Asl massiv o'zgarmaydi. */
 export function sortOpenOrders(orders: Order[]): Order[] {
   return [...orders].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));

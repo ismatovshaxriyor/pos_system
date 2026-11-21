@@ -521,6 +521,11 @@ h1 {
   border-bottom: 1px solid var(--grid);
 }
 
+.banner.err.info {
+  color: var(--ink);
+  border-left-color: var(--warn);
+}
+
 .main {
   flex: 1;
   min-height: 0;

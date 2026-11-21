@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterOrders, orderLabel, sortOpenOrders, stepSelection } from './orderList';
+import { filterOrders, orderLabel, orderTitle, sortOpenOrders, stepSelection } from './orderList';
 import type { Order } from './types';
 
 function order(id: number, table: string | null, waiter: string | null, created: string): Order {
@@ -67,5 +67,13 @@ describe('orderLabel', () => {
   it('qidiruv "olib ketish" so\u02bczi bilan stolsiz buyurtmani topadi', () => {
     const t = { ...C, order_type: 'takeaway' } as Order;
     expect(filterOrders([A, B, t], 'olib ketish')).toEqual([t]);
+  });
+});
+
+describe('orderTitle', () => {
+  it('raqamli stol nomiga "Stol" qo\'shadi, allaqachon "Stol 5" bo\'lsa takrorlamaydi', () => {
+    expect(orderTitle({ id: 9, table: { id: 1, name: '3' } as Order['table'], order_type: 'dine_in' })).toBe('Stol 3');
+    expect(orderTitle({ id: 9, table: { id: 1, name: 'Stol 5' } as Order['table'], order_type: 'dine_in' })).toBe('Stol 5');
+    expect(orderTitle({ id: 12, table: null, order_type: 'takeaway' })).toBe('Olib ketish #12');
   });
 });

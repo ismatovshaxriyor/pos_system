@@ -3,6 +3,7 @@ import {
   describeError,
   formatMoney,
   orderLabel,
+  orderTitle,
   tiyinToDecimal,
   toTiyin,
   type ApiError,
@@ -35,7 +36,18 @@ interface Done {
 }
 
 /** Tanlangan buyurtma: chek + to'lov paneli. To'lov to'liq bo'lsa buyurtma o'zi yopiladi. */
-export function Workspace({ orderId, onChanged, onClose }: { orderId: number; onChanged: () => void; onClose: () => void }) {
+export function Workspace({
+  orderId,
+  onChanged,
+  onClose,
+  onCancelled,
+}: {
+  orderId: number;
+  onChanged: () => void;
+  onClose: () => void;
+  /** Buyurtma boshqa joyda (masalan menejer telefonidan) bekor qilindi: ekran bosh sahifaga qaytishi va xabar ko'rsatishi uchun. */
+  onCancelled?: (label: string) => void;
+}) {
   const [order, setOrder] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +55,18 @@ export function Workspace({ orderId, onChanged, onClose }: { orderId: number; on
   const [sheet, setSheet] = useState<'credit' | 'discount' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { user } = useSession();
+  const cancelNotified = useRef(false);
+  const onCancelledRef = useRef(onCancelled);
+  onCancelledRef.current = onCancelled;
 
   const load = useCallback(async () => {
     try {
       const fresh = await pos.api.orders.get(orderId);
       setOrder(fresh);
+      if (fresh.status === 'cancelled' && !cancelNotified.current) {
+        cancelNotified.current = true;
+        onCancelledRef.current?.(orderTitle(fresh));
+      }
       return fresh;
     } catch (e) {
       setError(describeError(e));
@@ -108,7 +127,7 @@ export function Workspace({ orderId, onChanged, onClose }: { orderId: number; on
         await pos.api.orders.close(orderId);
         await load();
         onChanged();
-        setDone({ table: orderLabel(fresh), paid: toTiyin(fresh.final_amount), change: plan.changeTiyin });
+        setDone({ table: orderTitle(fresh), paid: toTiyin(fresh.final_amount), change: plan.changeTiyin });
         playPaid();
       } catch (e) {
         setError(`To'lov qabul qilindi, lekin buyurtmani yopib bo'lmadi: ${describeError(e)}`);
@@ -124,7 +143,7 @@ export function Workspace({ orderId, onChanged, onClose }: { orderId: number; on
     await load();
     onChanged();
     setDone({
-      table: was ? orderLabel(was) : `#${orderId}`,
+      table: was ? orderTitle(was) : `#${orderId}`,
       paid: was ? toTiyin(was.balance_due) : 0,
       change: 0,
       credit: customerName(customer),

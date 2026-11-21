@@ -44,6 +44,13 @@ export function HomeScreen() {
   /** 'view' - oddiy hisobot; 'close' - kassani yopish (hisobot ichida tasdiq). */
   const [dayEnd, setDayEnd] = useState<null | 'view' | 'close'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Qisqa ma'lumot xabari (masalan "#4 buyurtma bekor qilindi") - 6 soniyada o'zi yo'qoladi. */
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 6000);
+    return () => clearTimeout(t);
+  }, [flash]);
 
   // Himoya: real-time (WebSocket) uzilsa ham ro'yxat eskirib qolmasin - har 30 soniyada jim yangilanadi.
   useEffect(() => {
@@ -146,6 +153,7 @@ export function HomeScreen() {
         </div>
       )}
       {(error || actionError) && <div className="banner err">{actionError ?? error}</div>}
+      {flash && !error && !actionError && <div className="banner err info">{flash}</div>}
 
       <main className="main">
         <aside className="col-orders">
@@ -216,7 +224,17 @@ export function HomeScreen() {
             }}
           />
         ) : current !== null ? (
-          <Workspace key={current} orderId={current} onChanged={() => void refresh()} onClose={closePanel} />
+          <Workspace
+            key={current}
+            orderId={current}
+            onChanged={() => void refresh()}
+            onClose={closePanel}
+            onCancelled={(label) => {
+              setFlash(`${label} buyurtmasi bekor qilindi.`);
+              setSelected(null);
+              void refresh();
+            }}
+          />
         ) : (
           <section className="idle">
             <div className="idle-num">{orders.length}</div>
