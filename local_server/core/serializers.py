@@ -87,7 +87,12 @@ class TableSerializer(serializers.ModelSerializer):
         hech narsa sizib chiqmaydi.
         """
         request = self.context.get('request')
-        active_order = obj.orders.filter(status__in=('new', 'in_progress')).order_by('-created_at').first()
+        prefetched = getattr(obj, 'active_orders_prefetched', None)
+        if prefetched is not None:
+            # Ro'yxatlarda (`views.with_active_orders`) bitta so'rov bilan olingan - stol boshiga so'rov yo'q.
+            active_order = prefetched[0] if prefetched else None
+        else:
+            active_order = obj.orders.filter(status__in=('new', 'in_progress')).order_by('-created_at').first()
         if not active_order:
             return 'free'
         if request and active_order.waiter_id == request.user.id:
@@ -222,6 +227,15 @@ class ProductSerializer(serializers.ModelSerializer):
         # admin orqali.
         read_only_fields = ('is_deleted',)
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Tannarx (marja) - biznes siri: ofitsiant menyuda narx va nomni ko'rishi yetarli.
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated and user.role == 'waiter' and not user.is_staff:
+            data['cost_price'] = None
+        return data
+
 class OrderItemSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
     product = ProductSerializer(read_only=True)
@@ -314,6 +328,21 @@ class OrderSerializer(serializers.ModelSerializer):
     final_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     amount_paid = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    def to_representation(self, instance):
+        # Moliyaviy maydonlar (total/final/service/paid/balance) bir marta hisoblanadi; ro'yxatda esa litsenziya
+        # konteksti va RestaurantConfig butun so'rov uchun bir marta olinadi (serializer.context'da saqlanadi).
+        from .services import order_financials_full
+        ctx = self.context
+        if '_fin_license' not in ctx:
+            from licensing.jwt_utils import LicenseContext
+            ctx['_fin_license'] = LicenseContext.from_active_state()
+            ctx['_fin_config'] = RestaurantConfig.objects.first()
+        instance.__dict__['_fin_memo'] = order_financials_full(instance, ctx['_fin_license'], ctx['_fin_config'])
+        try:
+            return super().to_representation(instance)
+        finally:
+            instance.__dict__.pop('_fin_memo', None)
 
     class Meta:
         model = Order
@@ -425,7 +454,13 @@ class OrderSerializer(serializers.ModelSerializer):
 class RestaurantConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = RestaurantConfig
-        fields = ('id', 'name', 'logo', 'public_domain', 'phone', 'latitude', 'longitude', 'attendance_radius', 'service_charge_rate', 'restore_stock_on_cancel', 'telegram_bot_token', 'telegram_chat_id', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'logo', 'public_domain', 'phone', 'latitude', 'longitude', 'attendance_radius', 'require_check_in_for_orders', 'service_charge_rate', 'restore_stock_on_cancel', 'telegram_bot_token', 'telegram_chat_id', 'created_at', 'updated_at')
+
+    def validate_attendance_radius(self, value):
+        # 200 000 km kabi qiymat geofence'ni amalda o'chirib qo'yadi; haqiqiy ish joyi uchun mantiqiy chegara.
+        if not 20 <= value <= 5000:
+            raise serializers.ValidationError("Radius 20 dan 5000 metrgacha bo'lishi kerak.")
+        return value
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -583,7 +618,8 @@ class StockMovementSerializer(serializers.ModelSerializer):
 
 class StockAdjustSerializer(serializers.Serializer):
     """`IngredientViewSet.adjust` so'rov tanasi: new_quantity YOKI delta (bittasi)."""
-    new_quantity = serializers.DecimalField(max_digits=12, decimal_places=3, required=False)
+    # Inventarizatsiyadagi absolyut qoldiq manfiy bo'lolmaydi (sotuv sarfi esa qoldiqni minusga tushirishi mumkin - bu alohida).
+    new_quantity = serializers.DecimalField(max_digits=12, decimal_places=3, required=False, min_value=0)
     delta = serializers.DecimalField(max_digits=12, decimal_places=3, required=False)
     note = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
 

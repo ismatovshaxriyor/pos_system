@@ -13,7 +13,11 @@ def _get_user_from_token(token_key, device_id=None):
     try:
         token = Token.objects.select_related('user').get(key=token_key)
         user = token.user
-        
+
+        from core.authentication import is_blocked_service_account
+        if is_blocked_service_account(user):
+            return None
+
         if user.is_staff:
             return user
             

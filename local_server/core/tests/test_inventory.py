@@ -66,6 +66,14 @@ class InventoryTests(TestCase):
         self.assertTrue(StockMovement.objects.filter(
             ingredient=self.ingredient, movement_type='adjustment', quantity=Decimal('-7')).exists())
 
+    def test_adjust_rejects_negative_new_quantity(self):
+        url = reverse('ingredient-adjust', args=[self.ingredient.id])
+        resp = self.client.post(url, {'new_quantity': '-5'},
+                                content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(resp.status_code, 400)
+        self.ingredient.refresh_from_db()
+        self.assertEqual(self.ingredient.current_stock, Decimal('10'))
+
     def test_adjust_delta(self):
         url = reverse('ingredient-adjust', args=[self.ingredient.id])
         resp = self.client.post(url, {'delta': '2.5'},
@@ -218,3 +226,31 @@ class InventoryTests(TestCase):
             'product_id': self.product.id, 'ingredient_id': self.ingredient.id, 'quantity': '1',
         }, content_type='application/json', **_auth_header(self.waiter))
         self.assertEqual(resp.status_code, 403)
+
+
+class InventoryReadAccessTests(TestCase):
+    """Xarid narxi, retsept, yetkazib beruvchi, ombor harakati - ofitsiantga O'QISH uchun ham yopiq."""
+
+    def setUp(self):
+        self.waiter = User.objects.create_user(username='+998900000071', role='waiter')
+        self.cashier = User.objects.create_user(username='+998900000072', role='cashier')
+
+    def test_waiter_cannot_read_inventory_endpoints(self):
+        for name in ('ingredient-list', 'recipeitem-list', 'purchase-list', 'stockmovement-list', 'supplier-list'):
+            with self.subTest(name):
+                res = self.client.get(reverse(name), **_auth_header(self.waiter))
+                self.assertEqual(res.status_code, 403)
+
+    def test_cashier_can_still_read_inventory(self):
+        for name in ('ingredient-list', 'purchase-list', 'stockmovement-list'):
+            with self.subTest(name):
+                self.assertEqual(self.client.get(reverse(name), **_auth_header(self.cashier)).status_code, 200)
+
+    def test_product_cost_price_hidden_from_waiter_only(self):
+        from core.models import Category, Product
+        cat = Category.objects.create(name='T')
+        Product.objects.create(category=cat, name='Osh', price=Decimal('40000'), cost_price=Decimal('15000'))
+        waiter = self.client.get(reverse('product-list'), **_auth_header(self.waiter)).json()['results'][0]
+        cashier = self.client.get(reverse('product-list'), **_auth_header(self.cashier)).json()['results'][0]
+        self.assertIsNone(waiter['cost_price'])
+        self.assertEqual(cashier['cost_price'], '15000.00')

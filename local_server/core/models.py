@@ -268,35 +268,36 @@ class Order(BaseModel):
     def __str__(self):
         return f"Order #{self.id} - {self.status}"
 
+    # Ro'yxat serializatsiyasi davomida (OrderSerializer.to_representation) bir marta hisoblangan natija:
+    # har hisoblangan maydon alohida JWT tekshiruvi va 2-3 ta SQL so'rovini takrorlamasligi uchun.
+    _FIN_TOTAL, _FIN_FINAL, _FIN_BALANCE, _FIN_SERVICE, _FIN_PAID = range(5)
+
+    def _fin(self, index):
+        memo = self.__dict__.get('_fin_memo')
+        if memo is not None:
+            return memo[index]
+        from .services import order_financials_full
+        return order_financials_full(self)[index]
+
     @property
     def total_amount(self):
-        from .services import calculate_order_financials
-        total, _, _ = calculate_order_financials(self)
-        return total
+        return self._fin(self._FIN_TOTAL)
 
     @property
     def final_amount(self):
-        from .services import calculate_order_financials
-        _, final, _ = calculate_order_financials(self)
-        return final
+        return self._fin(self._FIN_FINAL)
 
     @property
     def calculated_service_charge(self):
-        from .models import RestaurantConfig
-        config = RestaurantConfig.objects.first()
-        if config and config.service_charge_rate > Decimal('0'):
-            return (self.total_amount * (config.service_charge_rate / Decimal('100'))).quantize(Decimal('0.01'))
-        return self.service_charge
+        return self._fin(self._FIN_SERVICE)
 
     @property
     def amount_paid(self):
-        return self.payments.filter(is_voided=False).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
+        return self._fin(self._FIN_PAID)
 
     @property
     def balance_due(self):
-        from .services import calculate_order_financials
-        _, _, balance = calculate_order_financials(self)
-        return balance
+        return self._fin(self._FIN_BALANCE)
 
 class OrderItem(BaseModel):
     STATUS_CHOICES = (
@@ -423,6 +424,13 @@ class RestaurantConfig(BaseModel):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Kenglik (Latitude)")
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, help_text="Uzunlik (Longitude)")
     attendance_radius = models.PositiveIntegerField(default=100, help_text="Ruxsat berilgan radius (metrlarda)")
+    require_check_in_for_orders = models.BooleanField(
+        default=True,
+        verbose_name="Ofitsiant buyurtma olishdan oldin smena boshlashi shart",
+        help_text="Yoqilsa (va restoran koordinatalari kiritilgan bo'lsa): ofitsiant check-in qilmaguncha (ya'ni restoran "
+                  "hududida ekanini tasdiqlamaguncha) yangi buyurtma ocha olmaydi. Koordinatalar kiritilmagan bo'lsa "
+                  "talab qo'llanmaydi - aks holda hech kim smena boshlay olmasdi.",
+    )
     service_charge_rate = models.DecimalField(
         max_digits=5, decimal_places=2, default=0,
         verbose_name="Xizmat haqi foizi",

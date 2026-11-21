@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 from rest_framework import permissions, status
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from . import services
@@ -111,3 +113,15 @@ class PinLoginView(APIView):
 
         return Response({"token": token.key, "user": UserSerializer(user).data})
 
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    scope = 'login'
+
+
+class AdminLoginView(ObtainAuthToken):
+    """
+    Telefon+parol bilan kirish. DRF'ning `obtain_auth_token` view'i `throttle_classes = ()` bilan keladi, ya'ni
+    parolni cheksiz taxmin qilish mumkin edi - bu yerda IP bo'yicha daqiqasiga cheklangan.
+    """
+    throttle_classes = [LoginRateThrottle]

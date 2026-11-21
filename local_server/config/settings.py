@@ -28,10 +28,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-oqs8bohdzf4x7z&139z7v!byl^n2zpnfy(%7m0fb%@61a3q+)h')
+_DEV_SECRET_KEY = 'django-insecure-oqs8bohdzf4x7z&139z7v!byl^n2zpnfy(%7m0fb%@61a3q+)h'
+SECRET_KEY = os.environ.get('SECRET_KEY', _DEV_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '0') == '1'
+
+# Repoda ochiq yozilgan dev kalit bilan prod'da ishlash - sessiya/imzo kalitini hamma biladi degani.
+# Faqat shu holatda to'xtatamiz; `.env.example` placeholder'i ("change-me...") eski o'rnatishlarni
+# avto-yangilanishda ishdan chiqarmasligi uchun faqat ogohlantiradi.
+if not DEBUG and 'test' not in sys.argv:
+    if SECRET_KEY == _DEV_SECRET_KEY:
+        raise ValueError("SECRET_KEY o'rnatilmagan: .env'ga tasodifiy kalit yozing (DEBUG=0 rejimida dev kalit taqiqlangan).")
+    if SECRET_KEY.startswith('change-me'):
+        import warnings
+        warnings.warn("SECRET_KEY hali .env.example placeholder'i - tasodifiy kalit bilan almashtiring.")
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '*').split(',') if h.strip()]
 if '*' not in ALLOWED_HOSTS:
@@ -224,6 +235,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '10/minute',
         'user': '100/minute',
+        'login': '5/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
@@ -238,7 +250,7 @@ REST_FRAMEWORK = {
 # qilmaydi - rate None esa har qanday SimpleRateThrottle'ni o'chiradi.
 if 'test' in sys.argv:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
-    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': None, 'user': None}
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': None, 'user': None, 'login': None}
 
 # Spectacular settings
 SPECTACULAR_SETTINGS = {
@@ -448,6 +460,10 @@ JAZZMIN_UI_TWEAKS = {
     "theme": "darkly",
     "dark_mode_theme": "darkly",
 }
+
+# Oshxona dashboardi (`/kitchen/printers/`) sahifaga servis tokenini joylaydi va login so'ramaydi -
+# shuning uchun prod'da standart holatda YOPIQ (qarang core/authentication.py).
+KITCHEN_DASHBOARD_ENABLED = os.environ.get('KITCHEN_DASHBOARD_ENABLED', '0') == '1'
 
 CORS_ALLOW_ALL_ORIGINS = True
 

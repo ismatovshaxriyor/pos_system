@@ -8,6 +8,8 @@ from django.utils.dateparse import parse_date
 from django.db import IntegrityError, transaction
 from django.db.models import F, Q
 from django.http import Http404
+
+from .authentication import KITCHEN_SERVICE_DEVICE_ID, KITCHEN_SERVICE_USERNAME, kitchen_dashboard_enabled
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
@@ -90,10 +92,25 @@ class UserViewSet(viewsets.ModelViewSet):
             'user': UserSerializer(user).data,
         }, status=status.HTTP_201_CREATED)
 
+def with_active_orders(tables_qs):
+    """Har stol uchun faol buyurtmani bitta qo'shimcha so'rov bilan oladi (TableSerializer.get_status N+1)."""
+    from django.db.models import Prefetch
+    return tables_qs.select_related('zone').prefetch_related(Prefetch(
+        'orders',
+        queryset=Order.objects.filter(status__in=('new', 'in_progress')).order_by('-created_at'),
+        to_attr='active_orders_prefetched',
+    ))
+
+
 class TableViewSet(viewsets.ModelViewSet):
     queryset = Table.objects.all()
     serializer_class = TableSerializer
     permission_classes = [permissions.IsAuthenticated, IsManagerOrAdmin]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Ro'yxat uchungina: yozish/boshqa amallarda (get_object + save) prefetch keraksiz.
+        return with_active_orders(qs) if self.action == 'list' else qs
 
     @extend_schema(
         request=None,
@@ -178,7 +195,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Soft-delete qilingan mahsulotlar API'dan butunlay yashiriladi
         # (tiklash - Django admin orqali).
-        return Product.objects.filter(is_deleted=False)
+        return Product.objects.filter(is_deleted=False).select_related('category', 'category__printer')
 
     def perform_destroy(self, instance):
         # OrderItem.product PROTECT - bir marta sotilgan mahsulotni hard
@@ -228,8 +245,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        qs = Order.objects.select_related('table', 'waiter', 'cashier').prefetch_related(
-            'items__product', 'payments__received_by',
+        qs = Order.objects.select_related('table', 'table__zone', 'waiter', 'cashier', 'customer').prefetch_related(
+            'items__product__category__printer', 'payments__received_by',
         )
         user = self.request.user
         if user.role == 'waiter':
@@ -292,6 +309,13 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response(
                 {'detail': "Kassa yopiq - yangi buyurtma qabul qilib bo'lmaydi."},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Ofitsiant smenani (check-in, ya'ni restoran hududida ekanini) boshlamasdan buyurtma ocha olmaydi.
+        if services.waiter_needs_check_in(request.user):
+            return Response(
+                {'detail': "Buyurtma olish uchun avval smenani boshlang (restoran hududida bo'lishingiz kerak)."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         self._client_sync_uuid = client_sync_uuid
@@ -750,13 +774,13 @@ class BootstrapView(APIView):
     def get(self, request):
         user = request.user
         
-        orders_qs = Order.objects.filter(status__in=['new', 'in_progress']).prefetch_related('items__product')
+        orders_qs = Order.objects.filter(status__in=['new', 'in_progress']).select_related('table', 'table__zone', 'waiter', 'cashier', 'customer').prefetch_related('items__product__category__printer', 'payments__received_by')
         if user.role == 'waiter':
             orders_qs = orders_qs.filter(waiter=user)
         
-        categories = Category.objects.all()
-        products = Product.objects.filter(is_available=True, is_deleted=False)
-        tables = Table.objects.filter(is_active=True).select_related('zone')
+        categories = Category.objects.select_related('printer')
+        products = Product.objects.filter(is_available=True, is_deleted=False).select_related('category', 'category__printer')
+        tables = with_active_orders(Table.objects.filter(is_active=True))
         table_zones = TableZone.objects.all()
         # Qator hali yo'q (hech kim /register-session/ ga tegmagan restoran) -
         # ochiq deb hisoblanadi, `RegisterSession.is_open` default'iga mos -
@@ -1091,7 +1115,7 @@ class PrinterViewSet(viewsets.ModelViewSet):
 
 
 class PrintJobViewSet(viewsets.ModelViewSet):
-    queryset = PrintJob.objects.all().order_by('-created_at')
+    queryset = PrintJob.objects.select_related('printer', 'order__table', 'order__waiter').order_by('-created_at')
     serializer_class = PrintJobSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1133,10 +1157,8 @@ class PrintJobViewSet(viewsets.ModelViewSet):
 # user.role == 'manager'` ekanini unutmang (Auth quirks - is_staff=True bu
 # yerda moliyaviy amallarni (chegirma/bekor qilish/mahsulot-jadval
 # sozlamalari) ham ochib qo'yardi). "view-source" orqali token oshkor
-# bo'lishi mumkinligi tan olingan-va-qabul qilingan tavakkal - blast radius
-# oddiy kassir darajasidan oshmasligi kerak.
-KITCHEN_SERVICE_USERNAME = '+998000000001'
-KITCHEN_SERVICE_DEVICE_ID = 'kitchen-dashboard-service'
+# bo'lishi mumkinligi eskirgan "qabul qilingan tavakkal" edi - endi sahifa faqat DEBUG'da beriladi,
+# servis hisobi esa prod'da autentifikatsiyadan o'tmaydi (qarang `authentication.py`).
 
 
 class KitchenDashboardView(TemplateView):
@@ -1146,6 +1168,14 @@ class KitchenDashboardView(TemplateView):
     stansiya ekrani uchun katta, sodda ko'rinish - qarang: shablon).
     """
     template_name = 'core/kitchen_dashboard.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Sahifa HTML ichiga servis tokenini joylaydi va login so'ramaydi - LAN'dagi istalgan qurilma
+        # kassir huquqli token olib qolardi. Shuning uchun faqat DEBUG'da yoki
+        # KITCHEN_DASHBOARD_ENABLED=1 bilan ongli yoqilganda (oshxona monitori tarmog'i ishonchli bo'lsa).
+        if not kitchen_dashboard_enabled():
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

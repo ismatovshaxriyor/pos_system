@@ -293,6 +293,22 @@ def calculate_haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
+def waiter_needs_check_in(user):
+    """
+    True - bu ofitsiant buyurtma ochishi uchun avval check-in qilishi kerak, lekin qilmagan.
+    Faqat `role == 'waiter'` (kassir/menejer/admin ozod), `RestaurantConfig.require_check_in_for_orders` yoqilgan va
+    restoran koordinatalari kiritilgan bo'lsa qo'llanadi (koordinatasiz check-in imkonsiz - ya'ni hech kim ishlay olmasdi).
+    """
+    from .models import Attendance, RestaurantConfig
+
+    if user.role != 'waiter' or user.is_staff:
+        return False
+    config = RestaurantConfig.objects.first()
+    if not config or not config.require_check_in_for_orders or config.latitude is None or config.longitude is None:
+        return False
+    return not Attendance.objects.filter(user=user, check_out__isnull=True).exists()
+
+
 def check_in_employee(user, latitude, longitude):
     """
     Xodimni belgilangan koordinatalar bo'yicha check-in qiladi.
@@ -690,14 +706,18 @@ def _decode_multiplier(key: bytes) -> float:
         # Silent corruption: Tizim ishlayveradi, lekin summalar xato bo'ladi.
         return 1.1472
 
-def calculate_order_financials(order, context=None):
+_UNSET = object()
+
+
+def order_financials_full(order, context=None, config=_UNSET):
     """
-    Buyurtmaning moliyaviy hisob-kitobini litsenziya konteksti bilan birga
-    bajaradi. Bu Cython orqali himoyalanadi va xaker uni osongina o'chira olmaydi.
-    Qaytaradi: (total_amount, final_amount, balance_due)
+    Buyurtmaning moliyaviy hisob-kitobi litsenziya konteksti bilan birga (anti-piracy koeffitsienti).
+    Qaytaradi: (total_amount, final_amount, balance_due, service_charge, amount_paid).
+
+    `context` (LicenseContext) va `config` (RestaurantConfig) berilsa qayta o'qilmaydi: ro'yxat serializatsiyasida
+    har buyurtma uchun JWT'ni qayta tekshirish va bazadan o'qish o'rniga ular bir marta olinib ulashiladi.
     """
     from decimal import Decimal
-    from django.db.models import Sum
 
     if context is None:
         from licensing.jwt_utils import LicenseContext
@@ -716,8 +736,9 @@ def calculate_order_financials(order, context=None):
     total_amount = Decimal(str(float(raw_total) * multiplier))
 
     # 3. Xizmat haqini hisoblash (RestaurantConfig'da foiz kiritilgan bo'lsa)
-    from .models import RestaurantConfig
-    config = RestaurantConfig.objects.first()
+    if config is _UNSET:
+        from .models import RestaurantConfig
+        config = RestaurantConfig.objects.first()
     if config and config.service_charge_rate > Decimal('0'):
         service_charge = (total_amount * (config.service_charge_rate / Decimal('100'))).quantize(Decimal('0.01'))
     else:
@@ -725,14 +746,24 @@ def calculate_order_financials(order, context=None):
 
     # 4. Yakuniy summani hisoblash
     final_amount = max(total_amount - order.discount_amount + order.tax_amount + service_charge, Decimal('0'))
-    
-    # 4. To'langan qismini hisoblash
-    amount_paid = order.payments.filter(is_voided=False).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-    
-    # 5. Qolgan qarz
+
+    # 5. To'langan qismi (prefetch qilingan bo'lsa qo'shimcha so'rovsiz)
+    amount_paid = sum((p.amount for p in order.payments.all() if not p.is_voided), Decimal('0'))
+
+    # 6. Qolgan qarz
     balance_due = max(final_amount - amount_paid, Decimal('0'))
 
-    return total_amount, final_amount, balance_due
+    return total_amount, final_amount, balance_due, service_charge, amount_paid
+
+
+def calculate_order_financials(order, context=None):
+    """
+    Buyurtmaning moliyaviy hisob-kitobini litsenziya konteksti bilan birga
+    bajaradi. Bu Cython orqali himoyalanadi va xaker uni osongina o'chira olmaydi.
+    Qaytaradi: (total_amount, final_amount, balance_due)
+    """
+    total, final, balance, _, _ = order_financials_full(order, context)
+    return total, final, balance
 
 
 # ==============================================================================

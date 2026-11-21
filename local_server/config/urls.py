@@ -19,9 +19,8 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.static import serve as serve_static
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from rest_framework.authtoken.views import obtain_auth_token
 
-from core.auth_views import DeviceRegisterView, PinLoginView, WaiterLoginView
+from core.auth_views import AdminLoginView, DeviceRegisterView, PinLoginView, WaiterLoginView
 from core.views import KitchenDashboardView, QRAppView
 from licensing.views import DiscoveryView
 
@@ -37,7 +36,7 @@ urlpatterns = [
     # API endpoints
     path('api/', include('core.urls')),
     path('api/discovery/', DiscoveryView.as_view(), name='api-discovery'),
-    path('api/auth/login/', obtain_auth_token, name='api_token_auth'),
+    path('api/auth/login/', AdminLoginView.as_view(), name='api_token_auth'),
 
     # Admin (is_staff) - yuqoridagi telefon+parol bilan kiradi. Boshqa xodim
     # (manager/cashier/waiter) - qurilmaga bog'langan PIN bilan, shu ikkitasi:
@@ -46,9 +45,6 @@ urlpatterns = [
     path('api/auth/waiter-login/', WaiterLoginView.as_view(), name='auth-waiter-login'),
     path('api/license/', include('licensing.urls')),
 
-    # Swagger API Docs
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 
     # Static va media fayllar. django.views.static.serve DEBUG'ga qarab
     # o'chib qolmaydi (django.contrib.staticfiles'dan farqli) - shart,
@@ -59,3 +55,10 @@ urlpatterns = [
     re_path(r'^static/(?P<path>.*)$', serve_static, {'document_root': settings.STATIC_ROOT}),
     re_path(r'^media/(?P<path>.*)$', serve_static, {'document_root': settings.MEDIA_ROOT}),
 ]
+
+# Swagger/OpenAPI sxemasi butun API yuzasini login'siz ochib beradi - faqat DEBUG'da.
+if settings.DEBUG:
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    ]
