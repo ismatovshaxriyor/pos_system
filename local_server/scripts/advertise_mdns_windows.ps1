@@ -11,6 +11,14 @@
 #   - manzil: "pos-bola.local" -> serverning HOZIRGI LAN IP'si (ilovalar shu nomni ham sinaydi)
 #   - har 15 soniyada IP'ni tekshiradi: o'zgarsa (Wi-Fi <-> kabel, yangi DHCP manzil)
 #     e'lonni yangi IP bilan qayta qiladi. IP yo'q bo'lsa (169.254...) kutib turadi.
+#   - LAN qo'riqchi (ARP): ba'zi Wi-Fi kuchaytirgichlar (repeater, MAC-NAT) boshqa qurilmalar
+#     nomidan ham ARP javob beradi. Natijada server routerni (yoki printerni) kuchaytirgich deb
+#     o'ylaydi, trafik havo orqali aylanib o'tadi, internet "bir ulanib bir uzilib" turadi.
+#     Shlyuz MAC'i lokal (02 bitli, haqiqiy routerda bo'lmaydi) chiqsa, qo'riqchi qayta so'raydi va
+#     haqiqiy MAC'ni faqat xotirada (store=active, reboot'da o'chadi) qotiradi; printer (9100) uchun
+#     ham shunday. Qotirilgan qurilma 3 marta javob bermasa (router almashtirilgan) - qotirish olinadi.
+#     Har 60 soniyada o'z manzilini ARP so'rov bilan e'lon qiladi (router/telefonlar keshini tuzatadi).
+#     Sog' tarmoqda hech narsa qotirilmaydi. Shu sabab IP to'qnashuv tekshiruvi (DAD) ham o'chiriladi.
 #
 # Ishga tushirish (Administrator PowerShell, local_server papkasida):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\advertise_mdns_windows.ps1 -Install    # o'rnatish (avtoyuklanish)
@@ -218,6 +226,147 @@ function Test-NameResolves([string]$name, [string]$ip) {
     return $false
 }
 
+# ------------------------------------------------------------------------------
+# LAN qo'riqchi (ARP). Holat skript darajasida; tarmoq (adapter/shlyuz) o'zgarsa tozalanadi.
+$script:Ping = [System.Net.NetworkInformation.Ping]::new()
+$script:Guard = $null
+
+function Test-LocalMac([string]$mac) {
+    # Ikkinchi bit (0x02) - "lokal boshqariladigan" MAC: kuchaytirgich/virtual qurilma, haqiqiy router emas.
+    if (-not $mac -or $mac -match '^(00-){5}00$|^(FF-){5}FF$') { return $false }
+    return (([Convert]::ToInt32($mac.Substring(0, 2), 16) -band 2) -ne 0)
+}
+
+function Get-NeighborMac([int]$idx, [string]$ip) {
+    $n = Get-NetNeighbor -InterfaceIndex $idx -IPAddress $ip -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($n -and $n.State -notin @('Unreachable', 'Incomplete')) { return $n.LinkLayerAddress }
+    return $null
+}
+
+# Yozuvni o'chirib qayta so'raydi: Windows hammaga eshitiladigan (broadcast) ARP so'rov yuboradi.
+function Resolve-Fresh([int]$idx, [string]$ip) {
+    Remove-NetNeighbor -InterfaceIndex $idx -IPAddress $ip -Confirm:$false -ErrorAction SilentlyContinue
+    try { [void]$script:Ping.Send($ip, 1000) } catch {}
+    Start-Sleep -Milliseconds 300
+    return (Get-NeighborMac $idx $ip)
+}
+
+function Test-Ping([string]$ip) {
+    try { return ($script:Ping.Send($ip, 1000).Status -eq 'Success') } catch { return $false }
+}
+
+function Test-Tcp([string]$ip, [int]$port, [int]$ms) {
+    $c = New-Object System.Net.Sockets.TcpClient
+    try { return ($c.ConnectAsync($ip, $port).Wait($ms) -and $c.Connected) } catch { return $false } finally { $c.Close() }
+}
+
+function Set-Pin([int]$idx, [string]$ip, [string]$mac, [string]$kind) {
+    # store=active: faqat xotirada, kompyuter qayta yonsa o'chadi (eskirgan qotirish abadiy qolmaydi).
+    $out = & netsh interface ipv4 set neighbors interface=$idx address=$ip neighbor=$($mac.ToLower()) store=active 2>&1
+    if ($LASTEXITCODE -ne 0) { Write-Log "LAN qo'riqchi: $ip ni qotirib bo'lmadi: $out"; return }
+    $script:Guard.Pins[$ip] = @{ Mac = $mac; Kind = $kind; Fails = 0 }
+}
+
+function Remove-Pin([string]$ip) {
+    Remove-NetNeighbor -InterfaceIndex $script:Guard.Idx -IPAddress $ip -Confirm:$false -ErrorAction SilentlyContinue
+    $script:Guard.Pins.Remove($ip)
+}
+
+# Soxta javob ($bad MAC) olgan manzil uchun haqiqiy (lokal bo'lmagan) MAC'ni topishga urinadi.
+function Find-RealMac([int]$idx, [string]$ip) {
+    for ($i = 0; $i -lt 6; $i++) {
+        $m = Resolve-Fresh $idx $ip
+        if ($m -and -not (Test-LocalMac $m)) { return $m }
+    }
+    return $null
+}
+
+function Invoke-LanGuard($lan) {
+    $gw = (Get-NetRoute -InterfaceIndex $lan.Index -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+        Sort-Object RouteMetric | Select-Object -First 1).NextHop
+    if (-not $gw -or $gw -eq '0.0.0.0') { return }
+    $g = $script:Guard
+    if (-not $g -or $g.Idx -ne $lan.Index -or $g.Gw -ne $gw) {
+        if ($g) { foreach ($ip in @($g.Pins.Keys)) { Remove-Pin $ip } }
+        $script:Guard = @{ Idx = $lan.Index; Gw = $gw; Pins = @{}; Bad = $null; Checked = @{}; Announce = [datetime]::MinValue; Warned = $null }
+        $g = $script:Guard
+        # Kuchaytirgich ARP tekshiruv so'rovlariga ham javob beradi -> Windows har bir DHCP manzilni
+        # "band" deb rad etib, IP'ni almashtirib turadi (hodisa 4199). Tekshiruvni o'chiramiz.
+        Get-NetAdapter -Physical -ErrorAction SilentlyContinue | ForEach-Object {
+            Set-NetIPInterface -InterfaceIndex $_.ifIndex -AddressFamily IPv4 -DadTransmits 0 -ErrorAction SilentlyContinue
+        }
+    }
+    $idx = $g.Idx
+
+    # 1) Qotirilganlar sog'mi: 3 marta ketma-ket javob bo'lmasa (qurilma almashgan/o'chgan) - qotirish olinadi.
+    foreach ($ip in @($g.Pins.Keys)) {
+        $p = $g.Pins[$ip]
+        if (Test-Ping $ip) { $p.Fails = 0; continue }
+        $p.Fails++
+        if ($p.Fails -ge 3) {
+            Remove-Pin $ip
+            Write-Log "LAN qo'riqchi: $ip ($($p.Kind)) javob bermayapti - qotirish olindi, oddiy rejimga qaytildi."
+        }
+    }
+
+    # 2) Shlyuz (router) MAC'i soxta emasmi.
+    if (-not $g.Pins.ContainsKey($gw)) {
+        $mac = Get-NeighborMac $idx $gw
+        if ($mac -and (Test-LocalMac $mac)) {
+            $real = Find-RealMac $idx $gw
+            if ($real) {
+                $g.Bad = $mac
+                Set-Pin $idx $gw $real 'router'
+                Write-Log "LAN qo'riqchi: router ($gw) nomidan $mac javob beryapti (kuchaytirgich?) - haqiqiy MAC $real qotirildi."
+            } elseif ($g.Warned -ne $mac) {
+                $g.Warned = $mac
+                Write-Log "LAN qo'riqchi: router MAC'i $mac lokal, lekin boshqasi topilmadi - router o'zi shunday (masalan telefon hotspot), tegilmaydi."
+            }
+        }
+    }
+
+    # 3) Soxta MAC aniqlangan bo'lsa: uning nomida turgan printerlarni (9100) ham tuzatamiz.
+    #    Har bir manzil 30 daqiqada bir martadan ko'p tekshirilmaydi (9100 ga ulanish chop etishga xalaqit bermasin).
+    if ($g.Bad) {
+        $now = Get-Date
+        $suspects = Get-NetNeighbor -InterfaceIndex $idx -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object { $_.LinkLayerAddress -eq $g.Bad -and $_.State -in @('Reachable', 'Stale', 'Delay', 'Probe') -and $_.IPAddress -ne $gw }
+        foreach ($n in $suspects) {
+            $ip = $n.IPAddress
+            if ($g.Pins.ContainsKey($ip)) { continue }
+            if ($g.Checked.ContainsKey($ip) -and ($now - $g.Checked[$ip]).TotalMinutes -lt 30) { continue }
+            $g.Checked[$ip] = $now
+            if (-not (Test-Tcp $ip 9100 500)) { continue }
+            $real = Find-RealMac $idx $ip
+            if ($real) {
+                Set-Pin $idx $ip $real 'printer'
+                Write-Log "LAN qo'riqchi: printer $ip nomidan $($g.Bad) javob berayotgan edi - haqiqiy MAC $real qotirildi."
+            }
+        }
+    }
+
+    # 4) Har 60 soniyada o'zimizni e'lon qilamiz: broadcast ARP so'rovdagi "jo'natuvchi" yozuvi orqali
+    #    router va boshqalar o'z keshidagi bizning manzilimizni (kuchaytirgich MAC'i bo'lsa) tuzatadi.
+    if (((Get-Date) - $g.Announce).TotalSeconds -ge 60) {
+        $g.Announce = Get-Date
+        $target = $null
+        if (-not $g.Pins.ContainsKey($gw)) { $target = $gw }
+        else {
+            # Shlyuz qotirilgan - keshda yozuvi yo'q (yoki oddiy) biror manzilni so'raymiz; javob shart emas.
+            $base = ($lan.IP -split '\.')[0..2] -join '.'
+            foreach ($o in 250, 251, 252, 253, 3, 4, 5) {
+                $c = "$base.$o"
+                if ($c -eq $lan.IP -or $g.Pins.ContainsKey($c)) { continue }
+                $target = $c; break
+            }
+        }
+        if ($target) {
+            Remove-NetNeighbor -InterfaceIndex $idx -IPAddress $target -Confirm:$false -ErrorAction SilentlyContinue
+            try { [void]$script:Ping.Send($target, 300) } catch {}
+        }
+    }
+}
+
 function Invoke-Advertiser {
     $created = $false
     try { $mutex = [System.Threading.Mutex]::new($true, 'Global\PosBolaMdns', [ref]$created) } catch { $created = $false }
@@ -291,6 +440,8 @@ function Invoke-Advertiser {
         } catch {
             Write-Log "Kutilmagan xato: $($_.Exception.Message)"
         }
+        # Qo'riqchi xatosi mDNS e'loniga hech qachon ta'sir qilmasin.
+        if ($lan) { try { Invoke-LanGuard $lan } catch { Write-Log "LAN qo'riqchi xatosi: $($_.Exception.Message)" } }
         Start-Sleep -Seconds 15
     }
 }
@@ -314,7 +465,13 @@ function Show-Status {
         Write-Host ("Vazifa: {0}   holati: {1}   oxirgi natija: {2}" -f $TaskName, $t.State, $info.LastTaskResult) -ForegroundColor $color
     }
     $lan = Get-LanIPv4
-    if ($lan) { Write-Host "Hozirgi LAN IP: $($lan.IP) ($($lan.Alias))" -ForegroundColor Cyan }
+    if ($lan) {
+        Write-Host "Hozirgi LAN IP: $($lan.IP) ($($lan.Alias))" -ForegroundColor Cyan
+        # Windows'ning o'z doimiy yozuvlari (multicast/broadcast) ko'rsatilmaydi - faqat qo'riqchi qotirganlari.
+        $pins = Get-NetNeighbor -InterfaceIndex $lan.Index -AddressFamily IPv4 -State Permanent -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPAddress -notmatch '^(22[4-9]|23\d|255)\.|\.255$' -and $_.LinkLayerAddress -notmatch '^01-00-5E|^FF-FF' }
+        if ($pins) { Write-Host ("LAN qo'riqchi qotirgan: " + (($pins | ForEach-Object { "$($_.IPAddress)=$($_.LinkLayerAddress)" }) -join ', ')) -ForegroundColor Yellow }
+    }
     else { Write-Host "Hozirgi LAN IP: YO'Q (kabel/Wi-Fi'ni tekshiring, 169.254... bo'lsa routerdan IP olinmagan)" -ForegroundColor Red }
     if (Test-Path $LogFile) {
         Write-Host "--- oxirgi log ($LogFile) ---"
@@ -364,11 +521,16 @@ if ($Install) {
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $action = New-ScheduledTaskAction -Execute $ps -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"{0}`" -Port {1}" -f $InstalledScript, $Port)
     $trigger = New-ScheduledTaskTrigger -AtStartup
+    # Qo'riqchi: har 5 daqiqada qayta ishga tushirishga urinadi. Jarayon tirik bo'lsa IgnoreNew (va mutex)
+    # yangisini ochmaydi; o'lgan bo'lsa (o'ldirilgan, 0 kod bilan chiqqan) - 5 daqiqa ichida qaytadi.
+    # RestartCount buni qoplamaydi: Task Scheduler uni faqat ishga tushish xatosida qo'llaydi.
+    # -RepetitionDuration berilmasa Windows 10+ cheksiz takrorlaydi ([TimeSpan]::MaxValue u yerda xato beradi).
+    $watchdog = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
     $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     # ExecutionTimeLimit = 0: standart 72 soatlik cheklov vazifani 3 kunda o'ldirardi.
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
         -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($trigger, $watchdog) -Principal $principal -Settings $settings -Force | Out-Null
     Start-ScheduledTask -TaskName $TaskName
     Write-Host "'$TaskName' vazifasi o'rnatildi va ishga tushirildi (kompyuter har yoqilganda o'zi ishlaydi)." -ForegroundColor Green
 
