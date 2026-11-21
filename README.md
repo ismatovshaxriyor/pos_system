@@ -17,6 +17,7 @@ Ushbu hujjat Flutter mobil xodimlar ilovasi (Ofitsiant / Kassir / Menejer) uchun
   - `phone`: Restoran telefon raqami - to'lov chekining pastida ko'rsatiladi (masalan `"+998901234567"`)
   - `latitude` / `longitude`: Restoran koordinatalari
   - `attendance_radius`: Davomat radiusi (metrlarda)
+  - `restore_stock_on_cancel`: Ombor qoidasi (boolean, standart `false`). `true` bo'lsa, buyurtma bekor qilinganda (`POST /api/orders/<id>/cancel/`) oshxonaga yuborilgan taomlar uchun sarflangan ingredientlar omborga qaytariladi va `StockMovement` ro'yxatida `movement_type = "return"` ("Qaytarish") yozuvi paydo bo'ladi. Faqat menejer/admin o'zgartiradi.
 
 ### 2. Restoran sozlamalarini yangilash
 - **Endpoint:** `PUT /api/restaurant-config/1/` yoki `PATCH /api/restaurant-config/1/`
@@ -166,6 +167,32 @@ Restoran sozlamalarida `telegram_bot_token` hamda `telegram_chat_id` o'rnatilgan
 - To'lov chekining pastida (mavjud bo'lsa) `Tel: <phone>` qatori, so'ng "Xaridingiz uchun rahmat!" xabari, so'ng doim **`https://hamrohpos.uz/`ga yo'naltiruvchi QR kod** chop etiladi (printerning o'zi generatsiya qiladi, `items_snapshot`da alohida maydon sifatida kelmaydi). **Diqqat:** bu restoranning o'z sayti (`RestaurantConfig.public_domain`) EMAS - u faqat stol QR-menyusi (`build_table_qr_url`) uchun ishlatiladi; chekdagi QR har doim hamrohpos.uz'ning o'ziga (BRAND_FOOTER "Powered by hamrohpos.uz" bilan bir xil qattiq belgilangan brend havolasi) o'tadi.
 
 ---
+
+## Davomat (Attendance API)
+
+Mavjud: `GET /api/attendance/` (ro'yxat, `?date=`, menejer uchun `?user=`), `POST /api/attendance/check-in/` va `POST /api/attendance/check-out/` (tanani `{"latitude": ..., "longitude": ...}`, restoran radiusi ichida bo'lish shart). Quyidagilar smena UI uchun qo'shilgan:
+
+### 1. O'zimning smenam holati
+`GET /api/attendance/me/` - istalgan xodim.
+
+```json
+{ "on_shift": true, "attendance": { "id": 12, "user": { ... }, "check_in": "2026-11-20T08:02:11Z", "check_out": null, ... } }
+```
+Smenada bo'lmasa: `{ "on_shift": false, "attendance": null }`. Kassa yopilganda server hamma smenani o'zi tugatadi - ilova shu endpoint'ni vaqti-vaqti bilan (~30 s) so'rab tursin.
+
+### 2. Hozir smenada turganlar
+`GET /api/attendance/on-shift/` - **kassir yoki menejer**. Ochiq (`check_out = null`) yozuvlar, `check_in` bo'yicha o'sish tartibida (massiv).
+
+### 3. Davr bo'yicha xulosa
+`GET /api/attendance/summary/?from=YYYY-MM-DD&to=YYYY-MM-DD` - **faqat menejer/admin** (standart: oxirgi 7 kun).
+
+```json
+{
+  "from": "2026-11-14", "to": "2026-11-20",
+  "staff": [ { "user": { ... }, "shifts": 5, "days": 5, "minutes": 2340, "on_shift": true } ]
+}
+```
+`minutes` bo'yicha kamayish tartibida. Hali tugamagan smena "hozirgacha" hisoblanadi, lekin eng ko'pi bilan 16 soat (unutilgan check-out kunlab hisoblanmasligi uchun).
 
 ## Kassa Sessiyasi (Register Open/Close API)
 
