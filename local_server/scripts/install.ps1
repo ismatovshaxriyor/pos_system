@@ -395,9 +395,13 @@ try {
     if ($osType -ne 'linux') { Fail "Docker Windows-konteyner rejimida. Docker Desktop tray belgisi -> 'Switch to Linux containers' ni tanlab, qayta ishga tushiring." }
     Ok 'Docker Desktop ishlayapti (Linux konteynerlar)'
 
-    # --- Docker qo'riqchisi (har 5 daqiqada), ikki vazifa:
+    # --- Docker qo'riqchisi (har 5 daqiqada), uch vazifa:
     #  1) Docker Desktop yopilib qolsa (yoki kirishdan keyin o'zi yonmasa - Rohat'da reboot'dan keyin
     #     shunday bo'ldi, POS 40 daqiqa ishlamadi) - qayta ishga tushiradi.
+    #  1b) Docker Desktop ochiq-u, engine 5+ daqiqa javob bermasa - Docker Desktop + WSL'ni qayta ishga
+    #     tushiradi (dialogdagi "Restart" bilan bir xil). Rohat, 2026-11-22 04:06: Microsoft Store WSL'ni
+    #     o'zi yangiladi, Docker Desktop "WSL is unresponsive" oynasida qotib qoldi, POS 4,5 soat ishlamadi
+    #     (jarayon tirik bo'lgani uchun 1) buni ko'rmadi). Qayta ishga tushirishlar orasida kamida 30 daqiqa.
     #  2) Konteynerlar ishlab tursa-yu, 8000-port javob bermasa - web konteynerini qayta ishga tushiradi.
     #     Rohat, 2026-11-22: kabel almashtirilganda Docker'ning WSL VM'i qayta ishga tushdi, konteynerlar
     #     o'zi ko'tarildi, lekin com.docker.backend'ning port yo'naltiruvchisi eski konteynerga qarab qoldi -
@@ -418,10 +422,41 @@ function Write-WdLog($m) {
     Add-Content $log ("{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m)
 }
 $exe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
-if (-not (Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue)) {
+$desk = Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object -First 1
+if (-not $desk) {
     if (Test-Path $exe) { Start-Process $exe; Write-WdLog 'Docker Desktop yopiq edi - ishga tushirildi' }
     return
 }
+function Test-Engine {
+    $j = Start-Job { docker version --format '{{.Server.Version}}' 2>$null | Out-Null; $LASTEXITCODE }
+    $ok = $false
+    if (Wait-Job $j -Timeout 20) { $ok = ((Receive-Job $j) -eq 0) } else { Stop-Job $j }
+    Remove-Job $j -Force
+    return $ok
+}
+$downFile = Join-Path $env:ProgramData 'PosBola\docker_watchdog.engine_down'
+if (-not (Test-Engine)) {
+    try { if (((Get-Date) - $desk.StartTime).TotalMinutes -lt 5) { return } } catch {}
+    if (-not (Test-Path $downFile)) {
+        Set-Content $downFile (Get-Date -Format 's')
+        Write-WdLog 'Docker engine javob bermayapti - kuzatilmoqda'
+        return
+    }
+    if (((Get-Date) - (Get-Item $downFile).LastWriteTime).TotalMinutes -lt 4) { return }
+    $dstamp = Join-Path $env:ProgramData 'PosBola\docker_watchdog.last_desktop_restart'
+    if ((Test-Path $dstamp) -and ((Get-Date) - (Get-Item $dstamp).LastWriteTime).TotalMinutes -lt 30) { return }
+    Set-Content $dstamp (Get-Date -Format 's')
+    Remove-Item $downFile -Force -ErrorAction SilentlyContinue
+    Write-WdLog 'Docker engine 5+ daqiqa javob bermadi - Docker Desktop va WSL qayta ishga tushirilmoqda'
+    Get-Process 'Docker Desktop', 'com.docker.backend', 'com.docker.build' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $j = Start-Job { wsl.exe --shutdown 2>&1 | Out-Null }
+    if (-not (Wait-Job $j -Timeout 45)) { Stop-Job $j }
+    Remove-Job $j -Force
+    Start-Sleep -Seconds 5
+    if (Test-Path $exe) { Start-Process $exe }
+    return
+}
+if (Test-Path $downFile) { Remove-Item $downFile -Force -ErrorAction SilentlyContinue; Write-WdLog 'Docker engine yana javob beryapti' }
 $web = @(docker ps --filter label=com.docker.compose.project=local_server --filter label=com.docker.compose.service=web --format '{{.Names}}' 2>$null) | Select-Object -First 1
 if (-not $web) { return }
 try { $started = [datetime]::Parse(((docker inspect $web --format '{{.State.StartedAt}}' 2>$null) | Out-String).Trim().Substring(0, 19) + 'Z') } catch { return }
