@@ -240,3 +240,100 @@ class EscposTicketTests(SimpleTestCase):
         # o'tadi (BRAND_FOOTER bilan bir xil qattiq belgilangan brend havolasi).
         payload = escpos.render_payment_receipt(**self._receipt_kwargs(cashier_name='Kamila'))
         self.assertIn(escpos.BRAND_WEBSITE_URL.encode(), payload)
+
+
+class LogoRasterTests(SimpleTestCase):
+    """Chekdagi logo: nisbat saqlanishi, shaffof fon va och ranglar (Rohat, 2026-11-22)."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def _save(self, img, name='logo.png'):
+        import os
+        path = os.path.join(self.tmp.name, name)
+        img.save(path)
+        return path
+
+    @staticmethod
+    def _parse(raster):
+        """ALIGN_CENTER + GS v 0 sarlavhasi + bitlar + '\\n' -> (bayt_kenglik, balandlik, bitlar)."""
+        start = raster.index(b'\x1d\x76\x30\x00')
+        xl, xh, yl, yh = raster[start + 4:start + 8]
+        width_bytes, height = xl + xh * 256, yl + yh * 256
+        bits = raster[start + 8:start + 8 + width_bytes * height]
+        return width_bytes, height, bits
+
+    @staticmethod
+    def _black_ratio(bits):
+        return sum(bin(b).count('1') for b in bits) / (len(bits) * 8)
+
+    def test_wide_logo_keeps_aspect_ratio_on_80mm_paper(self):
+        from PIL import Image
+        path = self._save(Image.new('RGB', (1280, 374), 'white'))
+        width_bytes, height, _ = self._parse(escpos.render_logo_raster(path, max_width=escpos.logo_width_for(48)))
+        self.assertEqual(width_bytes * 8, 576)  # 72mm bosma kengligi to'liq
+        self.assertEqual(height, 168)  # 374 * 576 / 1280 - cho'zilmagan
+
+    def test_58mm_printer_gets_narrower_logo(self):
+        from PIL import Image
+        path = self._save(Image.new('RGB', (1280, 374), 'white'))
+        width_bytes, height, _ = self._parse(escpos.render_logo_raster(path, max_width=escpos.logo_width_for(32)))
+        self.assertEqual((width_bytes * 8, height), (384, 112))
+
+    def test_square_logo_is_capped_by_height(self):
+        from PIL import Image
+        path = self._save(Image.new('RGB', (1000, 1000), 'white'))
+        width_bytes, height, _ = self._parse(escpos.render_logo_raster(path, max_width=576))
+        self.assertEqual(height, escpos.LOGO_MAX_HEIGHT)
+        self.assertEqual(width_bytes, (escpos.LOGO_MAX_HEIGHT + 7) // 8)
+
+    def test_small_logo_is_not_upscaled(self):
+        from PIL import Image
+        path = self._save(Image.new('RGB', (200, 60), 'white'))
+        width_bytes, height, _ = self._parse(escpos.render_logo_raster(path, max_width=576))
+        self.assertEqual((width_bytes, height), (25, 60))
+
+    def test_transparent_background_prints_white_not_black(self):
+        from PIL import Image
+        # Shaffof piksellarning yashirin rangi qora (0,0,0,0) - eski kod butun fonni qora qilardi.
+        img = Image.new('RGBA', (400, 100), (0, 0, 0, 0))
+        img.paste((0, 0, 0, 255), (150, 25, 250, 75))  # o'rtada qora logo qismi
+        _, _, bits = self._parse(escpos.render_logo_raster(self._save(img), max_width=576))
+        ratio = self._black_ratio(bits)
+        self.assertGreater(ratio, 0.05)  # qora qism chiqdi
+        self.assertLess(ratio, 0.2)  # fon esa oq (100x50 / 400x100 = 12.5%)
+
+    def test_light_gold_logo_does_not_vanish(self):
+        from PIL import Image
+        # #e3c282 yorqinligi ~200: 128 chegarasida butunlay oq bo'lib yo'qolardi.
+        path = self._save(Image.new('RGB', (400, 100), (0xE3, 0xC2, 0x82)))
+        _, _, bits = self._parse(escpos.render_logo_raster(path, max_width=576))
+        self.assertGreater(self._black_ratio(bits), 0.1)
+
+    def test_pure_black_and_white_logo_has_no_dither_noise(self):
+        from PIL import Image
+        img = Image.new('L', (160, 40), 255)
+        img.paste(0, (0, 0, 80, 40))
+        _, _, bits = self._parse(escpos.render_logo_raster(self._save(img), max_width=576))
+        self.assertEqual(self._black_ratio(bits), 0.5)
+
+    def test_receipts_use_printer_width_for_logo(self):
+        from PIL import Image
+        path = self._save(Image.new('RGB', (1280, 374), 'white'))
+        receipt = escpos.render_payment_receipt(
+            logo_path=path, order_id=1, table_name='1', waiter_name='A', cashier_name='B',
+            items=[], total_amount=0, final_amount=0, width=48,
+        )
+        width_bytes, height, _ = self._parse(receipt)
+        self.assertEqual((width_bytes * 8, height), (576, 168))
+
+    def test_missing_or_broken_file_gives_empty_bytes(self):
+        import os
+        self.assertEqual(escpos.render_logo_raster(None), b'')
+        self.assertEqual(escpos.render_logo_raster(os.path.join(self.tmp.name, 'yoq.png')), b'')
+        broken = os.path.join(self.tmp.name, 'buzuq.png')
+        with open(broken, 'wb') as f:
+            f.write(b'not an image')
+        self.assertEqual(escpos.render_logo_raster(broken), b'')

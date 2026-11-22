@@ -226,31 +226,55 @@ def render_kitchen_ticket(*, station_name, order_id, table_name, waiter_name,
     return b''.join(out)
 
 
-def render_logo_raster(image_path, max_width=384):
+DOTS_PER_CHAR = 12  # Font A belgisi 12 nuqta: 48 belgi = 576 nuqta (80mm, 72mm bosma), 32 = 384 (58mm).
+LOGO_MAX_HEIGHT = 240  # nuqta (~30mm, 203 dpi): kvadrat logo chekni uzaytirib, qog'ozni behuda sarflamasin.
+
+
+def logo_width_for(width):
+    """Chek kengligi (belgi) bo'yicha logo uchun eng katta kenglik (nuqta, 8 ga karrali)."""
+    return max(8, (width * DOTS_PER_CHAR) // 8 * 8)
+
+
+def render_logo_raster(image_path, max_width=384, max_height=LOGO_MAX_HEIGHT):
     """
     Logo rasmini (PNG/JPG) ESC/POS 'GS v 0' (Raster bit image) baytlariga o'tkazadi.
     Pillow kutubxonasi mavjud bo'lmasa yoki rasm fayli yo'q bo'lsa b'' qaytaradi.
+
+    Nisbat saqlanadi: rasm faqat kichraytiriladi (kenglik `max_width`, balandlik `max_height` ichiga
+    sig'guncha), cho'zilmaydi va kesilmaydi. Masalan 1280x374 logo 80mm printerda 576x168 nuqta bo'ladi.
     """
     if not image_path:
         return b''
     try:
         from PIL import Image
         img = Image.open(image_path)
+        img.load()
     except Exception:
         return b''
 
     try:
+        # Shaffof fon oq qog'oz bo'lishi kerak. To'g'ridan-to'g'ri convert('L') shaffof piksellarni
+        # ularning yashirin rangiga (ko'pincha qora) aylantiradi, natijada logo o'rniga qora to'rtburchak chiqadi.
+        if img.mode in ('RGBA', 'LA', 'PA') or (img.mode == 'P' and 'transparency' in img.info):
+            rgba = img.convert('RGBA')
+            img = Image.alpha_composite(Image.new('RGBA', rgba.size, (255, 255, 255, 255)), rgba)
         img = img.convert('L')
+
         w, h = img.size
-        if w > max_width:
-            ratio = max_width / float(w)
-            h = int(float(h) * ratio)
-            w = max_width
-            resample_flag = getattr(Image, 'Resampling', Image).LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS
+        scale = min(1.0, max_width / float(w), max_height / float(h))
+        if scale < 1.0:
+            # round(): 1280 * (384/1280) kabi ko'paytma float'da 383.999... bo'lib, int() bitta nuqtani yo'qotadi.
+            w, h = max(1, round(w * scale)), max(1, round(h * scale))
+            resample_flag = getattr(Image, 'Resampling', Image).LANCZOS
             img = img.resize((w, h), resample_flag)
 
+        # Oddiy 128 chegarasi och ranglarni (masalan oltin #e3c282) butunlay oq qilib yo'qotadi.
+        # '1' rejimi Floyd-Steinberg dithering qiladi: soya nuqtalar zichligi bilan beriladi,
+        # sof qora-oq logoga esa ta'sir qilmaydi.
+        img = img.convert('1')
+        px = img.load()
+
         bytes_per_line = (w + 7) // 8
-        threshold = 128
         raster_data = bytearray()
 
         for y in range(h):
@@ -258,10 +282,8 @@ def render_logo_raster(image_path, max_width=384):
                 byte_val = 0
                 for bit in range(8):
                     x = x_byte * 8 + bit
-                    if x < w:
-                        pixel = img.getpixel((x, y))
-                        if pixel < threshold:  # Qora piksel
-                            byte_val |= (1 << (7 - bit))
+                    if x < w and px[x, y] == 0:  # Qora nuqta
+                        byte_val |= (1 << (7 - bit))
                 raster_data.append(byte_val)
 
         xL = bytes_per_line % 256
@@ -324,7 +346,7 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
     printed = _parse_dt(created_at)
 
     out = [INIT, SELECT_CP866]
-    logo_bytes = render_logo_raster(logo_path)
+    logo_bytes = render_logo_raster(logo_path, max_width=logo_width_for(width))
     if logo_bytes:
         out.append(logo_bytes)
 
@@ -379,7 +401,7 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     closed = _parse_dt(created_at)
 
     out = [INIT, SELECT_CP866]
-    logo_bytes = render_logo_raster(logo_path)
+    logo_bytes = render_logo_raster(logo_path, max_width=logo_width_for(width))
     if logo_bytes:
         out.append(logo_bytes)
 
