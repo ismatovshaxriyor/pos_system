@@ -395,8 +395,15 @@ try {
     if ($osType -ne 'linux') { Fail "Docker Windows-konteyner rejimida. Docker Desktop tray belgisi -> 'Switch to Linux containers' ni tanlab, qayta ishga tushiring." }
     Ok 'Docker Desktop ishlayapti (Linux konteynerlar)'
 
-    # --- Docker qo'riqchisi: Docker Desktop yopilib qolsa (yoki kirishdan keyin o'zi yonmasa - Rohat'da
-    # reboot'dan keyin shunday bo'ldi, POS 40 daqiqa ishlamadi) - 5 daqiqa ichida qayta ishga tushiradi.
+    # --- Docker qo'riqchisi (har 5 daqiqada), ikki vazifa:
+    #  1) Docker Desktop yopilib qolsa (yoki kirishdan keyin o'zi yonmasa - Rohat'da reboot'dan keyin
+    #     shunday bo'ldi, POS 40 daqiqa ishlamadi) - qayta ishga tushiradi.
+    #  2) Konteynerlar ishlab tursa-yu, 8000-port javob bermasa - web konteynerini qayta ishga tushiradi.
+    #     Rohat, 2026-11-22: kabel almashtirilganda Docker'ning WSL VM'i qayta ishga tushdi, konteynerlar
+    #     o'zi ko'tarildi, lekin com.docker.backend'ning port yo'naltiruvchisi eski konteynerga qarab qoldi -
+    #     8000 hech kimga (localhost'ga ham) javob bermadi, heartbeat esa ishlayverdi. `docker restart web` tuzatdi.
+    #     Faqat ulanish xatosi hisoblanadi (har qanday HTTP javob = server tirik), ikki marta 30 s oralig'ida,
+    #     qayta ishga tushirishlar orasida kamida 15 daqiqa, endi ishga tushgan konteyner (3 daqiqa) tekshirilmaydi.
     # Docker Desktop foydalanuvchi seansida ishlaydi, shuning uchun vazifa SYSTEM emas, konsolga kirgan
     # foydalanuvchi nomidan; wscript orqali - ekranda PowerShell oynasi miltillamasligi uchun.
     try {
@@ -405,13 +412,43 @@ try {
         $wdPs1 = Join-Path $pbDir 'docker_watchdog.ps1'
         $wdVbs = Join-Path $pbDir 'docker_watchdog.vbs'
         @'
-$exe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
-if (-not (Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue) -and (Test-Path $exe)) {
-    Start-Process $exe
-    $log = Join-Path $env:ProgramData 'PosBola\docker_watchdog.log'
+$log = Join-Path $env:ProgramData 'PosBola\docker_watchdog.log'
+function Write-WdLog($m) {
     if ((Test-Path $log) -and (Get-Item $log).Length -gt 512KB) { Move-Item $log "$log.old" -Force }
-    Add-Content $log ("{0}  Docker Desktop yopiq edi - ishga tushirildi" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    Add-Content $log ("{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m)
 }
+$exe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+if (-not (Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue)) {
+    if (Test-Path $exe) { Start-Process $exe; Write-WdLog 'Docker Desktop yopiq edi - ishga tushirildi' }
+    return
+}
+$web = @(docker ps --filter label=com.docker.compose.project=local_server --filter label=com.docker.compose.service=web --format '{{.Names}}' 2>$null) | Select-Object -First 1
+if (-not $web) { return }
+try { $started = [datetime]::Parse(((docker inspect $web --format '{{.State.StartedAt}}' 2>$null) | Out-String).Trim().Substring(0, 19) + 'Z') } catch { return }
+if (((Get-Date) - $started).TotalMinutes -lt 3) { return }
+$urls = @('http://127.0.0.1:8000/api/discovery/')
+$lanIp = Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
+    ForEach-Object { $_.IPv4Address.IPAddress } | Select-Object -First 1
+if ($lanIp) { $urls += "http://${lanIp}:8000/api/discovery/" }
+function Test-Pos {
+    foreach ($u in $urls) {
+        try { $null = Invoke-WebRequest $u -UseBasicParsing -TimeoutSec 8 }
+        catch { if (-not $_.Exception.Response) { return $u } }
+    }
+    return $null
+}
+if (-not (Test-Pos)) { return }
+Start-Sleep -Seconds 30
+$bad = Test-Pos
+if (-not $bad) { return }
+$stamp = Join-Path $env:ProgramData 'PosBola\docker_watchdog.last_restart'
+if ((Test-Path $stamp) -and ((Get-Date) - (Get-Item $stamp).LastWriteTime).TotalMinutes -lt 15) {
+    Write-WdLog "POS porti javob bermayapti ($bad), lekin web yaqinda qayta ishga tushirilgan - kutilmoqda"
+    return
+}
+Set-Content $stamp (Get-Date -Format 's')
+docker restart $web 2>&1 | Out-Null
+Write-WdLog "POS porti javob bermadi ($bad) - $web qayta ishga tushirildi"
 '@ | Set-Content -Path $wdPs1 -Encoding ASCII
         ('CreateObject("WScript.Shell").Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""' + $wdPs1 + '""", 0, False') |
             Set-Content -Path $wdVbs -Encoding ASCII
@@ -425,7 +462,7 @@ if (-not (Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue) -and (Test
         $wdPrincipal = New-ScheduledTaskPrincipal -UserId $wdUser -LogonType Interactive
         $wdSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2)
         Register-ScheduledTask -TaskName 'POS Bola Docker' -Action $wdAction -Trigger $wdTriggers -Principal $wdPrincipal -Settings $wdSettings -Force | Out-Null
-        Ok "Docker qo'riqchisi o'rnatildi ('POS Bola Docker': Docker Desktop yopilsa 5 daqiqada qayta ochiladi, foydalanuvchi: $wdUser)"
+        Ok "Docker qo'riqchisi o'rnatildi ('POS Bola Docker': Docker Desktop yopilsa yoki POS porti javob bermasa 5 daqiqada tiklaydi, foydalanuvchi: $wdUser)"
     } catch {
         Warn "Docker qo'riqchisini o'rnatib bo'lmadi: $($_.Exception.Message)"
     }
