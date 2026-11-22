@@ -2,7 +2,7 @@
   "expo": {
     "name": "POS Xodim",
     "slug": "pos-staff",
-    "version": "1.2.0",
+    "version": "1.2.2",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "posstaff",
