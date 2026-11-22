@@ -92,6 +92,8 @@ export interface Ingredient {
   supplier: Supplier | null;
   is_low: boolean;
   is_active: boolean;
+  /** Retseptida shu ingredient bor taomlar. Eski server yubormaydi. */
+  linked_products?: { id: number; name: string }[];
 }
 
 export interface IngredientInput {
@@ -100,6 +102,8 @@ export interface IngredientInput {
   min_stock?: Decimal;
   supplier_id?: number | null;
   is_active?: boolean;
+  /** Menyudagi taomga ulash: server "1 taom = 1 birlik" retsept qatorini qo'shadi. */
+  product_id?: number | null;
 }
 
 export interface IngredientSlim {

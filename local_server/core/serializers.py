@@ -535,16 +535,55 @@ class IngredientSerializer(serializers.ModelSerializer):
         queryset=Supplier.objects.all(), source='supplier', write_only=True, required=False, allow_null=True,
     )
     is_low = serializers.BooleanField(read_only=True)
+    # Menyudagi taomni to'g'ridan-to'g'ri ombor birligiga ulash (suv, non, gazak):
+    # ingredient bilan birga "1 ta taom = 1 birlik" retsept qatori yaratiladi,
+    # shunda taom sotilganda zaxira o'zi kamayadi. Ixtiyoriy, faqat yozishda.
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.filter(is_deleted=False), write_only=True, required=False, allow_null=True,
+    )
+    linked_products = serializers.SerializerMethodField()
 
     class Meta:
         model = Ingredient
         fields = (
             'id', 'name', 'unit', 'current_stock', 'min_stock', 'cost_price',
-            'supplier', 'supplier_id', 'is_low', 'is_active', 'created_at', 'updated_at',
+            'supplier', 'supplier_id', 'is_low', 'is_active', 'product_id', 'linked_products',
+            'created_at', 'updated_at',
         )
         # Zaxira faqat harakat (kirim/sotuv/tuzatish) orqali o'zgaradi - ledger
         # yaxlitligi uchun. Boshlang'ich qoldiqni `adjust` action bilan qo'yiladi.
         read_only_fields = ('current_stock',)
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_linked_products(self, obj):
+        """Shu ingredient retseptida ishlatilgan (o'chirilmagan) taomlar: `[{id, name}]`."""
+        return [
+            {'id': r.product_id, 'name': r.product.name}
+            for r in obj.used_in.all()
+            if not r.product.is_deleted
+        ]
+
+    def _link_product(self, ingredient, product):
+        if product is not None:
+            ProductIngredient.objects.get_or_create(
+                product=product, ingredient=ingredient, defaults={'quantity': Decimal('1')},
+            )
+
+    def create(self, validated_data):
+        from django.db import transaction
+        product = validated_data.pop('product_id', None)
+        with transaction.atomic():
+            ingredient = super().create(validated_data)
+            self._link_product(ingredient, product)
+        return ingredient
+
+    def update(self, instance, validated_data):
+        from django.db import transaction
+        product = validated_data.pop('product_id', None)
+        with transaction.atomic():
+            ingredient = super().update(instance, validated_data)
+            self._link_product(ingredient, product)
+        return ingredient
 
 
 class RecipeItemSerializer(serializers.ModelSerializer):

@@ -41,7 +41,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
-        qs = Ingredient.objects.select_related('supplier').all()
+        qs = Ingredient.objects.select_related('supplier').prefetch_related('used_in__product').all()
         if self.request.query_params.get('low_stock') == 'true':
             qs = qs.filter(current_stock__lt=F('min_stock'))
         return qs.order_by('name')

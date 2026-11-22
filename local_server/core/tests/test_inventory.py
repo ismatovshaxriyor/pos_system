@@ -219,6 +219,43 @@ class InventoryTests(TestCase):
         }, content_type='application/json', **_auth_header(self.cashier))
         self.assertEqual(resp.status_code, 201)
 
+    # ---- Ingredientni menyudagi taomga ulash ----
+    def test_create_ingredient_linked_to_menu_product(self):
+        """Taom tanlab yaratilgan ingredient "1 taom = 1 birlik" retsepti bilan ulanadi va sotuvda kamayadi."""
+        cola = Product.objects.create(category=self.category, name='Coca-Cola 0.5', price=Decimal('8000'))
+        resp = self.client.post(reverse('ingredient-list'), {
+            'name': 'Coca-Cola 0.5', 'unit': 'dona', 'min_stock': '6', 'product_id': cola.id,
+        }, content_type='application/json', **_auth_header(self.cashier))
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.json()['linked_products'], [{'id': cola.id, 'name': 'Coca-Cola 0.5'}])
+        self.assertNotIn('product_id', resp.json())
+
+        line = ProductIngredient.objects.get(product=cola)
+        self.assertEqual(line.ingredient_id, resp.json()['id'])
+        self.assertEqual(line.quantity, Decimal('1'))
+
+    def test_create_ingredient_without_product_has_no_recipe(self):
+        resp = self.client.post(reverse('ingredient-list'), {
+            'name': 'Guruch', 'unit': 'kg',
+        }, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.json()['linked_products'], [])
+        self.assertFalse(ProductIngredient.objects.filter(ingredient_id=resp.json()['id']).exists())
+
+    def test_create_ingredient_rejects_deleted_product(self):
+        gone = Product.objects.create(category=self.category, name='Eski', price=Decimal('1000'), is_deleted=True)
+        resp = self.client.post(reverse('ingredient-list'), {
+            'name': 'Eski', 'unit': 'dona', 'product_id': gone.id,
+        }, content_type='application/json', **_auth_header(self.manager))
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(Ingredient.objects.filter(name='Eski').exists())
+
+    def test_ingredient_list_shows_linked_products(self):
+        ProductIngredient.objects.create(product=self.product, ingredient=self.ingredient, quantity=Decimal('0.2'))
+        resp = self.client.get(reverse('ingredient-list'), **_auth_header(self.manager))
+        row = next(r for r in resp.json()['results'] if r['id'] == self.ingredient.id)
+        self.assertEqual(row['linked_products'], [{'id': self.product.id, 'name': 'Osh'}])
+
     def test_recipe_item_create_forbidden_for_waiter(self):
         self.waiter = User.objects.create_user(username='+998900000024', role='waiter')
         url = reverse('recipeitem-list')

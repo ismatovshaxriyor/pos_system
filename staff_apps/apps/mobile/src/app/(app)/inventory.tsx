@@ -7,6 +7,7 @@ import {
   UNIT_LABEL,
   type Ingredient,
   type IngredientUnit,
+  type Product,
   type Supplier,
 } from '@pos/shared';
 import { router } from 'expo-router';
@@ -22,8 +23,25 @@ import { useHand } from '@/ui/theme';
 
 type Filter = 'all' | 'low' | 'archived';
 
+/**
+ * Yangi ingredient nomi: menyudagi taomdan (`menu`, server "1 taom = 1 birlik" retseptini ulaydi)
+ * yoki qo'lda (`custom` - "Boshqa"). Tahrirlashda doim `custom`.
+ */
+type NameSource = 'menu' | 'custom';
+
 type Action =
-  | { kind: 'edit'; id?: number; name: string; unit: IngredientUnit; minStock: string; supplierId: number | null; active: boolean }
+  | {
+      kind: 'edit';
+      id?: number;
+      name: string;
+      unit: IngredientUnit;
+      minStock: string;
+      supplierId: number | null;
+      active: boolean;
+      source: NameSource;
+      productId: number | null;
+      query: string;
+    }
   | { kind: 'count'; id: number; quantity: string; note: string }
   | { kind: 'waste'; id: number; quantity: string; note: string };
 
@@ -40,17 +58,31 @@ export default function InventoryScreen() {
   const { busy, error, info, setError, run } = useManage();
   const [items, setItems] = useState<Ingredient[] | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [action, setAction] = useState<Action | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
-    const [list, sup] = await Promise.all([pos.api.inventory.ingredients(), pos.api.inventory.suppliers()]);
+    const [list, sup, prod] = await Promise.all([pos.api.inventory.ingredients(), pos.api.inventory.suppliers(), pos.api.menu.products()]);
     setItems(list);
     setSuppliers(sup.filter((s) => s.is_active));
+    setProducts(prod);
   }, []);
 
-  useRealtimeRefresh(['inventory_changed', 'low_stock'], load);
+  useRealtimeRefresh(['inventory_changed', 'low_stock', 'menu_changed'], load);
+
+  // Menyudan tanlash uchun: retseptida hali birorta ingredient yo'q taomlar
+  // (retsepti borlarining zaxirasi o'z ingredientlari orqali kamayadi).
+  const linkable = useMemo(() => {
+    const linked = new Set((items ?? []).flatMap((i) => (i.linked_products ?? []).map((p) => p.id)));
+    return products.filter((p) => !linked.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, products]);
+
+  function newIngredient(): Action {
+    const source: NameSource = linkable.length > 0 ? 'menu' : 'custom';
+    return { kind: 'edit', name: '', unit: source === 'menu' ? 'dona' : 'kg', minStock: '', supplierId: null, active: true, source, productId: null, query: '' };
+  }
 
   useEffect(() => {
     if (allowed) void run(async () => undefined, undefined, load);
@@ -73,8 +105,16 @@ export default function InventoryScreen() {
     let call: (() => Promise<unknown>) | null = null;
     if (action.kind === 'edit') {
       const min = parseOptionalDecimal(action.minStock, '0', 3);
+      if (!action.id && action.source === 'menu' && action.productId === null) return setError("Menyudan taom tanlang yoki «Boshqa»ni bosing.");
       if (!action.name.trim() || min === null) return setError("Nomi va minimal qoldiqni to'g'ri kiriting.");
-      const body = { name: action.name.trim(), unit: action.unit, min_stock: min, supplier_id: action.supplierId, is_active: action.active };
+      const body = {
+        name: action.name.trim(),
+        unit: action.unit,
+        min_stock: min,
+        supplier_id: action.supplierId,
+        is_active: action.active,
+        ...(!action.id && action.productId !== null ? { product_id: action.productId } : {}),
+      };
       call = () => (action.id ? pos.api.inventory.updateIngredient(action.id, body) : pos.api.inventory.createIngredient(body));
     } else if (action.kind === 'count') {
       const q = parseDecimalInput(action.quantity, 3);
@@ -122,19 +162,44 @@ export default function InventoryScreen() {
         <Button
           title="+ Yangi ingredient"
           variant="ghost"
-          onPress={() => setAction({ kind: 'edit', name: '', unit: 'kg', minStock: '', supplierId: null, active: true })}
+          onPress={() => setAction(newIngredient())}
         />
       )}
 
       {action?.kind === 'edit' && (
         <FormCard title={action.id ? 'Ingredientni tahrirlash' : 'Yangi ingredient'}>
-          <Field label="Nomi" value={action.name} onChangeText={(name) => setAction({ ...action, name })} autoCapitalize="sentences" />
-          <ChipSelect
-            label="Birlik"
-            value={action.unit}
-            options={INGREDIENT_UNITS.map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
-            onChange={(unit) => setAction({ ...action, unit })}
-          />
+          {!action.id && action.source === 'menu' ? (
+            <MenuProductPicker
+              products={linkable}
+              query={action.query}
+              selected={action.productId}
+              onQuery={(query) => setAction({ ...action, query })}
+              onPick={(p) => setAction({ ...action, productId: p.id, name: p.name, unit: 'dona' })}
+              onOther={() => setAction({ ...action, source: 'custom', productId: null, name: action.query.trim(), unit: 'kg' })}
+            />
+          ) : (
+            <>
+              <Field label="Nomi" value={action.name} onChangeText={(name) => setAction({ ...action, name })} autoCapitalize="sentences" />
+              {!action.id && linkable.length > 0 && (
+                <Button
+                  title="← Menyudan tanlash"
+                  variant="ghost"
+                  compact
+                  onPress={() => setAction({ ...action, source: 'menu', productId: null, query: action.name, unit: 'dona' })}
+                />
+              )}
+            </>
+          )}
+          {action.productId !== null ? (
+            <Muted>Menyuda «{action.name}» 1 ta sotilsa, omborda 1 dona kamayadi.</Muted>
+          ) : (
+            <ChipSelect
+              label="Birlik"
+              value={action.unit}
+              options={INGREDIENT_UNITS.map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+              onChange={(unit) => setAction({ ...action, unit })}
+            />
+          )}
           <Field
             label={`Minimal qoldiq (${action.unit}) - shundan kamaysa ogohlantiriladi`}
             value={action.minStock}
@@ -190,6 +255,7 @@ export default function InventoryScreen() {
               {Number(i.cost_price) > 0 ? `Oxirgi narx: ${formatMoney(i.cost_price)}/${i.unit}` : 'Narx hali yo‘q'}
               {i.supplier ? ` · ${i.supplier.name}` : ''}
             </Muted>
+            {!!i.linked_products?.length && <Muted>Menyuda: {i.linked_products.map((p) => p.name).join(', ')}</Muted>}
 
             {open && (
               <>
@@ -223,7 +289,18 @@ export default function InventoryScreen() {
                   compact
                   variant="ghost"
                   onPress={() =>
-                    setAction({ kind: 'edit', id: i.id, name: i.name, unit: i.unit, minStock: trimDecimal(i.min_stock), supplierId: i.supplier?.id ?? null, active: i.is_active })
+                    setAction({
+                      kind: 'edit',
+                      id: i.id,
+                      name: i.name,
+                      unit: i.unit,
+                      minStock: trimDecimal(i.min_stock),
+                      supplierId: i.supplier?.id ?? null,
+                      active: i.is_active,
+                      source: 'custom',
+                      productId: null,
+                      query: '',
+                    })
                   }
                 />
                 {!i.is_active && (
@@ -236,5 +313,46 @@ export default function InventoryScreen() {
         );
       })}
     </Screen>
+  );
+}
+
+const PICK_LIMIT = 24;
+
+/** Yangi ingredient nomi menyudagi taomdan. Ro'yxatda yo'q bo'lsa - "Boshqa" (nom qo'lda yoziladi). */
+function MenuProductPicker({
+  products,
+  query,
+  selected,
+  onQuery,
+  onPick,
+  onOther,
+}: {
+  products: Product[];
+  query: string;
+  selected: number | null;
+  onQuery: (q: string) => void;
+  onPick: (p: Product) => void;
+  onOther: () => void;
+}) {
+  const q = query.trim().toLowerCase();
+  const matches = products.filter((p) => !q || p.name.toLowerCase().includes(q));
+  const shown = matches.slice(0, PICK_LIMIT);
+  const OTHER = 'other' as const;
+  return (
+    <>
+      {products.length > PICK_LIMIT / 2 && <Field label="Nomi: menyudan qidirish" value={query} onChangeText={onQuery} />}
+      <ChipSelect<number | typeof OTHER | null>
+        label={products.length > PICK_LIMIT / 2 ? undefined : 'Nomi: menyudan tanlang'}
+        value={selected}
+        options={[...shown.map((p) => ({ value: p.id as number | typeof OTHER | null, label: p.name })), { value: OTHER, label: 'Boshqa' }]}
+        onChange={(v) => {
+          if (v === OTHER) return onOther();
+          const p = shown.find((x) => x.id === v);
+          if (p) onPick(p);
+        }}
+      />
+      {matches.length > PICK_LIMIT && <Muted>Yana {matches.length - PICK_LIMIT} ta taom bor - qidiruv bilan toraytiring.</Muted>}
+      {q && matches.length === 0 && <Muted>Menyuda topilmadi - «Boshqa»ni bosib nomini yozing.</Muted>}
+    </>
   );
 }
