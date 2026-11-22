@@ -236,6 +236,11 @@ REST_FRAMEWORK = {
         'anon': '10/minute',
         'user': '100/minute',
         'login': '5/minute',
+        # Mijozlarning QR sayti, tashqi IP boshiga (`core/throttling.py::PublicClientThrottle`).
+        # Ochiq sahifa daqiqasiga ~4 so'rov yuboradi (15 s da stol holati). Restoran
+        # Wi-Fi'sidagi barcha mijozlar bitta tashqi IP bilan chiqadi: 120 taxminan
+        # 30 ta bir vaqtda ochiq sahifaga yetadi.
+        'public': '120/minute',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
@@ -250,7 +255,7 @@ REST_FRAMEWORK = {
 # qilmaydi - rate None esa har qanday SimpleRateThrottle'ni o'chiradi.
 if 'test' in sys.argv:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
-    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': None, 'user': None, 'login': None}
+    REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {'anon': None, 'user': None, 'login': None, 'public': None}
 
 # Spectacular settings
 SPECTACULAR_SETTINGS = {

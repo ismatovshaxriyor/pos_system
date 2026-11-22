@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 
 export const Header: React.FC = () => {
-  const { tab, setTab, table, live, demoEmpty, setDemoEmpty } = useApp();
+  const { tab, setTab, table, live, reconnecting, tableMissing, demoEmpty, setDemoEmpty } = useApp();
 
   const tableLabel = table
     ? (table.zone_name ? `${table.table_name} (${table.zone_name})` : String(table.table_name || '—'))
@@ -10,6 +10,16 @@ export const Header: React.FC = () => {
 
   return (
     <>
+      {tableMissing && (
+        <div className="demobar" role="status">
+          <span className="lbl">Bu QR kod ishlamayapti · xodimga ayting</span>
+        </div>
+      )}
+      {reconnecting && (
+        <div className="demobar" role="status">
+          <span className="lbl">Aloqa uzildi · qayta ulanmoqda…</span>
+        </div>
+      )}
       {!live && (
         <div className="demobar" id="demobar">
           <span className="lbl">Demo · backend ulanmagan</span>

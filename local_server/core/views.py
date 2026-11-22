@@ -24,6 +24,7 @@ from . import escpos, services
 from .models import User, Table, Category, Product, Order, OrderItem, Payment, StaffDevice, Notification, RestaurantConfig, Attendance, RegisterSession, TableZone, Printer, PrintJob, Customer
 from .permissions import IsAdminStaff, IsManagerOrAdmin, IsCashierOrManager
 from .realtime import broadcast_event
+from .throttling import PublicClientThrottle
 from .serializers import (
     UserSerializer, TableSerializer, CategorySerializer,
     ProductSerializer, OrderSerializer, OrderItemSerializer,
@@ -1228,6 +1229,7 @@ class PublicMenuView(APIView):
     va taomlar narxi hamda mavjudligini ko'rishi mumkin.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PublicClientThrottle]
 
     @extend_schema(
         summary="Ochiq menyu",
@@ -1270,6 +1272,7 @@ class PublicTableLiveView(APIView):
     shu stolning joriy holati va faol buyurtmasidagi narxlarni ko'ra oladi.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PublicClientThrottle]
 
     @extend_schema(
         summary="Stolning jonli hisobi",
@@ -1288,6 +1291,7 @@ class PublicCallWaiterView(APIView):
     WebSocket orqali barcha faol afitsiantlar va kassa ekraniga real-vaqtda bildirishnoma yuboradi.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PublicClientThrottle]
 
     @extend_schema(
         summary="Ofitsiantni chaqirish",
@@ -1324,6 +1328,9 @@ class PublicCallWaiterView(APIView):
                 'reason': reason,
                 'message': message,
                 'created_at': timezone.now().isoformat(),
+                # Ilovalar shu bo'yicha kimga ko'rsatishni hal qiladi: stolning ofitsianti
+                # bo'lsa faqat unga, null bo'lsa barcha xodimlarga (kassa ham).
+                'waiter_id': recipient.id if recipient else None,
             }
         )
 

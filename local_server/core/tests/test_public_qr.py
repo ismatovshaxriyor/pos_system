@@ -115,6 +115,22 @@ class PublicQRMenuTests(TestCase):
         self.assertIsNotNone(notif)
         self.assertIn('Stol #5', notif.message)
 
+    def test_call_waiter_broadcast_carries_table_waiter(self):
+        """Ilovalar `waiter_id` bo'yicha kimga ko'rsatishni hal qiladi: stol ofitsianti yoki null (hammaga)."""
+        import unittest.mock as mock
+        url = reverse('public-call-waiter', kwargs={'qr_code': self.table.qr_code})
+
+        with mock.patch('core.views.broadcast_event') as broadcast:
+            self.client.post(url, {'reason': 'Chaqiruv'}, content_type='application/json')
+        self.assertEqual(broadcast.call_args.kwargs['event_type'], 'call_waiter')
+        self.assertIsNone(broadcast.call_args.kwargs['payload']['waiter_id'])
+
+        waiter = User.objects.create_user(username='+998901112244', role='waiter')
+        Order.objects.create(table=self.table, waiter=waiter, status='in_progress')
+        with mock.patch('core.views.broadcast_event') as broadcast:
+            self.client.post(url, {'reason': 'Chaqiruv'}, content_type='application/json')
+        self.assertEqual(broadcast.call_args.kwargs['payload']['waiter_id'], waiter.id)
+
     def test_call_waiter_demo_mode(self):
         """qr_code='demo' bo'lganda ham call-waiter 200 OK qaytarishi va birinchi stol uchun bildirishnoma yaratishi kerak."""
         url = reverse('public-call-waiter', kwargs={'qr_code': 'demo'})
@@ -124,6 +140,35 @@ class PublicQRMenuTests(TestCase):
         from core.models import Notification
         notif = Notification.objects.filter(payload__reason='Demo chaqiruv').first()
         self.assertIsNotNone(notif)
+
+    def test_public_throttle_counts_each_cloudflare_client_separately(self):
+        """
+        Hamma QR mijozlar bitta REMOTE_ADDR (nginx `website`) bilan keladi.
+        Limit butun restoranga emas, har bir tashqi IP'ga (CF-Connecting-IP) qo'llanishi kerak:
+        Rohat'da umumiy 10/minute tufayli sayt 429 olib demo menyuga tushib qolardi.
+        """
+        import unittest.mock as mock
+        from django.core.cache import cache
+        from core.throttling import PublicClientThrottle
+
+        url = reverse('public-table-live', kwargs={'qr_code': self.table.qr_code})
+        ips = ['203.0.113.10', '203.0.113.11']
+        keys = [PublicClientThrottle.cache_format % {'scope': 'public', 'ident': f'127.0.0.1|{ip}'} for ip in ips]
+        cache.delete_many(keys)
+        self.addCleanup(cache.delete_many, keys)
+
+        with mock.patch.object(PublicClientThrottle, 'THROTTLE_RATES', {'public': '2/minute'}):
+            first = [self.client.get(url, HTTP_CF_CONNECTING_IP=ips[0]).status_code for _ in range(3)]
+            other = self.client.get(url, HTTP_CF_CONNECTING_IP=ips[1]).status_code
+
+        self.assertEqual(first, [200, 200, 429])
+        self.assertEqual(other, 200)
+
+    def test_public_views_use_per_client_throttle(self):
+        from core.throttling import PublicClientThrottle
+        from core.views import PublicCallWaiterView, PublicMenuView, PublicTableLiveView
+        for view in (PublicMenuView, PublicTableLiveView, PublicCallWaiterView):
+            self.assertEqual(view.throttle_classes, [PublicClientThrottle], view.__name__)
 
     def test_table_qr_code_image_generation(self):
         """Menejer stol uchun QR kod PNG rasmini yuklab ola olishi kerak."""

@@ -8,7 +8,11 @@ export async function fetchMenu() {
 
 export async function fetchTableLive(qrCode) {
   const res = await fetch(`${API_BASE}/table/${qrCode}/`);
-  if (!res.ok) throw new Error('Stol ma\'lumotlarini olib bo\'lmadi');
+  if (!res.ok) {
+    const err = new Error('Stol ma\'lumotlarini olib bo\'lmadi');
+    err.status = res.status;
+    throw err;
+  }
   return await res.json();
 }
 

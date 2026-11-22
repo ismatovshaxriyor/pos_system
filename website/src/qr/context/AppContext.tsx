@@ -19,6 +19,10 @@ interface AppContextType {
   table: TableLive | null;
   tableLoading: boolean;
   live: boolean;
+  /** Haqiqiy stolda server javob bermayapti, sahifa qayta urinmoqda. */
+  reconnecting: boolean;
+  /** Server bu QR kodni tanimadi (404). */
+  tableMissing: boolean;
   qrCode: string;
   selectedProduct: SelectedProduct | null;
   openProduct: (product: Product, categoryName: string) => void;
@@ -41,16 +45,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [table, setTable] = useState<TableLive | null>(null);
   const [tableLoading, setTableLoading] = useState(true);
   const [live, setLive] = useState(true);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [tableMissing, setTableMissing] = useState(false);
   const [demoEmpty, setDemoEmpty] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null);
   const [calling, setCalling] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
 
+  // Haqiqiy stol QR'ida (`/table/<uuid>/`) xato bo'lsa soxta demo ma'lumot KO'RSATILMAYDI:
+  // mijoz uni haqiqiy narx deb o'ylaydi. Bir martalik uzilish (server qayta ishga
+  // tushishi, tunnel, 429) o'tishi bilan sahifa o'zi tiklanadi. Demo faqat `qrCode === 'demo'` da.
+  const realTable = qrCode !== 'demo';
+
   useEffect(() => {
-    fetchMenu()
-      .then((data: Category[]) => setMenu(data))
-      .catch(() => { setMenu(MOCK_MENU); setLive(false); })
-      .finally(() => setMenuLoading(false));
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = (attempt: number) => {
+      fetchMenu()
+        .then((data: Category[]) => { if (!cancelled) { setMenu(data); setMenuLoading(false); } })
+        .catch(() => {
+          if (cancelled) return;
+          if (!realTable) { setMenu(MOCK_MENU); setLive(false); setMenuLoading(false); return; }
+          timer = setTimeout(() => load(attempt + 1), Math.min(3000 * 2 ** attempt, 30000));
+        });
+    };
+    load(0);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -59,9 +80,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const load = () => {
       fetchTableLive(qrCode)
-        .then((data: TableLive) => { if (!cancelled) setTable(data); })
-        .catch(() => {
+        .then((data: TableLive) => { if (!cancelled) { setTable(data); setReconnecting(false); setTableMissing(false); } })
+        .catch((err: { status?: number }) => {
           if (cancelled) return;
+          // Haqiqiy stol: oxirgi ma'lumot qoladi, keyingi so'rovda qayta urinadi.
+          // 404 - stol o'chirilgan yoki QR eskirgan: bu aloqa uzilishi emas.
+          if (realTable) {
+            const missing = err?.status === 404;
+            setTableMissing(missing);
+            setReconnecting(!missing);
+            return;
+          }
           stillLive = false;
           setLive(false);
           setTable(mockTable(qrCode, demoEmpty));
@@ -96,7 +125,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         tab, setTab,
         menu, menuLoading,
         table, tableLoading,
-        live, qrCode,
+        live, reconnecting, tableMissing, qrCode,
         selectedProduct, openProduct, closeProduct,
         calling, toastOpen, callWaiter,
         demoEmpty, setDemoEmpty,
