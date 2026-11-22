@@ -29,6 +29,18 @@ describe('normalizeBaseUrl', () => {
     expect(normalizeBaseUrl('192.168.1.5:8000')).toBe('http://192.168.1.5:8000');
     expect(normalizeBaseUrl(' https://pos.local/api/ ')).toBe('https://pos.local');
   });
+
+  it('portsiz ochiq domenga https, LAN nomlariga http qoʼyadi', () => {
+    expect(normalizeBaseUrl('rohat.hamrohpos.uz')).toBe('https://rohat.hamrohpos.uz');
+    expect(normalizeBaseUrl('Rohat.HamrohPOS.uz/api/')).toBe('https://Rohat.HamrohPOS.uz');
+    expect(normalizeBaseUrl('http://rohat.hamrohpos.uz')).toBe('http://rohat.hamrohpos.uz');
+    expect(normalizeBaseUrl('pos-bola.local:8000')).toBe('http://pos-bola.local:8000');
+    expect(normalizeBaseUrl('pos-bola.local')).toBe('http://pos-bola.local');
+    expect(normalizeBaseUrl('DESKTOP-P1JJQLK.local:8000')).toBe('http://DESKTOP-P1JJQLK.local:8000');
+    expect(normalizeBaseUrl('localhost:8000')).toBe('http://localhost:8000');
+    expect(normalizeBaseUrl('192.168.1.155')).toBe('http://192.168.1.155');
+    expect(normalizeBaseUrl('pos.example.uz:8000')).toBe('http://pos.example.uz:8000');
+  });
 });
 
 describe('createApiClient', () => {

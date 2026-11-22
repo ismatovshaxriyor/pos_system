@@ -5,11 +5,19 @@ import type { Decimal, Role, User } from './types';
  * (`local_server/core/serializers.py`): yozishda `*_id`, o'qishda ichma-ich obyekt.
  */
 
-/** Galereyadan tanlangan rasm; RN `FormData`ga `{uri, name, type}` ko'rinishida qo'shiladi. */
+/**
+ * Galereyadan tanlangan rasm, `FormData`ga shu obyekt holicha qo'shiladi.
+ *
+ * `bytes` mobil ilova uchun majburiy. Expo 58 global `fetch`ni `expo/fetch` bilan almashtiradi, u esa
+ * RN uslubidagi `{uri, name, type}` qismni jo'nata olmaydi ("Unsupported FormDataPart implementation").
+ * So'rov serverga umuman yetmaydi, logo va taom rasmlari shu sabab yuklanmagan edi (Rohat, 2026-11-22).
+ * `bytes()` bor obyektni esa `expo/fetch` o'qib multipart'ga qo'yadi (`name` va `type` qism sarlavhalariga ketadi).
+ */
 export interface ImageUpload {
   uri: string;
   name: string;
   type: string;
+  bytes?: () => Promise<Uint8Array>;
 }
 
 /**

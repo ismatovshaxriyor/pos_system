@@ -135,6 +135,7 @@ export default function ConnectScreen() {
             returnKeyType="go"
             onSubmitEditing={() => void connect(url)}
           />
+          <Muted>Restoranda: server IP manzili. Uydan: restoran domeni, masalan rohat.hamrohpos.uz.</Muted>
           <Button title="Ulanish" onPress={() => void connect(url)} loading={busy === url} disabled={busy !== null || !url.trim()} />
         </>
       ) : (

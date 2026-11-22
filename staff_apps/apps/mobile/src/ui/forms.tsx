@@ -55,11 +55,14 @@ export function ImageField({
   current,
   picked,
   onPick,
+  original = false,
 }: {
   label: string;
   current?: string | null;
   picked: ImageUpload | null;
   onPick: (img: ImageUpload) => void;
+  /** `true` - rasm kesilmasdan va qayta siqilmasdan olinadi (logo). */
+  original?: boolean;
 }) {
   const uri = picked?.uri ?? current ?? null;
   return (
@@ -77,7 +80,7 @@ export function ImageField({
         variant="ghost"
         compact
         onPress={async () => {
-          const img = await pickImage();
+          const img = await pickImage({ original });
           if (img) onPick(img);
         }}
       />

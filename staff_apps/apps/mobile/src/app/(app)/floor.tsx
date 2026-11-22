@@ -1,6 +1,8 @@
 import { describeError, type Table, type TableZone } from '@pos/shared';
+import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
@@ -29,6 +31,7 @@ export default function FloorScreen() {
   const [draft, setDraft] = useState<TableDraft | null>(null);
   const [zoneDraft, setZoneDraft] = useState<{ id?: number; name: string } | null>(null);
   const [qrFor, setQrFor] = useState<number | null>(null);
+  const [sharing, setSharing] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,6 +104,28 @@ export default function FloorScreen() {
       uri: `${base}/api${pos.api.floor.qrCodeUrl(id)}`,
       headers: { ...(token ? { Authorization: `Token ${token}` } : {}), ...(device ? { 'X-Device-ID': device } : {}) },
     };
+  }
+
+  /**
+   * QR rasmini (PNG) keshga yuklab, tizimning "Ulashish" oynasini ochadi: galereyaga saqlash, Telegram, chop etish.
+   * Rasm server tomonida domen bilan yasaladi, shuning uchun ilova ichida qayta chizilmaydi.
+   */
+  async function shareQr(t: Table) {
+    setSharing(t.id);
+    try {
+      if (!(await Sharing.isAvailableAsync())) throw new Error("Bu qurilmada fayl ulashish mavjud emas.");
+      const src = qrSource(t.id);
+      const safe = t.name.replace(/[\\/:*?"<>|'\s]+/g, '-').replace(/^-+|-+$/g, '') || String(t.id);
+      const file = new File(Paths.cache, `qr-${safe}.png`);
+      if (file.exists) file.delete();
+      const saved = await File.downloadFileAsync(src.uri, file, { headers: src.headers });
+      await Sharing.shareAsync(saved.uri, { mimeType: 'image/png', dialogTitle: `${t.name} - QR kod`, UTI: 'public.png' });
+    } catch (e) {
+      // Xato ro'yxat tepasidagi matnda ko'rinmay qolishi mumkin (QR pastda), shuning uchun oyna.
+      Alert.alert('QR kod yuklanmadi', describeError(e));
+    } finally {
+      setSharing(null);
+    }
   }
 
   function confirmDeleteZone(z: TableZone) {
@@ -214,6 +239,12 @@ export default function FloorScreen() {
           {qrFor === t.id && (
             <View style={{ alignItems: 'center', gap: 6 }}>
               <Image source={qrSource(t.id)} style={{ width: 220, height: 220 }} contentFit="contain" />
+              <Button
+                title={sharing === t.id ? 'Tayyorlanmoqda…' : 'Yuklab olish / ulashish'}
+                compact
+                disabled={sharing !== null}
+                onPress={() => void shareQr(t)}
+              />
               <Muted>Mijoz skanerlasa shu stol menyusi ochiladi. Domen "Sozlamalar"da belgilanadi.</Muted>
             </View>
           )}

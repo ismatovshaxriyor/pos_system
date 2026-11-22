@@ -37,9 +37,21 @@ export interface ApiClient {
   absoluteUrl(pathOrUrl: string | null | undefined): string | null;
 }
 
+/** LAN nomlari: bularga sxemasiz yozilganda `http://` qo'yiladi. */
+const LAN_SUFFIX = /\.(local|lan|home|internal|localhost)$/i;
+
+/**
+ * Sxemasiz manzilga sxema qo'yadi. IP, `localhost`, `.local` yoki port ko'rsatilgan manzil (Bola LAN'da) -
+ * `http://`. Portsiz ochiq domen (masalan `rohat.hamrohpos.uz`, uydan Cloudflare tunnel orqali kirish) -
+ * `https://`: `http://` bilan Cloudflare 301 qaytaradi va POST (login) yo'naltirishda GET'ga aylanib buziladi.
+ */
 export function normalizeBaseUrl(input: string): string {
   let url = input.trim();
-  if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+  if (!/^https?:\/\//i.test(url)) {
+    const host = url.split('/')[0] ?? '';
+    const publicDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(host) && !LAN_SUFFIX.test(host);
+    url = `${publicDomain ? 'https' : 'http'}://${url}`;
+  }
   return url.replace(/\/+$/, '').replace(/\/api$/i, '');
 }
 

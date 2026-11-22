@@ -145,7 +145,7 @@ export default function SettingsScreen() {
         <>
           <FormCard title="Restoran">
             <Field label="Nomi" value={form.name} onChangeText={(name) => setForm({ ...form, name })} autoCapitalize="words" />
-            <ImageField label="Logotip (chekda chiqadi)" current={saved?.logo} picked={form.logo} onPick={(logo) => setForm({ ...form, logo })} />
+            <ImageField label="Logotip (chekda chiqadi)" current={saved?.logo} picked={form.logo} original onPick={(logo) => setForm({ ...form, logo })} />
             <Field label="Telefon (chek pastida)" value={form.phone} onChangeText={(phone) => setForm({ ...form, phone })} keyboardType="phone-pad" placeholder="90 123 45 67" />
             <Field
               label="QR domeni (mijozlar stol QR'ini skanerlaganda ochiladi)"

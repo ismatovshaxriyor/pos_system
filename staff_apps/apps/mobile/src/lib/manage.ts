@@ -1,4 +1,5 @@
 import { describeError, type ImageUpload } from '@pos/shared';
+import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
 
@@ -37,14 +38,22 @@ export function useManage() {
 }
 
 /** Galereyadan bitta rasm tanlaydi; bekor qilinsa `null`. Sifat 0.7 - chek/menyu uchun yetarli, yuklash tez. */
-export async function pickImage(): Promise<ImageUpload | null> {
+export async function pickImage({ original = false }: { original?: boolean } = {}): Promise<ImageUpload | null> {
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    allowsEditing: true,
-    quality: 0.7,
+    // `original` (logo): kesish oynasi yo'q, chunki keng logo (masalan 1280x374) qirqilib qolmasin.
+    // Qayta siqish ham yo'q: Android 0.7 da JPEG'ga o'tkazadi va PNG'ning shaffof foni qora bo'ladi.
+    allowsEditing: !original,
+    quality: original ? 1 : 0.7,
   });
   if (res.canceled || res.assets.length === 0) return null;
   const a = res.assets[0];
   const ext = (a.fileName?.split('.').pop() || a.uri.split('.').pop() || 'jpg').toLowerCase();
-  return { uri: a.uri, name: a.fileName || `rasm.${ext}`, type: a.mimeType || (ext === 'png' ? 'image/png' : 'image/jpeg') };
+  return {
+    uri: a.uri,
+    name: a.fileName || `rasm.${ext}`,
+    type: a.mimeType || (ext === 'png' ? 'image/png' : 'image/jpeg'),
+    // Usiz `expo/fetch` faylni jo'nata olmaydi, sababi `ImageUpload` izohida.
+    bytes: () => new File(a.uri).bytes(),
+  };
 }
