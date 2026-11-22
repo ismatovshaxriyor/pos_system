@@ -223,6 +223,7 @@ Bugungi savdoni **to'liq yopish/ochish** uchun - `Attendance` (xodimning shaxsiy
 - **Vazifasi:**
   - `is_open`ni `false`ga o'zgartiradi. Shu daqiqadan boshlab `POST /api/orders/` (yangi buyurtma yaratish) `400` bilan rad etiladi - "Kassa yopiq - yangi buyurtma qabul qilib bo'lmaydi." (oflayn-retry uchun ilgari yaratilgan buyurtmani qayta so'rash, ya'ni bir xil `sync_uuid` bilan qayta yuborish, bunga kirmaydi - u baribir muvaffaqiyatli qaytadi).
   - **Hozir ochiq (check-out qilinmagan) barcha xodimlarning davomatini avtomatik yopadi** - kim yopganidan qat'iy nazar, hammasi, o'zi ham.
+  - **Barcha kassirlarni (`role: "cashier"`) tizimdan chiqaradi** - ularning tokeni o'chiriladi, keyingi har qanday so'rov `401` qaytaradi. Menejer va ofitsiantlarning tokeniga tegilmaydi. Kassirning o'zi yopsa ham, javob (`200`) baribir keladi, tokeni undan keyin o'chadi.
   - Barcha ulangan mobil ilovalarga WebSocket orqali `register_closed` eventi yuboriladi.
   - Buyurtma yaratishdan tashqari boshqa hech narsa bloklanmaydi - kassa yopilishidan oldin ochiq qolgan stollarni yakunlash (to'lov qabul qilish, yopish) baribir mumkin.
 - **Javob (200 OK):**
@@ -247,15 +248,17 @@ Bugungi savdoni **to'liq yopish/ochish** uchun - `Attendance` (xodimning shaxsiy
 - **Vazifasi:** `is_open`ni `true`ga qaytaradi (yangi buyurtma qabul qilish yana ochiladi).
   - **Kassir** ochsa: barcha menejerlarga `Notification` (`notif_type: "register_opened_by_cashier"`) + WS orqali bildirishnoma boradi - bu nazorat talab qiladigan istisno holat hisoblanadi.
   - **Menejer/admin** ochsa: hech qanday bildirishnoma yuborilmaydi - bu kunlik oddiy oqim.
+  - Kassani ochgan kassir hamda shu paytda kassa terminalida tizimda turgan kassirlarning smenasi (davomati) avtomatik boshlanadi.
 - **Javob (200 OK):** Yuqoridagi kabi struktura, `is_open: true`, `checked_out_count` maydonisiz.
 - **Xato (400):** Kassa allaqachon ochiq bo'lsa - `{"detail": "Kassa allaqachon ochiq."}`
 
 ### 4. WebSocket Eventlari (`ws/events/`)
-- `register_closed`: `{"closed_by": <user_id yoki null>, "checked_out_count": <int>}`
+- `register_closed`: `{"closed_by": <user_id yoki null>, "checked_out_count": <int>, "logged_out_count": <tizimdan chiqarilgan kassirlar soni>}`
 - `register_opened`: `{"opened_by": <user_id yoki null>, "notified_managers": <bool>}`
 
 ### 5. Ilova Tomonidagi Kutilgan Xatti-Harakat (MUHIM)
 - **Kassa yopilganda:** Server barcha xodimlarning davomatini avtomatik yopadi. Ilova `register_closed` WS eventini olganda (yoki keyingi so'rovda `GET /api/attendance/` ro'yxatidagi o'zining eng so'nggi yozuvi endi `check_out != null` ekanini ko'rganda) foydalanuvchini **darhol Davomat (Check-in) ekraniga qaytarishi shart** - xuddi ilova birinchi marta ochilganda ko'rsatiladigan "ishga keldingizmi" tekshiruv ekrani kabi. Login/token o'zgarmaydi - faqat ekran holati.
+- **Kassir ilovasi:** kassir uchun GPS check-in yo'q. Kassa terminaliga PIN bilan kirish (`POST /api/auth/pin-login/`) yoki qurilmani ro'yxatdan o'tkazish (`POST /api/auth/device/register/`) kassa ochiq bo'lsa smenani avtomatik boshlaydi (koordinatasiz `Attendance`). Terminalga boshqa kassir PIN bilan kirsa, avvalgisining smenasi yopiladi. Kassa yopilganda kassir tokeni o'chadi: ilova `register_closed` kelganda bootstrap'ni qayta so'raydi, `401` oladi va PIN ekraniga qaytadi.
 - **Kassa ochilganda:** Xodim odatdagidek `POST /api/attendance/check-in/` orqali ishga kelganini tasdiqlaydi (koordinata + radius tekshiruvi bilan, mavjud oqim o'zgarmagan) va shundan so'ng POS ekranlariga o'tib ishlashni davom ettiradi.
 - **Ilova ishga tushganda (cold start):** `GET /api/bootstrap/` javobiga qo'shilgan yangi `register_open` (bool) maydonidan foydalanib, kassa holatini alohida so'rovsiz bilib olish mumkin.
 
