@@ -17,6 +17,7 @@ import { RESYNC_EVENT, type RealtimeStatus } from './realtime';
 import { recoverServer, ServerWatcher } from './recovery';
 import type { SessionState } from './session';
 import type { Bootstrap } from './types';
+import { isWaiterCallForUser, mergeWaiterCall, type CallWaiterData, type WaiterCall } from './waiterCall';
 
 export interface BootstrapCtx {
   data: Bootstrap | null;
@@ -69,6 +70,32 @@ export function createPosHooks(pos: Pos) {
         offs.forEach((off) => off());
       };
     }, [fn, delayMs, key]);
+  }
+
+  /**
+   * Mijoz chaqiruvlari navbati (`call_waiter`): faqat shu foydalanuvchiga tegishlilari
+   * (`isWaiterCallForUser`). `onNew` har yangi chaqiruvda - tebranish/ovoz uchun.
+   * Server chaqiruvlarni qayta yubormaydi: ilova yopiq/uzilgan paytdagisi kelmaydi.
+   */
+  function useWaiterCalls(onNew?: (call: CallWaiterData) => void): { calls: WaiterCall[]; dismiss: (tableId: number) => void } {
+    const userId = useSession().user?.id ?? null;
+    const [calls, setCalls] = useState<WaiterCall[]>([]);
+    const onNewRef = useRef(onNew);
+    onNewRef.current = onNew;
+
+    useEffect(() => {
+      setCalls([]);
+      if (userId === null) return;
+      return pos.realtime.on('call_waiter', (ev) => {
+        const data = ev.data as unknown as CallWaiterData;
+        if (typeof data?.table_id !== 'number' || !isWaiterCallForUser(data, userId)) return;
+        setCalls((prev) => mergeWaiterCall(prev, data));
+        onNewRef.current?.(data);
+      });
+    }, [userId]);
+
+    const dismiss = useCallback((tableId: number) => setCalls((prev) => prev.filter((c) => c.tableId !== tableId)), []);
+    return { calls, dismiss };
   }
 
   const Ctx = createContext<BootstrapCtx | null>(null);
@@ -154,7 +181,7 @@ export function createPosHooks(pos: Pos) {
     }, [hasServer]);
   }
 
-  return { useSession, useRealtimeStatus, useRealtimeRefresh, useServerRecovery, BootstrapProvider, useBootstrap };
+  return { useSession, useRealtimeStatus, useRealtimeRefresh, useWaiterCalls, useServerRecovery, BootstrapProvider, useBootstrap };
 }
 
 export type PosHooks = ReturnType<typeof createPosHooks>;

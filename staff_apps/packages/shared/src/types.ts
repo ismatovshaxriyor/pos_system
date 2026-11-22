@@ -278,6 +278,7 @@ export type KnownEventName =
   | 'print_job_updated'
   | 'register_closed'
   | 'register_opened'
+  | 'call_waiter' // payload: `CallWaiterData` (waiterCall.ts)
   // Model yozilganda server avtomatik yuboradi (local_server/core/realtime_signals.py).
   | 'menu_changed'
   | 'staff_changed'

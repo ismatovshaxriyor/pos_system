@@ -25,3 +25,4 @@ export * from './reports';
 export * from './xlsx';
 export * from './reportsExcel';
 export * from './orderList';
+export * from './waiterCall';

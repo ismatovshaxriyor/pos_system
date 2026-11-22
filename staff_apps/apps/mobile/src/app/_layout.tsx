@@ -13,6 +13,7 @@ import { pos } from '@/lib/pos';
 import { useAppUpdate } from '@/lib/update';
 import { FONT, ThemeProvider, useTheme } from '@/ui/theme';
 import { UpdateBanner, UpdateRequired } from '@/ui/update';
+import { WaiterCallAlert } from '@/ui/waitercall';
 
 // Saqlangan sessiya o'qilguncha splash ushlab turiladi (login ekrani "yaltillab" ketmasin).
 SplashScreen.preventAutoHideAsync();
@@ -103,6 +104,7 @@ function Shell() {
         </Stack.Protected>
       </Stack>
       {hasServer && update.optional && <UpdateBanner state={update} />}
+      {session.status === 'signed_in' && <WaiterCallAlert />}
     </>
   );
 }

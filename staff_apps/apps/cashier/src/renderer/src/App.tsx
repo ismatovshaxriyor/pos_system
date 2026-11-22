@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { WaiterCallAlert } from './components/WaiterCallAlert';
 import { findServerOnNetwork } from './lib/findServer';
 import { BootstrapProvider, useServerRecovery, useSession } from './lib/hooks';
 import { useAppUpdate } from './lib/update';
@@ -63,6 +64,7 @@ export function App() {
       <Shell banner={update.optional && <UpdateBanner serverUrl={session.serverUrl} state={update} />}>
         <HomeScreen />
       </Shell>
+      <WaiterCallAlert />
     </BootstrapProvider>
   );
 }
