@@ -263,13 +263,18 @@ h1 {
   padding: 48px;
   background: var(--panel);
   border-right: 1px solid var(--grid);
+  min-width: 0;
+  overflow: hidden;
+  /* cqw: yozuv o'lchami shu ustunning kengligiga qarab moslashadi (har qanday ekran/masshtab) */
+  container-type: inline-size;
 }
 
 .login-brand .brand {
   font-family: var(--font-disp);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 11.5rem;
+  /* "HAMROH" ≈ 3.8em kenglikda; 22cqw ustunga doim sig'adi, katta ekranda 11.5rem'dan oshmaydi */
+  font-size: min(11.5rem, 22cqw);
   line-height: 0.86;
 }
 
@@ -1924,3 +1929,35 @@ html[data-motion='reduced'] *::after {
 .no-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .no-total-sum { font-size: 1.75rem; font-weight: 600; }
 .no-confirm-items { max-height: 38vh; overflow-y: auto; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); padding: 8px 0; }
+
+/* Mijoz chaqiruvi (WaiterCallAlert): boshqa oynalar ustida turadi. */
+.overlay.call-alert {
+  z-index: 50;
+}
+
+.call-alert .sheet {
+  border: 2px solid var(--signal);
+}
+
+.call-alert-eyebrow {
+  color: var(--signal);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.call-alert-table {
+  font-family: var(--font-disp);
+  font-weight: 700;
+  font-size: 5rem;
+  line-height: 0.95;
+}
+
+.call-alert-reason {
+  font-size: 1.375rem;
+}
+
+.call-alert .btn {
+  margin-top: 12px;
+}
