@@ -42,6 +42,11 @@ WORKDIR /app
 
 # psycopg2-binary o'zining libpq'ini olib keladi - apt paketlari (libpq-dev
 # ~22 MB) va --no-cache-dir (pip keshi ~50 MB) kerak emas.
+# pg_dump - baza zaxirasini Telegram'ga yuborish uchun (core/tasks.py::send_db_backup).
+# Server postgres:15; Debian'ning yangiroq pg_dump'i eski serverni ham dump qila oladi.
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir --default-timeout=100 --retries 10 -r requirements.txt
 

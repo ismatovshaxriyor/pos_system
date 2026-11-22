@@ -316,6 +316,13 @@ CELERY_BEAT_SCHEDULE = {
     },
     # Jismoniy printer navbatida qolib ketgan pending cheklarni qayta yuborish /
     # juda eskirganini failed qilish (core/tasks.py::sweep_stale_print_jobs).
+    # Baza zaxirasi restoran Telegram botiga. Asosiy yo'l - kassa yopilishi (core/services.py::close_register);
+    # bu jadval faqat 20 soatdan beri zaxira ketmagan bo'lsa ishlaydi (core/tasks.py::send_db_backup).
+    'send-db-backup': {
+        'task': 'core.tasks.send_db_backup',
+        'schedule': 3 * 3600.0,
+        'options': {'expires': 3 * 3600 - 300},
+    },
     'sweep-stale-print-jobs': {
         'task': 'core.tasks.sweep_stale_print_jobs',
         'schedule': 120.0,

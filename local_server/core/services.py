@@ -478,6 +478,13 @@ def close_register(*, closed_by):
         'checked_out_count': checked_out,
         'logged_out_count': logged_out,
     })
+    # Kun yakuni - baza zaxirasini Telegram'ga yuborish uchun eng ishonchli payt: kompyuter shu
+    # paytda albatta yoniq (kechasi o'chirib qo'yilishi mumkin). Navbat ishlamasa ham kassa yopilaveradi.
+    try:
+        from .tasks import send_db_backup
+        send_db_backup.delay(force=True)
+    except Exception:
+        logger.warning("Kassa yopilganda zaxira navbatga qo'yilmadi", exc_info=True)
     return session, checked_out
 
 
@@ -1140,6 +1147,89 @@ def describe_network_error(exc):
     if code in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EHOSTDOWN):
         return "qurilmaga yo'l topilmadi. Tarmoq/Wi-Fi va IP manzilni tekshiring"
     return "ulanishda noma'lum xatolik yuz berdi"
+
+
+BACKUP_LAST_KEY = 'db_backup:last_sent'
+BACKUP_FRESH_FOR = timedelta(hours=20)
+TELEGRAM_FILE_LIMIT = 49 * 1024 * 1024  # Bot API sendDocument cheklovi 50 MB
+
+
+class BackupNetworkError(Exception):
+    """Telegram'ga yetib bo'lmadi (internet yo'q va h.k.) - keyingi urinishda qayta sinaladi."""
+
+
+def _redact(text, secret):
+    return str(text).replace(secret, '***') if secret else str(text)
+
+
+def send_db_backup_to_telegram():
+    """
+    Butun bazani `pg_dump -Fc` bilan olib, restoran egasining botiga (`RestaurantConfig`
+    `telegram_bot_token`/`telegram_chat_id`, qarz xabarlari bilan bir xil kanal) fayl qilib yuboradi.
+    Shifrlanmaydi - egasining o'z boti, shunday kelishilgan (Rohat, 2026-11-22).
+    Tiklash: `pg_restore --clean --if-exists -d <baza> <fayl>`.
+
+    Qaytaradi: 'sent' | 'not_configured' | 'too_large'. Tarmoq xatosi - `BackupNetworkError`.
+    Xato matnlarida bot tokeni yashiriladi: `requests` xatosi URL'ni (token bilan) o'z ichiga oladi,
+    ERROR loglar esa Ona'ga ketadi.
+    """
+    import os
+    import subprocess
+    import tempfile
+    from zoneinfo import ZoneInfo
+
+    import requests
+    from django.conf import settings
+    from .models import RestaurantConfig
+
+    config = RestaurantConfig.objects.first()
+    token = (config.telegram_bot_token if config else '') or ''
+    chat_id = (config.telegram_chat_id if config else '') or ''
+    if not token or not chat_id:
+        return 'not_configured'
+
+    db = settings.DATABASES['default']
+    now = timezone.now().astimezone(ZoneInfo('Asia/Tashkent'))
+    title = (config.name or 'Restoran').strip()
+    slug = re.sub(r'[^A-Za-z0-9]+', '-', title).strip('-').lower() or 'restoran'
+    filename = f"{slug}-{now:%Y-%m-%d-%H%M}.dump"
+
+    fd, path = tempfile.mkstemp(suffix='.dump')
+    os.close(fd)
+    try:
+        subprocess.run(
+            ['pg_dump', '-Fc', '-h', str(db['HOST']), '-p', str(db['PORT']), '-U', str(db['USER']),
+             '-f', path, str(db['NAME'])],
+            env={**os.environ, 'PGPASSWORD': str(db.get('PASSWORD') or '')},
+            check=True, capture_output=True, timeout=600,
+        )
+        size = os.path.getsize(path)
+        size_mb = size / (1024 * 1024)
+        if size > TELEGRAM_FILE_LIMIT:
+            send_telegram_notification(
+                f"⚠️ {title}: baza zaxirasi {size_mb:.0f} MB, Telegram cheklovidan (50 MB) katta - yuborilmadi. "
+                "Server kompyuteridagi kunlik zaxira saqlanib turibdi."
+            )
+            return 'too_large'
+        caption = f"🗄 {title} - baza zaxirasi\n{now:%d.%m.%Y %H:%M}, {size_mb:.1f} MB"
+        try:
+            with open(path, 'rb') as f:
+                res = requests.post(
+                    f"https://api.telegram.org/bot{token}/sendDocument",
+                    data={'chat_id': chat_id, 'caption': caption},
+                    files={'document': (filename, f, 'application/octet-stream')},
+                    timeout=180,
+                )
+        except requests.RequestException as e:
+            raise BackupNetworkError(_redact(e, token)) from None
+        if res.status_code != 200:
+            raise RuntimeError(f"Telegram sendDocument {res.status_code}: {_redact(res.text[:300], token)}")
+        return 'sent'
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
 def send_telegram_notification(text, parse_mode='HTML'):

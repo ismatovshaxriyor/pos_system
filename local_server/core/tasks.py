@@ -200,3 +200,34 @@ def send_telegram_notification_task(text, parse_mode='HTML'):
     orqali, lock bo'shagandan keyin ishga tushiriladi (`services._dispatch_telegram_alert`).
     """
     return services.send_telegram_notification(text, parse_mode=parse_mode)
+
+
+@shared_task
+def send_db_backup(force=False):
+    """
+    Baza zaxirasini restoran botiga yuboradi (`services.send_db_backup_to_telegram`).
+
+    Ikki yo'l bilan chaqiriladi: kassa yopilganda `force=True` (kun yakuni) va beat har 3 soatda -
+    oxirgi muvaffaqiyatli zaxiradan 20 soat o'tmagan bo'lsa hech narsa qilmaydi. Beat kassa yopilmay
+    qolgan yoki kompyuter yopilish paytida o'chiq bo'lgan kunlar uchun himoya.
+    """
+    if not force:
+        last = cache.get(services.BACKUP_LAST_KEY)
+        if last and timezone.now() - last < services.BACKUP_FRESH_FOR:
+            return 'fresh'
+    if not cache.add('db_backup:lock', 1, timeout=900):
+        return 'locked'
+    try:
+        result = services.send_db_backup_to_telegram()
+    except services.BackupNetworkError as e:
+        # Internetsiz restoranda har 3 soatda ERROR yozib, Ona'ga xato oqimini to'ldirmaslik uchun.
+        logger.warning("Baza zaxirasi Telegram'ga yuborilmadi (tarmoq): %s", e)
+        return 'network_error'
+    except Exception as e:
+        logger.error("Baza zaxirasini yuborishda xatolik: %s", e)
+        return 'error'
+    finally:
+        cache.delete('db_backup:lock')
+    if result == 'sent':
+        cache.set(services.BACKUP_LAST_KEY, timezone.now(), timeout=7 * 24 * 3600)
+    return result

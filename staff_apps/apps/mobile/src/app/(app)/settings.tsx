@@ -175,7 +175,7 @@ export default function SettingsScreen() {
           </FormCard>
 
           <FormCard title="Telegram ogohlantirishlari">
-            <Muted>Qarz (nasiya) harakatlari haqida xabar yuboriladi. Bot tokenini BotFather'dan oling.</Muted>
+            <Muted>Qarz (nasiya) harakatlari haqida xabar va har kuni kassa yopilganda baza zaxirasi (fayl) shu chatga yuboriladi. Bot tokenini BotFather'dan oling.</Muted>
             <Field label="Bot tokeni" value={form.botToken} onChangeText={(botToken) => setForm({ ...form, botToken })} secureTextEntry />
             <Field label="Chat ID (guruh yoki shaxsiy)" value={form.chatId} onChangeText={(chatId) => setForm({ ...form, chatId })} keyboardType="numbers-and-punctuation" />
             <Button title="Test xabar yuborish" variant="ghost" compact disabled={busy || !form.botToken || !form.chatId} onPress={() => void testTelegram()} />
