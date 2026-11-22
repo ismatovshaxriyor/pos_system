@@ -174,6 +174,7 @@ def redeem_registration_code(phone, code, device_id, pin, device_label=''):
         registration.save(update_fields=['used_at'])
         token, _ = Token.objects.get_or_create(user=user)
 
+    start_cashier_shift(user)
     return user, token
 
 
@@ -247,7 +248,8 @@ def verify_pin_login(device_id, pin):
         raise ServiceError("Qurilma yoki PIN noto'g'ri.")
 
     _clear_failures(device_id)
-    if device.user_id != matched_user.id:
+    previous_user = device.user if device.user_id != matched_user.id else None
+    if previous_user is not None:
         # Smena almashinuvi: shu kassa plansheti boshqa xodimga (matched_user)
         # o'tmoqda. Agar matched_user allaqachon BOSHQA faol+tasdiqlangan
         # qurilmaga ega bo'lsa (masalan bir necha kassa terminali bo'lgan
@@ -263,6 +265,10 @@ def verify_pin_login(device_id, pin):
         device.last_login_at = timezone.now()
         device.save(update_fields=['last_login_at', 'updated_at'])
     token, _ = Token.objects.get_or_create(user=matched_user)
+    # Terminal boshqa kassirga o'tdi: avvalgisining yagona qurilmasi endi uniki emas
+    # (keyingi so'rovi 401) - ya'ni u tizimdan chiqdi, smenasi ham shu yerda tugaydi.
+    end_cashier_shift(previous_user)
+    start_cashier_shift(matched_user)
     return matched_user, token
 
 
@@ -368,6 +374,64 @@ def check_out_employee(user, latitude, longitude):
 
 
 # ==============================================================================
+# KASSIR SMENASI: kassa terminalida tizimda bo'lish = smenada
+# ==============================================================================
+
+def _is_terminal_cashier(user):
+    """PIN bilan kassa terminalida ishlaydigan oddiy kassir (oshxona ekranining xizmat hisobi emas)."""
+    from .authentication import KITCHEN_SERVICE_USERNAME
+
+    return (
+        user is not None and user.role == 'cashier' and not user.is_staff
+        and user.username != KITCHEN_SERVICE_USERNAME
+    )
+
+
+def _terminal_cashiers():
+    from .authentication import KITCHEN_SERVICE_USERNAME
+
+    return User.objects.filter(role='cashier', is_staff=False).exclude(username=KITCHEN_SERVICE_USERNAME)
+
+
+def start_cashier_shift(user):
+    """
+    Kassirning smenasini avtomatik boshlaydi: PIN login, qurilmani ro'yxatdan
+    o'tkazish va kassani ochishda chaqiriladi. Kassa kompyuteri restoranning
+    o'zida turadi - kassirning unga kirgani ish joyida ekanini bildiradi, GPS
+    so'ralmaydi (koordinatalar bo'sh qoladi). Kassa yopiq bo'lsa smena
+    boshlanmaydi: yopilgandan keyin hisobot ko'rish uchun kirish ertangi
+    yopilishgacha soat yig'ib qo'ymasin - smena kassa ochilganda
+    (`open_register`) boshlanadi. Ochiq smena bo'lsa hech narsa qilmaydi.
+    """
+    from .models import Attendance, RegisterSession
+
+    if not _is_terminal_cashier(user):
+        return None
+    if RegisterSession.objects.filter(pk=1, is_open=False).exists():  # qator yo'q = ochiq
+        return None
+    with transaction.atomic():
+        # Bir vaqtdagi ikki login ikkita ochiq smena yaratib qo'ymasin.
+        User.objects.select_for_update().filter(pk=user.pk).first()
+        if Attendance.objects.filter(user=user, check_out__isnull=True).exists():
+            return None
+        return Attendance.objects.create(user=user)
+
+
+def end_cashier_shift(user):
+    """Kassirning ochiq smenasini yopadi (terminal boshqa kassirga o'tganda)."""
+    from .models import Attendance
+
+    if not _is_terminal_cashier(user):
+        return 0
+    closed = 0
+    for attendance in Attendance.objects.filter(user=user, check_out__isnull=True):
+        attendance.check_out = timezone.now()
+        attendance.save(update_fields=['check_out', 'updated_at'])
+        closed += 1
+    return closed
+
+
+# ==============================================================================
 # KASSA SESSIYASI (Register open/close)
 # ==============================================================================
 
@@ -380,6 +444,12 @@ def close_register(*, closed_by):
     (check-in) ekraniga qaytadi. Bulk `.update()` emas, har birini `.save()`
     bilan yopamiz - aks holda `django-simple-history` signal orqali ishlagani
     uchun avtomatik check-out audit izsiz qolib ketardi.
+
+    Kassirlar (`_terminal_cashiers`) shu bilan tizimdan ham chiqariladi: Token'i
+    o'chiriladi, kassa ilovasi `register_closed` kelganda bootstrap'ni qayta
+    so'raydi, 401 oladi va PIN ekraniga qaytadi. Ertasi kuni PIN bilan qayta
+    kirish smenani yangidan boshlaydi (`start_cashier_shift`). Menejer va
+    ofitsiantlarning sessiyasiga tegilmaydi.
     """
     from .models import Attendance, RegisterSession
     from .realtime import broadcast_event
@@ -396,6 +466,8 @@ def close_register(*, closed_by):
             attendance.save(update_fields=['check_out', 'updated_at'])
             checked_out += 1
 
+        logged_out = Token.objects.filter(user__in=_terminal_cashiers()).delete()[0]
+
         session.is_open = False
         session.closed_at = now
         session.closed_by = closed_by
@@ -404,6 +476,7 @@ def close_register(*, closed_by):
     broadcast_event('register_closed', {
         'closed_by': closed_by.id if closed_by else None,
         'checked_out_count': checked_out,
+        'logged_out_count': logged_out,
     })
     return session, checked_out
 
@@ -427,6 +500,15 @@ def open_register(*, opened_by):
         session.opened_at = timezone.now()
         session.opened_by = opened_by
         session.save(update_fields=['is_open', 'opened_at', 'opened_by', 'updated_at'])
+
+    # Kassani ochgan kassir hamda kassa yopiq paytida terminalga kirib turgan
+    # kassirlar (Token + faol qurilma) smenaga o'tadi.
+    start_cashier_shift(opened_by)
+    for cashier in _terminal_cashiers().filter(
+        is_active=True, auth_token__isnull=False,
+        devices__is_active=True, devices__is_approved=True,
+    ).distinct():
+        start_cashier_shift(cashier)
 
     notified = bool(opened_by and opened_by.role == 'cashier')
     if notified:
