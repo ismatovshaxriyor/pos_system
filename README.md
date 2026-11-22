@@ -333,6 +333,34 @@ Ko'p takrorlanadigan buyurtma ("Osh + salat + choy") — menejer yaratadi, ofits
 
 ---
 
+## Ombor: ingredientni menyudagi taomga ulash
+
+`POST /api/ingredients/` (kassir/menejer) endi ixtiyoriy `product_id` qabul qiladi (o'chirilmagan taom id'si). Server ingredient bilan birga `1 taom = 1 birlik` retsept qatorini (`ProductIngredient`, `quantity: 1`) shu tranzaksiyada yaratadi: taom sotilganda (oshxonaga yuborilganda) zaxira o'zi kamayadi. Bu to'g'ridan-to'g'ri sotiladigan narsalar uchun: ichimlik, non, gazak. `PATCH` da yuborilsa ham ulaydi (bor bo'lsa takror yaratmaydi). O'chirilgan yoki mavjud bo'lmagan taom bo'lsa `400`.
+
+```json
+POST /api/ingredients/
+{ "name": "Coca-Cola 0.5", "unit": "dona", "min_stock": "6", "product_id": 42 }
+```
+
+Javobda (ro'yxatda ham) yangi faqat-o'qish maydoni bor: `linked_products: [{ "id": 42, "name": "Coca-Cola 0.5" }]`. Bu retseptida shu ingredient ishlatilgan barcha o'chirilmagan taomlar. Eski server bu maydonni yubormaydi, uni ixtiyoriy deb o'qing.
+
+Mobil ilovadagi "Yangi ingredient" formasi: nom menyudan tanlanadi. Unda faqat retsepti hali yo'q taomlar chiqadi, birlik `dona` bo'lib qoladi. "Boshqa" bosilsa nom qo'lda yoziladi.
+
+## Mijoz chaqiruvi (`call_waiter` WebSocket eventi)
+
+Mijoz QR saytida "Ofitsiantni chaqirish"ni bossa (`POST /api/public/table/<qr>/call-waiter/`), server `ws/events/` orqali yuboradi:
+
+```json
+{ "event": "call_waiter",
+  "data": { "notification_id": 17, "table_id": 11, "table_name": "11", "reason": "Ofitsiant chaqiruvi",
+            "message": "11 stolidan chaqiruv: Ofitsiant chaqiruvi", "created_at": "2026-11-22T10:31:00+00:00",
+            "waiter_id": 5 } }
+```
+
+- `waiter_id`: stolda ochiq (`new`/`in_progress`) buyurtma bo'lsa, o'sha buyurtmaning ofitsianti. Ilova faqat o'sha xodimga ko'rsatadi. `null` bo'lsa hamma xodimga ko'rsatiladi: ofitsiantlar, kassa, menejer. Eski server bu maydonni yubormaydi; bu holat `null` deb hisoblanadi.
+- Ilovalar (`@pos/shared::useWaiterCalls`) ochiq turgan paytda katta oyna chiqaradi: ofitsiantda tebranish bilan, kassada ovoz bilan. Oyna "Ko'rdim" bosilguncha turadi. Bir stoldan takror kelgan chaqiruv yangi oyna ochmaydi, "N marta" deb birlashtiriladi.
+- `/api/public/*` limiti: bitta tashqi IP'dan **120 ta/daqiqa** (`CF-Connecting-IP` bo'yicha, `429`).
+
 ## Xavfsizlik bo'yicha o'zgarishlar (mobil/kassir ilovalariga ta'siri)
 
 ### WebSocket ulanishi (bir martalik bilet)
