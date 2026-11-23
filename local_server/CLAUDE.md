@@ -40,3 +40,5 @@ First-time licensing setup (generating/placing the RSA keypair) is a one-time on
 
 ### Rebuilding the Android staff app after a JS/TS change
 `staff_apps/apps/mobile/scripts/rebuild-install.sh` wraps the local release-APK workflow (rsync to a space-free build path since ndk-build breaks on paths with spaces, `gradlew assembleRelease`, `adb install -r`, falling back to `pm install-existing --user 0` for devices — some Xiaomi/MIUI ones observed — that install successfully but not onto the active user profile, then launching the app). Pass `--full` to re-run `expo prebuild --clean` first (needed when native config, e.g. an `app.json` plugin, changed — not needed for plain JS/TS edits).
+
+These local builds are debug-signed. Android rejects them over a CI-signed install (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) unless the `POS_ANDROID_KEYSTORE`, `POS_ANDROID_KEYSTORE_PASSWORD` and `POS_ANDROID_KEY_ALIAS` env vars are exported. Releases are built by CI, not this script; see "Building and publishing staff apps" in the repo-root `CLAUDE.md`.

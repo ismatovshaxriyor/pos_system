@@ -41,6 +41,11 @@
       "package.json"
     ],
     "artifactName": "HamrohPOS-Kassir-Setup-${version}.${ext}",
+    "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "ru"
+    ],
     "win": {
       "target": [
         {

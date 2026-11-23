@@ -1,0 +1,235 @@
+name: Release staff apps (APK + Kassir EXE)
+
+# Xodim ilovalarini GitHub'da yig'adi va Ona'ga e'lon qiladi. Bolalar yangi versiyani keyingi heartbeat'da
+# oladi va LAN'dagi qurilmalarga tarqatadi (repo-root CLAUDE.md, "Staff-app delivery").
+#
+# Ishga tushirish: GitHub -> Actions -> "Release staff apps" -> Run workflow, yoki
+#   gh workflow run release-staff-apps.yml -f apps=both -f notes="Birinchi qator|Ikkinchi qator"
+# Versiya repodagi fayldan olinadi, avval uni oshirib commit qiling:
+#   mobil: staff_apps/apps/mobile/app.json (expo.version) + package.json
+#   kassa: staff_apps/apps/cashier/package.json (version)
+# Ona'da shu versiya shu fayl bilan turgan bo'lsa, publish hech narsa qilmaydi: qayta ishga tushirish xavfsiz.
+#
+# Kerakli secret'lar:
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD  - APK imzo kaliti (PKCS12, alias "hamrohpos").
+#                     Kalit o'zgarsa, o'rnatilgan ilovalar yangilanmaydi: faylni va parolni yo'qotmang.
+#   EC2_HOST, EC2_USER, SSH_PRIVATE_KEY                 - Ona serveri (deploy-cloud-server.yml bilan bir xil)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "Qaysi ilova"
+        type: choice
+        options: [both, mobile, cashier]
+        default: both
+      publish:
+        description: "Ona'ga e'lon qilinsin (o'chirilsa faqat yig'iladi, fayl Artifacts'da qoladi)"
+        type: boolean
+        default: true
+      required:
+        description: "Majburiy yangilanish (ilovalar yangilanmaguncha ishlamaydi)"
+        type: boolean
+        default: false
+      notes:
+        description: "O'zgarishlar ro'yxati, qatorlar | bilan ajratiladi"
+        type: string
+        default: ""
+
+concurrency:
+  group: release-staff-apps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "26"
+
+jobs:
+  mobile:
+    if: inputs.apps != 'cashier'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: staff_apps
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD secret'lari qo'shilmagan"
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: staff_apps/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Typecheck and tests
+        run: |
+          npm run typecheck --workspace @pos/mobile --workspace @pos/shared --workspace @pos/design
+          npm test --workspace @pos/shared --workspace @pos/design
+
+      - name: Prebuild
+        working-directory: staff_apps/apps/mobile
+        run: npx expo prebuild --platform android --clean --no-install
+
+      # armeabi-v7a: arzon planshet va telefonlarning bir qismi hali 32-bit, ularda ham o'rnatilsin.
+      - name: Build APK
+        working-directory: staff_apps/apps/mobile/android
+        env:
+          POS_ANDROID_KEYSTORE: ${{ runner.temp }}/release.p12
+          POS_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          POS_ANDROID_KEY_ALIAS: hamrohpos
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a --no-daemon
+
+      - name: Verify signature
+        run: |
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --print-certs "$APK" | tee "$RUNNER_TEMP/certs.txt"
+          if grep -q "Android Debug" "$RUNNER_TEMP/certs.txt"; then
+            echo "::error::APK debug kalit bilan imzolangan - e'lon qilinmaydi"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$APK" "dist/HamrohPOS-Xodim-$VERSION.apk"
+          echo "$VERSION" > dist/mobile.version
+          {
+            echo "### Mobil ilova $VERSION"
+            echo "- Hajmi: $(du -h "dist/HamrohPOS-Xodim-$VERSION.apk" | cut -f1)"
+            echo "- Sertifikat SHA-256: \`$(grep -m1 'SHA-256' "$RUNNER_TEMP/certs.txt" | awk '{print $NF}')\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile
+          path: staff_apps/dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  cashier:
+    if: inputs.apps != 'mobile'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: staff_apps
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: staff_apps/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @pos/cashier
+
+      # Windows'da rcedit ishlaydi: exe'ga ikonka va versiya ma'lumoti yoziladi (Mac'da wine kerak edi,
+      # shuning uchun package.json'da o'chiq turadi).
+      - name: Build installer
+        working-directory: staff_apps/apps/cashier
+        run: |
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.build.win.signAndEditExecutable=true;fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+          npx electron-vite build
+          npx electron-builder --win --x64 --publish never
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p ../../dist
+          cp "release/HamrohPOS-Kassir-Setup-$VERSION.exe" ../../dist/
+          echo "$VERSION" > ../../dist/cashier.version
+          {
+            echo "### Kassa ilovasi $VERSION"
+            echo "- Hajmi: $(du -h "release/HamrohPOS-Kassir-Setup-$VERSION.exe" | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cashier
+          path: staff_apps/dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [mobile, cashier]
+    # Bitta ilova tanlansa ikkinchi job "skipped" bo'ladi - bu xato emas.
+    if: ${{ !cancelled() && inputs.publish && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ona
+          chmod 600 ~/.ssh/id_ona
+          ssh-keyscan -T 15 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Publish to Ona
+        env:
+          HOST: ${{ secrets.EC2_HOST }}
+          USER_NAME: ${{ secrets.EC2_USER }}
+          REQUIRED: ${{ inputs.required }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          # Ona repo papkasi deploy-cloud-server.yml dagi bilan bir xil tartibda qidiriladi.
+          FIND_DIR='for d in /opt/pos_system "$HOME/pos_system" "$HOME" /root/pos_system /var/www/pos_system; do if [ -d "$d/cloud_server" ]; then cd "$d/cloud_server"; break; fi; done; [ -f docker-compose.prod.yml ] || { echo "cloud_server topilmadi" >&2; exit 1; }'
+          EXTRA=()
+          [ "$REQUIRED" = "true" ] && EXTRA+=(--required)
+          # Bo'sh joylar va bo'sh qatorlarni buyruqning o'zi tozalaydi.
+          IFS='|' read -ra LINES <<< "$NOTES"
+          for line in "${LINES[@]}"; do EXTRA+=(--note "$line"); done
+
+          publish() {  # fayl platforma versiya slug...
+            local file=$1 platform=$2 version=$3; shift 3
+            local sha args=()
+            sha=$(sha256sum "$file" | cut -d' ' -f1)
+            for slug in "$@"; do args+=(--slug "$slug"); done
+            args+=(--platform "$platform" --app-version "$version" --filename "$(basename "$file")" --sha256 "$sha")
+            args+=("${EXTRA[@]}")
+            echo "==> $(basename "$file") ($sha)"
+            ssh -i ~/.ssh/id_ona -o BatchMode=yes -o ServerAliveInterval=30 "$USER_NAME@$HOST" \
+              "$FIND_DIR; docker compose -f docker-compose.prod.yml exec -T web python manage.py publish_mobile_app $(printf '%q ' "${args[@]}")" \
+              < "$file" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+
+          # Bitta Expo ilova menejer ham, ofitsiant ham: ikkala qator bir faylni ko'rsatadi.
+          if [ -f dist/mobile.version ]; then
+            V=$(cat dist/mobile.version)
+            publish "dist/HamrohPOS-Xodim-$V.apk" android "$V" ofitsiant manager
+          fi
+          if [ -f dist/cashier.version ]; then
+            V=$(cat dist/cashier.version)
+            publish "dist/HamrohPOS-Kassir-Setup-$V.exe" windows "$V" kassir
+          fi

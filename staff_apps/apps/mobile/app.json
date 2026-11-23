@@ -66,7 +66,8 @@
           "locationWhenInUsePermission": "Restoran joylashuvini belgilash va davomat uchun joylashuv kerak."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "./plugins/withReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true,
