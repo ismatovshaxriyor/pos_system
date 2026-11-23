@@ -18,6 +18,8 @@
   IfSilent languard_skip
   ReadEnvStr $R0 "ProgramData"
   IfFileExists "$R0\PosGuard\lan_guard.ps1" languard_skip
+  ; Bola server kompyuteri: uning o'z qo'riqchisi bor (advertise_mdns_windows.ps1), behuda UAC so'ralmaydi.
+  IfFileExists "$R0\PosBola\*.*" languard_skip
   ExecShellWait "runas" "powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\lan_guard_client_windows.ps1" -Install' SW_HIDE
   languard_skip:
 !macroend

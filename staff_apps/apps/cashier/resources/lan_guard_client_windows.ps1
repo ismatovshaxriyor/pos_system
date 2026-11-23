@@ -142,7 +142,7 @@ function Invoke-Step {
         if ($p.Fails -ge 3) { Remove-Pin $ip; Write-Log "$ip ($($p.Kind)) javob bermayapti - qotirish olindi" }
     }
 
-    # 2) Router va server yozuvlarida kuchaytirgich MAC'i yo'qmi. Muvaffaqiyatsiz urinish 2 daqiqada bir.
+    # 2) Router va server yozuvlarida kuchaytirgich MAC'i yo'qmi.
     #    Bir marta ko'rilgan server shu tarmoqda eslab qolinadi (ilova yopiq paytda ham kuzatiladi).
     foreach ($ip in @($Watch) + @(Get-ServerCandidates)) {
         if ($ip -and $ip -ne $gw -and -not $g.Servers.ContainsKey($ip)) {
@@ -157,12 +157,19 @@ function Invoke-Step {
         if ($g.Pins.ContainsKey($ip)) { continue }
         $mac = Get-NeighborMac $idx $ip
         if (-not $mac -or -not (Test-LocalMac $mac)) { continue }
-        if ($g.Tried.ContainsKey($ip) -and ($now - $g.Tried[$ip]).TotalMinutes -lt 2) { continue }
-        $g.Tried[$ip] = $now
+        if ($g.Tried.ContainsKey($ip) -and $now -lt $g.Tried[$ip].Next) { continue }
         $real = Find-RealMac $idx $ip
         if ($real) {
+            $g.Tried.Remove($ip)
             Set-Pin $ip $real $t.Kind
             Write-Log "$($t.Kind) $ip nomidan $mac javob berayotgan edi (kuchaytirgich?) - haqiqiy MAC $real qotirildi"
+        } else {
+            # Qurilmaning haqiqiy MAC'i ham lokal bo'lishi mumkin (mesh tizim, telefon hotspot, tasodifiy MAC'li
+            # Wi-Fi). Bunday tarmoqda ARP yozuvini tez-tez o'chirmaslik uchun kutish 2 -> 4 -> 8 -> 10 daqiqa.
+            $wait = 2
+            if ($g.Tried.ContainsKey($ip)) { $wait = [Math]::Min($g.Tried[$ip].Wait * 2, 10) }
+            else { Write-Log "$($t.Kind) $ip MAC'i $mac lokal, boshqasi topilmadi - qurilma o'zi shunday bo'lishi mumkin, tegilmaydi" }
+            $g.Tried[$ip] = @{ Next = $now.AddMinutes($wait); Wait = $wait }
         }
     }
 

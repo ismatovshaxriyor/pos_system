@@ -288,7 +288,7 @@ function Invoke-LanGuard($lan) {
     $g = $script:Guard
     if (-not $g -or $g.Idx -ne $lan.Index -or $g.Gw -ne $gw) {
         if ($g) { foreach ($ip in @($g.Pins.Keys)) { Remove-Pin $ip } }
-        $script:Guard = @{ Idx = $lan.Index; Gw = $gw; Pins = @{}; Bad = $null; Checked = @{}; Announce = [datetime]::MinValue; Warned = $null }
+        $script:Guard = @{ Idx = $lan.Index; Gw = $gw; Pins = @{}; Bad = $null; Checked = @{}; Announce = [datetime]::MinValue; Warned = $null; GwNext = [datetime]::MinValue; GwWait = 0 }
         $g = $script:Guard
         # Kuchaytirgich ARP tekshiruv so'rovlariga ham javob beradi -> Windows har bir DHCP manzilni
         # "band" deb rad etib, IP'ni almashtirib turadi (hodisa 4199). Tekshiruvni o'chiramiz.
@@ -312,15 +312,22 @@ function Invoke-LanGuard($lan) {
     # 2) Shlyuz (router) MAC'i soxta emasmi.
     if (-not $g.Pins.ContainsKey($gw)) {
         $mac = Get-NeighborMac $idx $gw
-        if ($mac -and (Test-LocalMac $mac)) {
+        if ($mac -and (Test-LocalMac $mac) -and ((Get-Date) -ge $g.GwNext)) {
             $real = Find-RealMac $idx $gw
             if ($real) {
+                $g.GwWait = 0
                 $g.Bad = $mac
                 Set-Pin $idx $gw $real 'router'
                 Write-Log "LAN qo'riqchi: router ($gw) nomidan $mac javob beryapti (kuchaytirgich?) - haqiqiy MAC $real qotirildi."
-            } elseif ($g.Warned -ne $mac) {
-                $g.Warned = $mac
-                Write-Log "LAN qo'riqchi: router MAC'i $mac lokal, lekin boshqasi topilmadi - router o'zi shunday (masalan telefon hotspot), tegilmaydi."
+            } else {
+                # Router o'zi lokal MAC'li bo'lishi mumkin (telefon hotspot, ba'zi mesh/4G routerlar). Har 15 s
+                # uning ARP yozuvini o'chirib turmaslik uchun keyingi urinish 2 -> 4 -> 8 -> 10 daqiqadan keyin.
+                $g.GwWait = [Math]::Max(2, [Math]::Min($g.GwWait * 2, 10))
+                $g.GwNext = (Get-Date).AddMinutes($g.GwWait)
+                if ($g.Warned -ne $mac) {
+                    $g.Warned = $mac
+                    Write-Log "LAN qo'riqchi: router MAC'i $mac lokal, lekin boshqasi topilmadi - router o'zi shunday (masalan telefon hotspot), tegilmaydi."
+                }
             }
         }
     }
