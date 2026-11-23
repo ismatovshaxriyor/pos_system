@@ -41,7 +41,10 @@ services:
 
   web:
     build: .
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8001 --workers 2
+    # gthread: /media/ dagi ~100 MB ilova o'rnatuvchisini sekin internetli Bola uzoq yuklaydi. sync worker'da
+    # bitta javob 30 s (timeout) dan oshsa gunicorn worker'ni o'ldiradi va yuklash uziladi; gthread'da timeout
+    # faqat worker tirikligini o'lchaydi. 2x4 oqim = Postgres'ga eng ko'pi 8 ta doimiy ulanish (CONN_MAX_AGE).
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8001 --workers 2 --worker-class gthread --threads 4
     env_file: .env
     environment:
       - RUN_MIGRATIONS=1

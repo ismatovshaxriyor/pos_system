@@ -470,3 +470,118 @@ class AdminPhoneNormalizationTests(TestCase):
         acc = RestaurantAdminAccount.objects.create(restaurant=r, phone='901234567')
         acc.refresh_from_db()
         self.assertEqual(acc.phone, '+998901234567')
+
+
+class PublishMobileAppCommandTests(TestCase):
+    """`publish_mobile_app`: CI yig'gan ilovani SSH/stdin orqali e'lon qilish (release-staff-apps.yml)."""
+
+    def setUp(self):
+        import hashlib
+        import shutil
+        import tempfile
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, ignore_errors=True)
+        override = override_settings(MEDIA_ROOT=self.media)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.hashlib = hashlib
+
+    def _file(self, content):
+        import tempfile
+        f = tempfile.NamedTemporaryFile(delete=False, dir=self.media, suffix='.bin')
+        f.write(content)
+        f.close()
+        return f.name, self.hashlib.sha256(content).hexdigest()
+
+    def _publish(self, content, version, slugs=('ofitsiant', 'manager'), platform='android', ext='apk', **extra):
+        from io import StringIO
+        from django.core.management import call_command
+        path, sha = self._file(content)
+        args = []
+        for s in slugs:
+            args += ['--slug', s]
+        args += ['--platform', platform, '--app-version', version, '--filename', f'App-{version}.{ext}',
+                 '--sha256', extra.pop('sha256', sha), '--file', path]
+        for flag, value in extra.items():
+            args += [f'--{flag}'] if value is True else [f'--{flag}', value]
+        out = StringIO()
+        call_command('publish_mobile_app', *args, stdout=out)
+        return out.getvalue()
+
+    def _apps(self):
+        from .models import MobileApp
+        return {a.slug: a for a in MobileApp.objects.filter(platform='android')}
+
+    def _media_files(self):
+        import os
+        d = os.path.join(self.media, 'mobile_apps')
+        return sorted(n for n in os.listdir(d) if not n.startswith('.')) if os.path.isdir(d) else []
+
+    def test_creates_rows_for_every_slug_with_one_shared_file(self):
+        self._publish(b'apk-1', '1.2.4', note='Yangi hisobot', required=True)
+        apps = self._apps()
+        self.assertEqual(set(apps), {'ofitsiant', 'manager'})
+        for a in apps.values():
+            self.assertEqual(a.version, '1.2.4')
+            self.assertEqual(a.sha256, self.hashlib.sha256(b'apk-1').hexdigest())
+            self.assertEqual(a.apk_file.name, 'mobile_apps/App-1.2.4.apk')
+            self.assertTrue(a.is_required)
+            self.assertEqual(a.notes, ['Yangi hisobot'])
+        self.assertEqual(self._media_files(), ['App-1.2.4.apk'])
+
+    def test_new_version_replaces_and_deletes_old_file(self):
+        self._publish(b'apk-1', '1.2.4')
+        self._publish(b'apk-2', '1.2.5')
+        apps = self._apps()
+        self.assertEqual({a.version for a in apps.values()}, {'1.2.5'})
+        self.assertFalse(any(a.is_required for a in apps.values()))
+        self.assertEqual(self._media_files(), ['App-1.2.5.apk'])
+
+    def test_old_file_kept_while_another_row_still_uses_it(self):
+        self._publish(b'apk-1', '1.2.4')
+        self._publish(b'apk-2', '1.2.5', slugs=('manager',))
+        self.assertEqual(self._apps()['ofitsiant'].version, '1.2.4')
+        self.assertEqual(self._media_files(), ['App-1.2.4.apk', 'App-1.2.5.apk'])
+
+    def test_sha256_mismatch_rejected_and_nothing_left_behind(self):
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, 'sha256'):
+            self._publish(b'truncated', '1.2.4', sha256='0' * 64)
+        self.assertEqual(self._apps(), {})
+        self.assertEqual(self._media_files(), [])
+
+    def test_same_version_same_file_is_a_noop(self):
+        self._publish(b'apk-1', '1.2.4')
+        out = self._publish(b'apk-1', '1.2.4')
+        self.assertIn('allaqachon', out)
+        self.assertEqual(self._media_files(), ['App-1.2.4.apk'])
+
+    def test_same_version_different_file_needs_force(self):
+        from django.core.management.base import CommandError
+        self._publish(b'apk-1', '1.2.4')
+        with self.assertRaisesMessage(CommandError, 'Versiyani oshiring'):
+            self._publish(b'apk-other', '1.2.4')
+        self._publish(b'apk-other', '1.2.4', force=True)
+        self.assertEqual(self._apps()['manager'].sha256, self.hashlib.sha256(b'apk-other').hexdigest())
+
+    def test_downgrade_needs_force(self):
+        from django.core.management.base import CommandError
+        self._publish(b'apk-2', '1.10.0')
+        with self.assertRaisesMessage(CommandError, 'yangiroq versiya'):
+            self._publish(b'apk-1', '1.9.9')
+        self.assertEqual(self._apps()['manager'].version, '1.10.0')
+
+    def test_wrong_extension_rejected(self):
+        from django.core.management.base import CommandError
+        with self.assertRaisesMessage(CommandError, 'kengaytmasi'):
+            self._publish(b'x', '0.2.7', slugs=('kassir',), platform='windows', ext='apk')
+
+    def test_published_release_reaches_heartbeat_payload(self):
+        from django.test import RequestFactory
+        from sync.views import _app_releases
+        self._publish(b'exe-1', '0.2.7', slugs=('kassir',), platform='windows', ext='exe')
+        items = _app_releases(RequestFactory().get('/'))
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['slug'], 'kassir')
+        self.assertEqual(items[0]['sha256'], self.hashlib.sha256(b'exe-1').hexdigest())
+        self.assertTrue(items[0]['download_url'].endswith('/media/mobile_apps/App-0.2.7.exe'))
