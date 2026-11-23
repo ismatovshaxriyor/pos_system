@@ -48,6 +48,14 @@ The same loop runs a **LAN guard**, written for a failure seen at Rohat. A TP-Li
 
 On a healthy network it pins nothing. Verified live at Rohat (2026-11-22): router pinned, HTTPS and heartbeats recovered. The real fix is still on the network side: remove the extender, or use an access point with a cable. Servers and printers must never sit behind a repeater.
 
+Client PCs need the same treatment. On 2026-11-22 the Rohat cashier laptop (Wi-Fi) hit exactly this: it was stuck on `169.254` with "IP address already in use", and it got to the Bola only once DAD was turned off. `staff_apps/apps/cashier/resources/lan_guard_client_windows.ps1` is the client version of the guard. It runs as a SYSTEM task "POS LAN guard" and:
+- sets `DadTransmits 0`;
+- pins the router and the server it talks to. The server address is learned from the TCP connections the cashier opens to port 8000 (`Established` or `SynSent`).
+- drops its pins when the network changes, so a laptop that moves between networks cleans up after itself;
+- refuses to install or run on a machine that has the Bola's own "POS Bola mDNS" task.
+
+The cashier installer offers it through `customInstall` in `build/installer.nsh`, with its own UAC prompt. This is skipped on `/S` silent updates and when the guard is already installed. Refusing the prompt does not stop the app from installing.
+
 ## Architecture
 
 ### `local_server/core` — POS domain, kitchen printing, attendance, staff auth, WebSocket events

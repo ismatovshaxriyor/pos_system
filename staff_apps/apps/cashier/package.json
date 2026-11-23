@@ -56,6 +56,12 @@
       "oneClick": true,
       "perMachine": false,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "extraResources": [
+      {
+        "from": "resources/lan_guard_client_windows.ps1",
+        "to": "lan_guard_client_windows.ps1"
+      }
+    ]
   }
 }
