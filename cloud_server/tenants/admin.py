@@ -5,6 +5,7 @@ from datetime import timedelta
 import qrcode
 from django import forms
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
@@ -12,7 +13,7 @@ from .models import (
     Restaurant, License, RestaurantStatus, RemoteCommand, RestaurantAdminAccount, ErrorLog,
     SyncedOrder, SyncedOrderItem, SyncedPayment, DemoRequest, MobileApp, PricingPlan, PricingFeature,
 )
-from .signals import compute_default_license_expiry
+from .signals import extend_license_expiry
 from .updates import UPDATE_MODE_FORCE, UPDATE_MODE_WINDOW, UPDATE_MODES, update_payload
 from sync.jwt_utils import issue_license_token
 
@@ -20,11 +21,18 @@ LICENSE_WARNING_DAYS = 7
 
 
 def _mark_paid(modeladmin, request, license_queryset):
-    new_expiry = compute_default_license_expiry()
-    updated = license_queryset.update(expires_at=new_expiry)
+    # Har litsenziyaning o'z muddatiga +1 oy (signals.extend_license_expiry). Qulf: ikki operator bir vaqtda
+    # bossa ham ikkala to'lov hisobga olinadi.
+    lines = []
+    with transaction.atomic():
+        for lic in license_queryset.select_for_update().select_related('restaurant'):
+            old = lic.expires_at
+            lic.expires_at = extend_license_expiry(old)
+            lic.save(update_fields=['expires_at'])  # is_active'ga ataylab tegilmaydi
+            lines.append(f"{lic.restaurant.name}: {old:%Y-%m-%d} -> {lic.expires_at:%Y-%m-%d}")
     modeladmin.message_user(
         request,
-        f"{updated} ta litsenziya {new_expiry:%Y-%m-%d %H:%M} gacha uzaytirildi.",
+        f"{len(lines)} ta litsenziya uzaytirildi. " + "; ".join(lines),
     )
 
 
@@ -216,7 +224,7 @@ class RestaurantAdmin(admin.ModelAdmin):
     def action_force_license_renew(self, request, queryset):
         _enqueue_command(self, request, queryset, 'force_license_renew', "Litsenziyani yangilash")
 
-    @admin.action(description="To'lov qilindi - litsenziya muddatini uzaytirish")
+    @admin.action(description="To'lov qilindi - litsenziya muddatiga +1 oy")
     def action_mark_paid(self, request, queryset):
         _mark_paid(self, request, License.objects.filter(restaurant__in=queryset))
 
@@ -307,7 +315,7 @@ class LicenseAdmin(admin.ModelAdmin):
     readonly_fields = ('key', 'hardware_hash', 'qr_code')
     actions = ['reset_hardware_hash', 'generate_offline_token', 'mark_paid']
 
-    @admin.action(description="To'lov qilindi - muddatni uzaytirish")
+    @admin.action(description="To'lov qilindi - muddatga +1 oy")
     def mark_paid(self, request, queryset):
         _mark_paid(self, request, queryset)
 

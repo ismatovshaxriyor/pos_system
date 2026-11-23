@@ -585,3 +585,61 @@ class PublishMobileAppCommandTests(TestCase):
         self.assertEqual(items[0]['slug'], 'kassir')
         self.assertEqual(items[0]['sha256'], self.hashlib.sha256(b'exe-1').hexdigest())
         self.assertTrue(items[0]['download_url'].endswith('/media/mobile_apps/App-0.2.7.exe'))
+
+
+class ExtendLicenseExpiryTests(TestCase):
+    """"To'lov qilindi": amaldagi muddatga +1 oy (signals.extend_license_expiry)."""
+
+    def _dt(self, *args):
+        import datetime
+        return datetime.datetime(*args, tzinfo=datetime.timezone.utc)
+
+    def test_active_license_gets_one_month(self):
+        from .signals import extend_license_expiry
+        now = self._dt(2026, 12, 1, 12)
+        self.assertEqual(extend_license_expiry(self._dt(2026, 12, 2, 23, 59, 59), now), self._dt(2027, 1, 2, 23, 59, 59))
+
+    def test_prepayment_is_not_lost(self):
+        """Noyabrda oldindan to'lov: 2-dekabr -> 2-yanvar (avval 2-dekabrda qolib ketar edi)."""
+        from .signals import extend_license_expiry
+        now = self._dt(2026, 11, 23, 9)
+        once = extend_license_expiry(self._dt(2026, 12, 2, 23, 59, 59), now)
+        self.assertEqual(once, self._dt(2027, 1, 2, 23, 59, 59))
+        self.assertEqual(extend_license_expiry(once, now), self._dt(2027, 2, 2, 23, 59, 59))
+
+    def test_month_end_clamped(self):
+        from .signals import add_one_month
+        self.assertEqual(add_one_month(self._dt(2027, 1, 31, 23, 59, 59)), self._dt(2027, 2, 28, 23, 59, 59))
+        self.assertEqual(add_one_month(self._dt(2026, 12, 15)), self._dt(2027, 1, 15))
+
+    def test_expired_license_gets_at_least_current_month(self):
+        from .signals import extend_license_expiry
+        old = self._dt(2026, 12, 2, 23, 59, 59)
+        # Muddat o'tgan kunning ertasiga to'landi - dekabr uchun: 2-yanvar.
+        self.assertEqual(extend_license_expiry(old, self._dt(2026, 12, 3, 8)), self._dt(2027, 1, 2, 23, 59, 59))
+        # 1-yanvarda to'landi: eski sana +1 oy (2-yanvar) ertasiga yana bloklaydi - joriy oy oxiri + 2 kun.
+        self.assertEqual(extend_license_expiry(old, self._dt(2027, 1, 1, 8)), self._dt(2027, 2, 2, 23, 59, 59))
+
+
+class MarkPaidAdminActionTests(TestCase):
+    def setUp(self):
+        self.superuser = get_user_model().objects.create_superuser(
+            username='paid_admin', email='paid@example.com', password='pw-12345',
+        )
+        self.client.force_login(self.superuser)
+
+    def test_admin_action_adds_one_month_per_license(self):
+        from .signals import add_one_month
+        r1 = Restaurant.objects.create(name='Birinchi', subdomain='birinchi')
+        r2 = Restaurant.objects.create(name='Ikkinchi', subdomain='ikkinchi')
+        far = timezone.now() + timedelta(days=40)
+        License.objects.filter(restaurant=r2).update(expires_at=far)
+        before1 = License.objects.get(restaurant=r1).expires_at
+        res = self.client.post(reverse('admin:tenants_restaurant_changelist'), {
+            'action': 'action_mark_paid', '_selected_action': [str(r1.pk), str(r2.pk)],
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(License.objects.get(restaurant=r1).expires_at, add_one_month(before1))
+        self.assertEqual(License.objects.get(restaurant=r2).expires_at, add_one_month(far))
+        msgs = [str(m) for m in django_messages.get_messages(res.wsgi_request)]
+        self.assertTrue(any('2 ta litsenziya uzaytirildi' in m and 'Ikkinchi' in m for m in msgs), msgs)

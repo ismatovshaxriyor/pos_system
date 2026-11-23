@@ -23,14 +23,14 @@ import psutil
 from django.conf import settings
 from django.contrib.admin.models import CHANGE, LogEntry
 from django.core.cache import cache
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from packaging.version import InvalidVersion, Version
 
 from .models import ErrorLog, License, RemoteCommand, Restaurant, SyncedOrder, SyncedOrderItem, SyncedPayment
-from .signals import compute_default_license_expiry
+from .signals import extend_license_expiry
 from .updates import UPDATE_MODE_WINDOW, UPDATE_MODES, update_payload
 
 OPS_TZ = ZoneInfo('Asia/Tashkent')  # Bola'dagi RESTAURANT_TZ bilan bir xil - "bugun" shu bo'yicha
@@ -634,7 +634,7 @@ ACTIONS = {
     'unblock': 'Blokdan chiqarish',
     'renew': 'Litsenziyani yangilashga majburlash',
     'update': 'Yangilanishni yuborish',
-    'mark_paid': "To'lov qilindi (muddatni uzaytirish)",
+    'mark_paid': "To'lov qilindi (muddatga +1 oy)",
     'resolve_errors': 'Xatolarni hal qilingan deb belgilash',
     'reset_hardware': "Qurilma bog'lanishini tozalash",
     'offline_token': 'Oflayn yangilash kodi',
@@ -696,8 +696,10 @@ def perform_action(user, action, restaurant_ids, params=None):
             if not lic:
                 skipped += 1
                 continue
-            lic.expires_at = compute_default_license_expiry()
-            lic.save(update_fields=['expires_at'])  # is_active'ga ataylab tegilmaydi (admin _mark_paid bilan bir xil)
+            with transaction.atomic():
+                lic = License.objects.select_for_update().get(pk=lic.pk)
+                lic.expires_at = extend_license_expiry(lic.expires_at)  # amaldagi muddatga +1 oy
+                lic.save(update_fields=['expires_at'])  # is_active'ga ataylab tegilmaydi (admin _mark_paid bilan bir xil)
         elif action == 'resolve_errors':
             ErrorLog.objects.filter(restaurant=r, is_resolved=False).update(
                 is_resolved=True, resolved_at=timezone.now(), resolved_by=user,

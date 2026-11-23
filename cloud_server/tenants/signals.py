@@ -20,6 +20,28 @@ def compute_default_license_expiry(from_dt=None):
     return end_of_month + timedelta(days=2)
 
 
+def add_one_month(dt):
+    """Bir kalendar oy keyin, kun oy uzunligiga qisqartiriladi: 2-dek -> 2-yan, 31-yan -> 28/29-fev."""
+    year, month = (dt.year + 1, 1) if dt.month == 12 else (dt.year, dt.month + 1)
+    return dt.replace(year=year, month=month, day=min(dt.day, calendar.monthrange(year, month)[1]))
+
+
+def extend_license_expiry(current, now=None):
+    """
+    "To'lov qilindi" amalining yangi muddati.
+    - Amaldagi muddatga bir oy qo'shiladi (2-dekabr -> 2-yanvar). Oldindan to'lov ham yo'qolmaydi,
+      ikki marta bosilsa 2 oy uzayadi.
+    - Muddati o'tib ketgan bo'lsa, eski sana +1 oy yetarli bo'lmasligi mumkin (masalan, 1-yanvarda
+      to'lansa 2-yanvar chiqadi). Shuning uchun kamida joriy oy oxiri + 2 kun beriladi: to'lagan
+      restoran ertasiga yana bloklanib qolmasin.
+    """
+    now = now or timezone.now()
+    if current and current > now:
+        return add_one_month(current)
+    floor = compute_default_license_expiry(now)
+    return max(floor, add_one_month(current)) if current else floor
+
+
 @receiver(post_save, sender=Restaurant)
 def create_default_license(sender, instance, created, **kwargs):
     """
