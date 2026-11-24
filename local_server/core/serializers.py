@@ -719,6 +719,9 @@ class PublicOrderItemSerializer(serializers.ModelSerializer):
 class PublicOrderSerializer(serializers.ModelSerializer):
     """Mijozlar uchun stoldagi faol buyurtma va uning umumiy hisob-kitobi."""
     items = serializers.SerializerMethodField()
+    # Xom `Order.service_charge` (qo'lda kiritilgan summa) emas: foizli xizmat haqi `final_amount`ga
+    # `calculated_service_charge` orqali qo'shiladi, shuning uchun sahifadagi qator ham shundan olinadi.
+    service_charge = serializers.DecimalField(source='calculated_service_charge', max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = Order

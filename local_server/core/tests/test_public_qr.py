@@ -81,6 +81,22 @@ class PublicQRMenuTests(TestCase):
         # Summa: (2 * 25000) + (1 * 35000) = 85000
         self.assertEqual(Decimal(str(current_order['final_amount'])), Decimal('85000.00'))
 
+    def test_public_table_live_shows_percentage_service_charge(self):
+        """Foizli xizmat haqi `service_charge`da ko'rinishi kerak (xom DB maydoni 0 bo'lsa ham), aks holda sahifa
+        yakuniy summaga qo'shilgan xizmat haqini yashirib qo'yadi."""
+        from core.models import RestaurantConfig
+        RestaurantConfig.objects.create(pk=1, service_charge_rate=Decimal('12.00'))
+        waiter = User.objects.create_user(username='+998901112244', role='waiter')
+        order = Order.objects.create(table=self.table, waiter=waiter, status='in_progress')
+        OrderItem.objects.create(order=order, product=self.product1, quantity=2, price=Decimal('25000'))
+        OrderItem.objects.create(order=order, product=self.product2, quantity=1, price=Decimal('35000'))
+
+        url = reverse('public-table-live', kwargs={'qr_code': self.table.qr_code})
+        current_order = self.client.get(url).json()['current_order']
+        self.assertEqual(Decimal(str(current_order['total_amount'])), Decimal('85000.00'))
+        self.assertEqual(Decimal(str(current_order['service_charge'])), Decimal('10200.00'))
+        self.assertEqual(Decimal(str(current_order['final_amount'])), Decimal('95200.00'))
+
     def test_public_table_invalid_qr_code(self):
         """Mavjud bo'lmagan QR UUID berilganda 404 qaytishi kerak."""
         fake_uuid = uuid.uuid4()

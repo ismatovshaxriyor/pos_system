@@ -39,7 +39,11 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const qrCode = useRef(getQrCodeFromUrl()).current;
 
-  const [tab, setTab] = useState<TabView>('menu');
+  const [tab, setTabState] = useState<TabView>('menu');
+  // Birinchi muvaffaqiyatli javobdan keyin tab o'zi tanlanadi (buyurtma bor -> hisob). Mijoz o'zi tab
+  // almashtirgan bo'lsa yoki birinchi javob o'tib ketgan bo'lsa, keyingi so'rovlar uni o'zgartirmaydi.
+  const tabLocked = useRef(false);
+  const setTab = (next: TabView) => { tabLocked.current = true; setTabState(next); };
   const [menu, setMenu] = useState<Category[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [table, setTable] = useState<TableLive | null>(null);
@@ -80,7 +84,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const load = () => {
       fetchTableLive(qrCode)
-        .then((data: TableLive) => { if (!cancelled) { setTable(data); setReconnecting(false); setTableMissing(false); } })
+        .then((data: TableLive) => {
+          if (cancelled) return;
+          setTable(data); setReconnecting(false); setTableMissing(false);
+          // Buyurtmasi bor stolni ochgan mijoz avvalo hisobni ko'radi (menyu emas). Demo'da menyu qoladi.
+          if (!tabLocked.current) {
+            tabLocked.current = true;
+            if (realTable && data.current_order) setTabState('bill');
+          }
+        })
         .catch((err: { status?: number }) => {
           if (cancelled) return;
           // Haqiqiy stol: oxirgi ma'lumot qoladi, keyingi so'rovda qayta urinadi.
