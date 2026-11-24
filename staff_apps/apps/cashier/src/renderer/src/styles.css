@@ -623,7 +623,8 @@ h1 {
 
 .tg-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  /* Avto: panelga sig'gancha, lekin qatorda 4 tadan oshmaydi (3 ta oraliq = 24px) */
+  grid-template-columns: repeat(auto-fill, minmax(max(120px, calc((100% - 24px) / 4)), 1fr));
   gap: 8px;
 }
 
@@ -697,6 +698,14 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Buyurtma kartalari: ustun kengaysa qatorga ko'proq sig'adi, lekin 3 tadan oshmaydi (kartalar cho'zilib ketmasin) */
+.order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(max(220px, calc((100% - 16px) / 3)), 1fr));
+  gap: 8px;
+  align-items: start;
 }
 
 .orders-empty {
@@ -2000,7 +2009,7 @@ html[data-motion='reduced'] *::after {
   top: 0;
   bottom: 0;
   width: 16px;
-  z-index: 20;
+  z-index: 5; /* qoplamalar (.overlay, z-index 10) ostida: modal ustida chiziq ko'rinmasin */
   cursor: col-resize;
   touch-action: none;
 }
@@ -2042,3 +2051,35 @@ html[data-tcols="4"] .tg-grid { grid-template-columns: repeat(4, minmax(0, 1fr))
 html[data-tcols="4"] .tg-tile { padding: 8px 6px 8px 8px; min-height: 76px; border-left-width: 4px; }
 html[data-tcols="4"] .tg-name { font-size: 1.5rem; }
 html[data-tcols="4"] .tg-state { font-size: 0.75rem; }
+
+/* ===== Yumshoq effektlar =====
+   Qisqa (<=180ms), faqat opacity/transform. Yuqoridagi "Harakatni kamaytirish" qoidalari (OS yoki ☰ menyu)
+   `animation`/`transition` ni butunlay o'chiradi, shuning uchun bu yerda alohida tekshiruv kerak emas. */
+@keyframes fx-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fx-rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fx-slide-in {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Qoplama va varaq: "To'landi", ☰ menyu, kassa yakuni va h.k. */
+.overlay { animation: fx-fade 0.14s ease-out both; }
+.overlay:not(.side) > * { animation: fx-rise 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.overlay.side > .menu { animation: fx-slide-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Chekka yangi qator qo'shilganda va to'lov paneli ochilganda */
+.ri { animation: fx-fade 0.16s ease-out both; }
+.pay { animation: fx-fade 0.16s ease-out both; }
+
+/* Stol kartalari: holat o'zgarishi (bo'sh -> band) keskin emas, bosilganda esa ozgina kichrayadi */
+.tg-tile {
+  animation: fx-fade 0.16s ease-out both;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+}
+.tg-tile.busy:active { transform: scale(0.98); }

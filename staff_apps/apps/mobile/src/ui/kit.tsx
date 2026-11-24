@@ -1,7 +1,9 @@
 import type { Palette } from '@pos/design';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  type PressableProps,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -37,6 +40,54 @@ function toneColor(c: Palette, tone: Tone): string {
     default:
       return c.ink;
   }
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * `Pressable`, bosilganda yumshoq kichrayadi (80ms) va qo'yib yuborilganda qaytadi (140ms): tez va sezilar-sezilmas.
+ * `style` faqat obyekt/massiv (funksiya emas): animatsiyalangan komponent funksiya-stilni qo'llamaydi.
+ * "Harakatni kamaytirish" yoqilgan bo'lsa hech narsa o'zgarmaydi.
+ */
+export function Press({
+  style,
+  scaleTo = 0.97,
+  onPressIn,
+  onPressOut,
+  ...rest
+}: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle>; scaleTo?: number }) {
+  const { appearance } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  const to = (value: number, duration: number) => {
+    if (appearance.reduceMotion) return;
+    Animated.timing(scale, { toValue: value, duration, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  };
+  return (
+    <AnimatedPressable
+      {...rest}
+      onPressIn={(e) => {
+        to(scaleTo, 80);
+        onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        to(1, 140);
+        onPressOut?.(e);
+      }}
+      style={[style, { transform: [{ scale }] }]}
+    />
+  );
+}
+
+/** Ekranga chiqqanda yumshoq paydo bo'lish: 170ms, 6px pastdan. Faqat o'rnatilganda ishlaydi (qayta chizilganda emas). */
+function useAppear() {
+  const { appearance } = useTheme();
+  const v = useRef(new Animated.Value(appearance.reduceMotion ? 1 : 0)).current;
+  useEffect(() => {
+    if (appearance.reduceMotion) return;
+    Animated.timing(v, { toValue: 1, duration: 170, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] };
 }
 
 /** Yumshoq soya (kun mavzusida). Tunda soya ko'rinmaydi - chegara yetarli. */
@@ -228,7 +279,7 @@ export function Button({
   variant?: ButtonVariant;
   compact?: boolean;
 }) {
-  const { c, appearance } = useTheme();
+  const { c } = useTheme();
   const lift = useLift();
   const inactive = disabled || loading;
   const bg = variant === 'primary' ? c.signal : variant === 'ink' ? c.ink : c.card;
@@ -236,11 +287,11 @@ export function Button({
   const fg: Tone = variant === 'primary' ? 'onSignal' : 'ink';
   const fgColor = variant === 'ink' ? c.paper : undefined;
   return (
-    <Pressable
+    <Press
       accessibilityRole="button"
       onPress={onPress}
       disabled={inactive}
-      style={({ pressed }) => [
+      style={[
         {
           backgroundColor: bg,
           borderColor: border,
@@ -253,7 +304,6 @@ export function Button({
         },
         variant !== 'ink' && lift,
         inactive && { opacity: 0.45 },
-        pressed && { opacity: 0.9, transform: appearance.reduceMotion ? undefined : [{ scale: 0.985 }] },
       ]}
     >
       {loading ? (
@@ -263,7 +313,7 @@ export function Button({
           {title}
         </Txt>
       )}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -294,8 +344,9 @@ export function Segmented<T extends string>({
       {options.map((o) => {
         const active = value === o.value;
         return (
-          <Pressable
+          <Press
             key={o.value}
+            scaleTo={0.96}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(o.value)}
@@ -313,7 +364,7 @@ export function Segmented<T extends string>({
             <Txt size={15} weight={600} tone={active ? 'ink' : 'muted'}>
               {o.label}
             </Txt>
-          </Pressable>
+          </Press>
         );
       })}
     </View>
@@ -323,8 +374,9 @@ export function Segmented<T extends string>({
 export function Card({ children, edge, style }: { children: ReactNode; edge?: string; style?: StyleProp<ViewStyle> }) {
   const { c } = useTheme();
   const lift = useLift();
+  const appear = useAppear();
   return (
-    <View
+    <Animated.View
       style={[
         {
           backgroundColor: c.card,
@@ -338,10 +390,11 @@ export function Card({ children, edge, style }: { children: ReactNode; edge?: st
         },
         lift,
         style,
+        appear,
       ]}
     >
       {children}
-    </View>
+    </Animated.View>
   );
 }
 

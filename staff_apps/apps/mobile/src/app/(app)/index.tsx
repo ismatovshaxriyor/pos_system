@@ -5,7 +5,7 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { useDevices } from '@/lib/devices';
 import { useBootstrap, useRealtimeStatus, useSession } from '@/lib/hooks';
-import { Avatar, Card, ErrorText, Field, Muted, Pill, Screen, Txt } from '@/ui/kit';
+import { Avatar, Card, ErrorText, Field, Muted, Pill, Press, Screen, Txt } from '@/ui/kit';
 import { Chip } from '@/ui/parts';
 import { SettingsSheet } from '@/ui/settings';
 import { ShiftCard } from '@/ui/shift';
@@ -81,7 +81,7 @@ export default function TablesScreen() {
               {fullName(user)}
             </Txt>
           </View>
-          <Pressable
+          <Press
             accessibilityRole="button"
             accessibilityLabel="Sozlamalar"
             onPress={() => setSettings(true)}
@@ -100,7 +100,7 @@ export default function TablesScreen() {
             {[0, 1, 2].map((i) => (
               <View key={i} style={{ width: 20, height: 2, borderRadius: 1, backgroundColor: c.ink }} />
             ))}
-          </Pressable>
+          </Press>
         </View>
 
         <ShiftCard />
@@ -111,7 +111,7 @@ export default function TablesScreen() {
               const isDevices = l.title === 'Qurilmalar';
               const waiting = isDevices ? pendingDevices.length : 0;
               return (
-                <Pressable key={l.title} accessibilityRole="button" onPress={() => router.push(l.href)} style={{ flexBasis: '47%', flexGrow: 1 }}>
+                <Press key={l.title} accessibilityRole="button" onPress={() => router.push(l.href)} style={{ flexBasis: '47%', flexGrow: 1 }}>
                   <Card edge={waiting > 0 ? c.warn : undefined} style={{ minHeight: 56, padding: 12, justifyContent: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <Txt size={16} weight={600}>
@@ -120,7 +120,7 @@ export default function TablesScreen() {
                       {waiting > 0 && <Pill label={String(waiting)} kind="warn" />}
                     </View>
                   </Card>
-                </Pressable>
+                </Press>
               );
             })}
           </View>
@@ -161,7 +161,7 @@ export default function TablesScreen() {
             // Chap chiziq = holat: bo'sh - neytral, men band qilgan - yashil, boshqa band - sariq.
             const edge = t.status === 'free' ? c.edge : t.status === 'occupied_by_me' ? c.ok : c.warn;
             return (
-              <Pressable key={t.id} disabled={blocked} onPress={() => open(t)} style={{ flexBasis: cellBasis, flexGrow: 1, opacity: blocked ? 0.55 : 1 }}>
+              <Press key={t.id} disabled={blocked} onPress={() => open(t)} style={{ flexBasis: cellBasis, flexGrow: 1, opacity: blocked ? 0.55 : 1 }}>
                 <Card edge={edge} style={{ minHeight: 96, padding: 10, gap: 2 }}>
                   <Txt family="disp" size={28} numberOfLines={1}>
                     {t.name}
@@ -181,7 +181,7 @@ export default function TablesScreen() {
                     </View>
                   )}
                 </Card>
-              </Pressable>
+              </Press>
             );
           })}
           {/* Oxirgi qator to'lmasa, kartalar butun qatorga cho'zilib ketmasin. Foiz+gap kichik ekranda ustunni tushirib yuborardi, shuning uchun basis chegaradan kichik. */}

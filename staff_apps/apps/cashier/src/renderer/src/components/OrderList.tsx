@@ -25,7 +25,7 @@ export function OrderList({
   if (sorted.length === 0) return <div className="orders-empty muted">{emptyText}</div>;
 
   return (
-    <>
+    <div className="order-grid">
       {sorted.map((o) => {
         const paid = toTiyin(o.amount_paid) > 0;
         const late = now - Date.parse(o.created_at) >= LATE_AFTER_MS;
@@ -47,6 +47,6 @@ export function OrderList({
           </button>
         );
       })}
-    </>
+    </div>
   );
 }

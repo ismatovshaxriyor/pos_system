@@ -124,6 +124,29 @@ class EscposTicketTests(SimpleTestCase):
         kwargs.update(overrides)
         return kwargs
 
+    def _logo_path(self):
+        import os, tempfile
+        from PIL import Image
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = os.path.join(tmp.name, 'logo.png')
+        Image.new('RGB', (200, 80), (0, 0, 0)).save(path)
+        return path
+
+    def test_receipts_hide_restaurant_name_when_logo_printed(self):
+        logo = self._logo_path()
+        pre = escpos.render_pre_bill_receipt(**self._receipt_kwargs(restaurant_name='Rohat Oshxona', logo_path=logo))
+        pay = escpos.render_payment_receipt(**self._receipt_kwargs(restaurant_name='Rohat Oshxona', cashier_name='K', logo_path=logo))
+        for payload in (pre, pay):
+            self.assertIn(b'\x1d\x76\x30\x00', payload)  # logo bor
+            self.assertNotIn(escpos.encode('Rohat Oshxona'), payload)
+
+    def test_receipts_keep_restaurant_name_without_logo(self):
+        pre = escpos.render_pre_bill_receipt(**self._receipt_kwargs(restaurant_name='Rohat Oshxona'))
+        pay = escpos.render_payment_receipt(**self._receipt_kwargs(restaurant_name='Rohat Oshxona', cashier_name='K'))
+        for payload in (pre, pay):
+            self.assertIn(escpos.encode('Rohat Oshxona'), payload)
+
     def test_pre_bill_receipt_shows_service_charge_percentage(self):
         payload = escpos.render_pre_bill_receipt(**self._receipt_kwargs(service_charge_rate=10))
         self.assertIn(b'Xizmat foizi (10%):', payload)

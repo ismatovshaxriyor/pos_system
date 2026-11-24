@@ -350,10 +350,12 @@ def render_pre_bill_receipt(*, restaurant_name="Restoran", logo_path=None, order
     if logo_bytes:
         out.append(logo_bytes)
 
-    out += [ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
-    for line in _wrap(restaurant_name, width // 2):
-        out.append(encode(line) + b'\n')
-    out += [BOLD_OFF, SIZE_NORMAL]
+    out += [ALIGN_CENTER]
+    if not logo_bytes:  # Logo chiqsa, restoran nomi takrorlanmaydi.
+        out += [SIZE_DOUBLE, BOLD_ON]
+        for line in _wrap(restaurant_name, width // 2):
+            out.append(encode(line) + b'\n')
+        out += [BOLD_OFF, SIZE_NORMAL]
     out.append(encode("=== HISOB-CHEK ===") + b'\n')
     out += [ALIGN_LEFT]
     out.append(encode(f"Buyurtma #{order_id}") + b'\n')
@@ -405,10 +407,12 @@ def render_payment_receipt(*, restaurant_name="Restoran", logo_path=None, order_
     if logo_bytes:
         out.append(logo_bytes)
 
-    out += [ALIGN_CENTER, SIZE_DOUBLE, BOLD_ON]
-    for line in _wrap(restaurant_name, width // 2):
-        out.append(encode(line) + b'\n')
-    out += [BOLD_OFF, SIZE_NORMAL]
+    out += [ALIGN_CENTER]
+    if not logo_bytes:  # Logo chiqsa, restoran nomi takrorlanmaydi.
+        out += [SIZE_DOUBLE, BOLD_ON]
+        for line in _wrap(restaurant_name, width // 2):
+            out.append(encode(line) + b'\n')
+        out += [BOLD_OFF, SIZE_NORMAL]
     out.append(encode("*** TO'LOV CHEKI ***") + b'\n')
     out += [ALIGN_LEFT]
     out.append(encode(f"Buyurtma #{order_id}") + b'\n')
