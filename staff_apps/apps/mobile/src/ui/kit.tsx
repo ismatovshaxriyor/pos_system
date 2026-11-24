@@ -59,11 +59,13 @@ interface TxtProps {
   upper?: boolean;
   align?: TextStyle['textAlign'];
   numberOfLines?: number;
+  /** Bir qatorga sig'masa shrift kichrayadi (tor kartalardagi summa uchun). */
+  fit?: boolean;
   style?: StyleProp<TextStyle>;
 }
 
 /** Yagona matn komponenti: shrift, rang va o'lcham sozlamasi shu yerda. */
-export function Txt({ children, size = 16, family = 'body', weight = 400, tone = 'ink', upper, align, numberOfLines, style }: TxtProps) {
+export function Txt({ children, size = 16, family = 'body', weight = 400, tone = 'ink', upper, align, numberOfLines, fit, style }: TxtProps) {
   const { c, scale } = useTheme();
   const fontFamily =
     family === 'disp'
@@ -81,6 +83,8 @@ export function Txt({ children, size = 16, family = 'body', weight = 400, tone =
   return (
     <Text
       numberOfLines={numberOfLines}
+      adjustsFontSizeToFit={fit}
+      minimumFontScale={fit ? 0.7 : undefined}
       style={[
         {
           color: toneColor(c, tone),

@@ -14,8 +14,9 @@ import { View } from 'react-native';
 import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
-import { ChipSelect, FormCard, SectionTitle, SwitchRow } from '@/ui/forms';
+import { ChipSelect, FormSheet, SectionTitle, SwitchRow, useHeld } from '@/ui/forms';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Segmented, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 type Filter = 'all' | 'debt';
@@ -53,6 +54,8 @@ export default function CustomersScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
+  useNotify(error, info, draft !== null);
+  const shown = useHeld(draft);
   const [openId, setOpenId] = useState<number | null>(null);
   const [txns, setTxns] = useState<DebtTransaction[]>([]);
   const [repay, setRepay] = useState<{ id: number; amount: string; method: PaymentMethod; note: string } | null>(null);
@@ -77,7 +80,7 @@ export default function CustomersScreen() {
     if (!draft.firstName.trim()) return setError('Mijoz ismini kiriting.');
     if (phone === null) return setError("Telefon raqami noto'g'ri (masalan 90 123 45 67).");
     const body = { first_name: draft.firstName.trim(), last_name: draft.lastName.trim(), phone, note: draft.note.trim(), is_active: draft.active };
-    const ok = await run(() => (draft.id ? pos.api.customers.update(draft.id, body) : pos.api.customers.create(body)), undefined, load);
+    const ok = await run(() => (draft.id ? pos.api.customers.update(draft.id, body) : pos.api.customers.create(body)), 'Mijoz saqlandi.', load);
     if (ok) setDraft(null);
   }
 
@@ -115,22 +118,35 @@ export default function CustomersScreen() {
       </View>
 
       {!allowed && <ErrorText>Bu bo'lim faqat menejer va kassir uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
-      {info && <Muted>{info}</Muted>}
 
-      {allowed && !draft && <Button title="+ Yangi mijoz" onPress={() => setDraft({ firstName: '', lastName: '', phone: '', note: '', active: true })} />}
-
-      {draft && (
-        <FormCard title={draft.id ? 'Mijozni tahrirlash' : 'Yangi mijoz'}>
-          <Field label="Ism" value={draft.firstName} onChangeText={(firstName) => setDraft({ ...draft, firstName })} autoCapitalize="words" />
-          <Field label="Familiya (ixtiyoriy)" value={draft.lastName} onChangeText={(lastName) => setDraft({ ...draft, lastName })} autoCapitalize="words" />
-          <Field label="Telefon (ixtiyoriy)" value={draft.phone} onChangeText={(phone) => setDraft({ ...draft, phone })} keyboardType="phone-pad" placeholder="90 123 45 67" />
-          <Field label="Izoh (ixtiyoriy)" value={draft.note} onChangeText={(note) => setDraft({ ...draft, note })} autoCapitalize="sentences" />
-          {draft.id && <SwitchRow label="Faol" hint="Faol bo'lmagan mijozga yangi nasiya berilmaydi." value={draft.active} onChange={(active) => setDraft({ ...draft, active })} />}
-          <Button title="Saqlash" loading={busy} onPress={() => void save()} />
-          <Button title="Bekor qilish" variant="ghost" disabled={busy} onPress={() => setDraft(null)} />
-        </FormCard>
+      {allowed && (
+        <Button
+          title="+ Yangi mijoz"
+          onPress={() => {
+            setError(null);
+            setDraft({ firstName: '', lastName: '', phone: '', note: '', active: true });
+          }}
+        />
       )}
+
+      <FormSheet
+        visible={draft !== null}
+        title={shown?.id ? 'Mijozni tahrirlash' : 'Yangi mijoz'}
+        busy={busy}
+        error={error}
+        onClose={() => setDraft(null)}
+        onSave={() => void save()}
+      >
+        {shown && (
+          <>
+          <Field label="Ism" value={shown.firstName} onChangeText={(firstName) => setDraft({ ...shown, firstName })} autoCapitalize="words" />
+          <Field label="Familiya (ixtiyoriy)" value={shown.lastName} onChangeText={(lastName) => setDraft({ ...shown, lastName })} autoCapitalize="words" />
+          <Field label="Telefon (ixtiyoriy)" value={shown.phone} onChangeText={(phone) => setDraft({ ...shown, phone })} keyboardType="phone-pad" placeholder="90 123 45 67" />
+          <Field label="Izoh (ixtiyoriy)" value={shown.note} onChangeText={(note) => setDraft({ ...shown, note })} autoCapitalize="sentences" />
+          {shown.id && <SwitchRow label="Faol" hint="Faol bo'lmagan mijozga yangi nasiya berilmaydi." value={shown.active} onChange={(active) => setDraft({ ...shown, active })} />}
+          </>
+        )}
+      </FormSheet>
 
       {allowed && (
         <>
@@ -182,7 +198,10 @@ export default function CustomersScreen() {
                   variant="ghost"
                   compact
                   disabled={busy}
-                  onPress={() => setDraft({ id: c.id, firstName: c.first_name, lastName: c.last_name, phone: c.phone, note: c.note, active: c.is_active })}
+                  onPress={() => {
+                    setError(null);
+                    setDraft({ id: c.id, firstName: c.first_name, lastName: c.last_name, phone: c.phone, note: c.note, active: c.is_active });
+                  }}
                 />
               </View>
             )}

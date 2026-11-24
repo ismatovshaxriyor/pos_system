@@ -3,13 +3,15 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { FormCard, ImageField, SwitchRow } from '@/ui/forms';
 import { Button, ErrorText, Eyebrow, Field, Muted, Screen, Title } from '@/ui/kit';
-import { useHand } from '@/ui/theme';
+import { useNotify } from '@/ui/toast';
+import { useHand, useTheme } from '@/ui/theme';
 
 interface Form {
   name: string;
@@ -52,7 +54,10 @@ export default function SettingsScreen() {
   const { user } = useSession();
   const isManager = user?.role === 'manager';
   const hand = useHand();
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
   const { busy, error, info, setError, setInfo, run } = useManage();
+  useNotify(error, info);
   const [saved, setSaved] = useState<RestaurantSettings | null>(null);
   const [form, setForm] = useState<Form | null>(null);
 
@@ -127,7 +132,19 @@ export default function SettingsScreen() {
   }
 
   return (
-    <Screen onRefresh={() => void run(async () => undefined, undefined, load)}>
+    <Screen
+      onRefresh={() => void run(async () => undefined, undefined, load)}
+      // Saqlash va natija xabari doim pastda ko'rinib turadi: sahifa uzun, ilgari tugma 3 ekran pastda edi.
+      footer={
+        form ? (
+          <View style={{ backgroundColor: c.paper, borderTopWidth: 1, borderTopColor: c.grid, paddingTop: 10, paddingBottom: insets.bottom + 12 }}>
+            <View style={{ paddingHorizontal: 20, gap: 8, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
+              <Button title="Saqlash" loading={busy} onPress={() => void save()} />
+            </View>
+          </View>
+        ) : undefined
+      }
+    >
       <View style={{ flexDirection: hand.headerDirection, alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Eyebrow>Boshqaruv</Eyebrow>
@@ -137,8 +154,6 @@ export default function SettingsScreen() {
       </View>
 
       {!isManager && <ErrorText>Bu bo'lim faqat menejer uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
-      {info && <Muted>{info}</Muted>}
       {isManager && !form && !error && <Muted>Yuklanmoqda...</Muted>}
 
       {form && (
@@ -180,8 +195,6 @@ export default function SettingsScreen() {
             <Field label="Chat ID (guruh yoki shaxsiy)" value={form.chatId} onChangeText={(chatId) => setForm({ ...form, chatId })} keyboardType="numbers-and-punctuation" />
             <Button title="Test xabar yuborish" variant="ghost" compact disabled={busy || !form.botToken || !form.chatId} onPress={() => void testTelegram()} />
           </FormCard>
-
-          <Button title="Saqlash" loading={busy} onPress={() => void save()} />
         </>
       )}
     </Screen>

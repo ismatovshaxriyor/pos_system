@@ -535,7 +535,9 @@ h1 {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 330px minmax(0, 1fr) 440px;
+  position: relative;
+  /* Kengliklar suriladi (ColumnHandles): --w-orders / --w-pay, chek ustuni qolganini oladi */
+  grid-template-columns: var(--w-orders, 330px) minmax(0, 1fr) var(--w-pay, 440px);
   grid-template-areas: 'orders receipt pay';
 }
 
@@ -545,15 +547,15 @@ h1 {
 
 /* ----- Qo'lga moslash: <html data-layout> (o'ng - standart) ----- */
 [data-layout='left'] .main {
-  grid-template-columns: 440px minmax(0, 1fr) 330px;
+  grid-template-columns: var(--w-pay, 440px) minmax(0, 1fr) var(--w-orders, 330px);
   grid-template-areas: 'pay receipt orders';
 }
 [data-layout='center'] .main {
-  grid-template-columns: 330px 440px minmax(0, 1fr);
+  grid-template-columns: var(--w-orders, 330px) var(--w-pay, 440px) minmax(0, 1fr);
   grid-template-areas: 'orders pay receipt';
 }
 [data-layout='center-flip'] .main {
-  grid-template-columns: minmax(0, 1fr) 440px 330px;
+  grid-template-columns: minmax(0, 1fr) var(--w-pay, 440px) var(--w-orders, 330px);
   grid-template-areas: 'receipt pay orders';
 }
 
@@ -1961,3 +1963,82 @@ html[data-motion='reduced'] *::after {
 .call-alert .btn {
   margin-top: 12px;
 }
+
+
+/* ----- Stollar ko'rinishi: qidiruv va zona filtri ----- */
+.tg-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.tg-tools input {
+  width: 100%;
+  min-height: 44px;
+  background: var(--card);
+  border: 1px solid var(--grid);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0 14px;
+}
+.tg-tools input:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.tg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tg-chips button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--grid);
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+.tg-chips button.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+
+/* ----- Ustunlarni surish (ColumnHandles) ----- */
+.col-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  z-index: 20;
+  cursor: col-resize;
+  touch-action: none;
+}
+/* Chegara chizig'i bo'ylab markazlash: left bilan o'ngga, right bilan chapga yarim kenglikka suriladi */
+.col-handle[style*='left'] { margin-left: -8px; }
+.col-handle[style*='right'] { margin-right: -8px; }
+.col-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 56px;
+  margin: -28px 0 0 -2px;
+  border-radius: 2px;
+  background: var(--ink-60);
+  opacity: 0.35;
+  transition: opacity 0.12s, height 0.12s, margin 0.12s;
+}
+.col-handle:hover::after,
+.col-handle:focus-visible::after,
+body.col-resizing .col-handle::after {
+  opacity: 0.9;
+  height: 88px;
+  margin-top: -44px;
+}
+.col-handle:focus-visible { outline: none; }
+body.col-resizing { cursor: col-resize; user-select: none; }
+body.col-resizing iframe { pointer-events: none; }
+
+/* Stollar: bir qatorda nechta (Sozlamalar -> "Stollar: bir qatorda"). Avto - panelga sig'gancha. */
+html[data-tcols="2"] .tg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-tcols="3"] .tg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html[data-tcols="4"] .tg-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tg-tile { min-width: 0; }
+.tg-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-state { max-width: 100%; overflow-wrap: break-word; }
+/* 4 ustun: katakcha tor, shuning uchun ixchamroq (aks holda "Bo'sh" harf-harf bo'linadi). */
+html[data-tcols="4"] .tg-tile { padding: 8px 6px 8px 8px; min-height: 76px; border-left-width: 4px; }
+html[data-tcols="4"] .tg-name { font-size: 1.5rem; }
+html[data-tcols="4"] .tg-state { font-size: 0.75rem; }

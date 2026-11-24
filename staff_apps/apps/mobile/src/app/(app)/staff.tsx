@@ -8,14 +8,17 @@ import {
   type User,
 } from '@pos/shared';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
-import { ChipSelect, FormCard, SectionTitle } from '@/ui/forms';
+import { hhmm } from '@/lib/time';
+import { ChipSelect, FormSheet, SectionTitle, useHeld } from '@/ui/forms';
+import { Chip } from '@/ui/parts';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 const ROLE_LABEL: Record<Role, string> = { manager: 'Menejer', cashier: 'Kassir', waiter: 'Ofitsiant' };
@@ -31,7 +34,6 @@ interface Draft {
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const hhmm = (iso: string) => `${pad(new Date(iso).getHours())}:${pad(new Date(iso).getMinutes())}`;
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const human = (d: Date) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
 
@@ -57,8 +59,21 @@ export default function StaffScreen() {
   const [staff, setStaff] = useState<User[] | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[] | null>(null);
   const [day, setDay] = useState(() => new Date());
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<Role | null>(null);
+  const visibleStaff = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const digits = q.replace(/\D/g, '');
+    return (staff ?? []).filter(
+      (u) =>
+        (roleFilter === null || u.role === roleFilter) &&
+        (!q || (fullName(u) || u.username).toLowerCase().includes(q) || (digits.length >= 3 && u.username.includes(digits))),
+    );
+  }, [staff, search, roleFilter]);
   const [draft, setDraft] = useState<Draft | null>(null);
+  useNotify(error, null, draft !== null);
   const [code, setCode] = useState<RegistrationCode | null>(null);
+  const shown = useHeld(draft);
 
   const loadStaff = useCallback(async () => setStaff(await pos.api.staff.list()), []);
   const loadAttendance = useCallback(async () => {
@@ -98,7 +113,7 @@ export default function StaffScreen() {
         if (isNew) created = await pos.api.staff.create({ ...base, username: phone as string, ...password });
         else await pos.api.staff.update(draft.id as number, { ...base, ...password });
       },
-      undefined,
+      'Xodim saqlandi.',
       loadStaff,
     );
     if (!ok) return;
@@ -111,7 +126,7 @@ export default function StaffScreen() {
   function confirmDelete(u: User) {
     Alert.alert("Xodimni o'chirish", `${fullName(u) || u.username} tizimdan o'chiriladi. Buyurtma tarixi bor xodimni o'chirib bo'lmasligi mumkin.`, [
       { text: "Yo'q", style: 'cancel' },
-      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.staff.delete(u.id), undefined, loadStaff) },
+      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.staff.delete(u.id), "Xodim o'chirildi.", loadStaff) },
     ]);
   }
 
@@ -126,7 +141,6 @@ export default function StaffScreen() {
       </View>
 
       {!isManager && <ErrorText>Bu bo'lim faqat menejer uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
 
       {code && (
         <Card>
@@ -141,34 +155,88 @@ export default function StaffScreen() {
         </Card>
       )}
 
-      {isManager && !draft && (
-        <Button title="+ Yangi xodim" onPress={() => setDraft({ firstName: '', lastName: '', phone: '', role: 'waiter', password: '' })} />
+      {isManager && (
+        <Button
+          title="+ Yangi xodim"
+          onPress={() => {
+            setError(null);
+            setDraft({ firstName: '', lastName: '', phone: '', role: 'waiter', password: '' });
+          }}
+        />
       )}
 
-      {draft && (
-        <FormCard title={draft.id ? 'Xodimni tahrirlash' : 'Yangi xodim'}>
-          <Field label="Ism" value={draft.firstName} onChangeText={(firstName) => setDraft({ ...draft, firstName })} autoCapitalize="words" />
-          <Field label="Familiya" value={draft.lastName} onChangeText={(lastName) => setDraft({ ...draft, lastName })} autoCapitalize="words" />
-          {draft.id === undefined ? (
-            <Field label="Telefon (kirish uchun login)" value={draft.phone} onChangeText={(phone) => setDraft({ ...draft, phone })} keyboardType="phone-pad" placeholder="90 123 45 67" />
+      <FormSheet
+        visible={draft !== null}
+        title={shown?.id ? 'Xodimni tahrirlash' : 'Yangi xodim'}
+        busy={busy}
+        error={error}
+        onClose={() => setDraft(null)}
+        onSave={() => void save()}
+      >
+        {shown && (
+          <>
+          <Field label="Ism" value={shown.firstName} onChangeText={(firstName) => setDraft({ ...shown, firstName })} autoCapitalize="words" />
+          <Field label="Familiya" value={shown.lastName} onChangeText={(lastName) => setDraft({ ...shown, lastName })} autoCapitalize="words" />
+          {shown.id === undefined ? (
+            <Field label="Telefon (kirish uchun login)" value={shown.phone} onChangeText={(phone) => setDraft({ ...shown, phone })} keyboardType="phone-pad" placeholder="90 123 45 67" />
           ) : (
-            <Muted>Telefon (login): {formatPhone(draft.phone)} - o'zgartirib bo'lmaydi.</Muted>
+            <Muted>Telefon (login): {formatPhone(shown.phone)} - o'zgartirib bo'lmaydi.</Muted>
           )}
-          <ChipSelect<Role> label="Lavozimi" value={draft.role} options={ROLES.map((r) => ({ value: r, label: ROLE_LABEL[r] }))} onChange={(role) => setDraft({ ...draft, role })} />
-          {draft.role === 'cashier' ? (
+          <ChipSelect<Role> label="Lavozimi" value={shown.role} options={ROLES.map((r) => ({ value: r, label: ROLE_LABEL[r] }))} onChange={(role) => setDraft({ ...shown, role })} />
+          {shown.role === 'cashier' ? (
             <Muted>Kassirga parol berilmaydi: kirish kodi orqali PIN'ni o'zi o'rnatadi.</Muted>
           ) : (
             <Field
-              label={draft.id ? "Yangi parol (o'zgartirmasangiz bo'sh qoldiring)" : 'Parol (kamida 6 ta belgi)'}
-              value={draft.password}
-              onChangeText={(password) => setDraft({ ...draft, password })}
+              label={shown.id ? "Yangi parol (o'zgartirmasangiz bo'sh qoldiring)" : 'Parol (kamida 6 ta belgi)'}
+              value={shown.password}
+              onChangeText={(password) => setDraft({ ...shown, password })}
               secureTextEntry
             />
           )}
-          <Button title="Saqlash" loading={busy} onPress={() => void save()} />
-          <Button title="Bekor qilish" variant="ghost" disabled={busy} onPress={() => setDraft(null)} />
-        </FormCard>
+          </>
+        )}
+      </FormSheet>
+
+      {isManager && staff === null && !error && <Muted>Yuklanmoqda...</Muted>}
+
+      {isManager && <SectionTitle>Xodimlar ro'yxati</SectionTitle>}
+      {isManager && staff !== null && staff.length > 5 && (
+        <>
+          <Field label="Qidirish (ism yoki telefon)" value={search} onChangeText={setSearch} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Chip label="Hammasi" active={roleFilter === null} onPress={() => setRoleFilter(null)} />
+            {ROLES.map((r) => (
+              <Chip key={r} label={ROLE_LABEL[r]} active={roleFilter === r} onPress={() => setRoleFilter(r)} />
+            ))}
+          </View>
+        </>
       )}
+      {isManager && staff !== null && staff.length > 0 && visibleStaff.length === 0 && <Muted>Xodim topilmadi.</Muted>}
+      {visibleStaff.map((u) => (
+        <Card key={u.id}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <Txt size={18} weight={600} style={{ flex: 1 }}>
+              {fullName(u) || u.username}
+            </Txt>
+            <Pill label={ROLE_LABEL[u.role]} kind="neutral" />
+          </View>
+          <Muted>{formatPhone(u.username)}</Muted>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Button
+              title="Tahrirlash"
+              variant="ghost"
+              compact
+              disabled={busy}
+              onPress={() => {
+                setError(null);
+                setDraft({ id: u.id, firstName: u.first_name, lastName: u.last_name, phone: u.username, role: u.role, password: '' });
+              }}
+            />
+            {u.role === 'cashier' && <Button title="Kirish kodi" variant="ghost" compact disabled={busy} onPress={() => void run(async () => setCode(await pos.api.staff.registrationCode(u.id)))} />}
+            {u.id !== user?.id && <Button title="O'chirish" variant="danger" compact disabled={busy} onPress={() => confirmDelete(u)} />}
+          </View>
+        </Card>
+      ))}
 
       {isManager && (
         <>
@@ -199,32 +267,6 @@ export default function StaffScreen() {
           </Card>
         </>
       )}
-
-      {isManager && staff === null && !error && <Muted>Yuklanmoqda...</Muted>}
-
-      {isManager && <SectionTitle>Xodimlar ro'yxati</SectionTitle>}
-      {staff?.map((u) => (
-        <Card key={u.id}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <Txt size={18} weight={600} style={{ flex: 1 }}>
-              {fullName(u) || u.username}
-            </Txt>
-            <Pill label={ROLE_LABEL[u.role]} kind="neutral" />
-          </View>
-          <Muted>{formatPhone(u.username)}</Muted>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Button
-              title="Tahrirlash"
-              variant="ghost"
-              compact
-              disabled={busy}
-              onPress={() => setDraft({ id: u.id, firstName: u.first_name, lastName: u.last_name, phone: u.username, role: u.role, password: '' })}
-            />
-            {u.role === 'cashier' && <Button title="Kirish kodi" variant="ghost" compact disabled={busy} onPress={() => void run(async () => setCode(await pos.api.staff.registrationCode(u.id)))} />}
-            {u.id !== user?.id && <Button title="O'chirish" variant="danger" compact disabled={busy} onPress={() => confirmDelete(u)} />}
-          </View>
-        </Card>
-      ))}
     </Screen>
   );
 }

@@ -3,6 +3,7 @@ import {
   type CashierPanel,
   type TextScale,
   type ThemePref,
+  TABLE_COLS,
 } from "@pos/design";
 import { setAppearance, useAppearance } from "../lib/appearance";
 
@@ -154,6 +155,24 @@ export function MenuSheet({
                     onClick={() => setAppearance({ textScale: s.id })}
                   >
                     {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mblock">
+              <div>
+                <div className="mrow-t">Stollar: bir qatorda</div>
+                <div className="mrow-s">Stollar ro'yxatida yonma-yon nechta stol ko'rinsin</div>
+              </div>
+              <div className="tabs">
+                {TABLE_COLS.map((t) => (
+                  <button
+                    key={t.id}
+                    className={ap.tableCols === t.id ? "active" : ""}
+                    onClick={() => setAppearance({ tableCols: t.id })}
+                  >
+                    {t.label}
                   </button>
                 ))}
               </div>

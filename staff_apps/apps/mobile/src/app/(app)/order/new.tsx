@@ -38,6 +38,7 @@ export default function NewOrderScreen() {
   const progress = useRef<SubmitProgress>({});
   const [guests, setGuests] = useState('');
   const [note, setNote] = useState('');
+  const [metaOpen, setMetaOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +102,20 @@ export default function NewOrderScreen() {
       {registerClosed && <ErrorText>Kassa yopiq — buyurtma ochib bo'lmaydi.</ErrorText>}
       {!data && <Muted>Yuklanmoqda...</Muted>}
 
-      {data && (
+      {data && !metaOpen && (
+        <Button
+          title={
+            Number(guests) > 0 || note.trim()
+              ? ['Mehmon: ' + (Number(guests) > 0 ? guests : '-'), note.trim() ? 'izoh bor' : ''].filter(Boolean).join(' · ') + '  (o‘zgartirish)'
+              : '+ Mehmonlar soni / izoh (ixtiyoriy)'
+          }
+          variant="ghost"
+          compact
+          onPress={() => setMetaOpen(true)}
+        />
+      )}
+
+      {data && metaOpen && (
         <Card>
           <Txt size={14} weight={500} tone="muted">
             Mehmonlar soni (ixtiyoriy)
@@ -113,6 +127,7 @@ export default function NewOrderScreen() {
           </View>
           <Field label="Boshqa son" value={guests} onChangeText={(v) => setGuests(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad" />
           <Field label="Buyurtmaga izoh (ixtiyoriy)" value={note} onChangeText={setNote} autoCapitalize="sentences" />
+          <Button title="Tayyor" compact onPress={() => setMetaOpen(false)} />
         </Card>
       )}
 

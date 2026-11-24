@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatMoney, sortOpenOrders, tiyinToDecimal, toTiyin, type Order, type Table } from '@pos/shared';
 
 /** Stollarni zonalar bo'yicha guruhlab, nomini "2" < "10" tartibida (raqam sifatida) saralaydi. */
@@ -32,12 +33,45 @@ export function TableGrid({
   /** Bo'sh stol bosilsa: shu stolga yangi buyurtma ochish. */
   onPickFree?: (tableId: number) => void;
 }) {
-  const groups = groupTablesByZone(tables);
-  if (groups.length === 0) return <div className="orders-empty muted">Stollar hali qo'shilmagan</div>;
+  const [query, setQuery] = useState('');
+  const [zone, setZone] = useState<string | null>(null);
+  const all = groupTablesByZone(tables);
+  if (all.length === 0) return <div className="orders-empty muted">Stollar hali qo'shilmagan</div>;
+
+  const total = all.reduce((n, g) => n + g.tables.length, 0);
+  const q = query.trim().toLowerCase();
+  // Tanlangan zona o'chib ketgan bo'lsa filtr "Hammasi"ga qaytadi.
+  const activeZone = zone !== null && all.some((g) => g.zone === zone) ? zone : null;
+  const groups = all
+    .filter((g) => activeZone === null || g.zone === activeZone)
+    .map((g) => ({ ...g, tables: q ? g.tables.filter((t) => t.name.toLowerCase().includes(q)) : g.tables }))
+    .filter((g) => g.tables.length > 0);
 
   const open = sortOpenOrders(orders);
   return (
     <>
+      {(total > 8 || all.length > 1) && (
+        <div className="tg-tools">
+          {total > 8 && (
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Stol nomi"
+              aria-label="Stol qidirish"
+            />
+          )}
+          {all.length > 1 && (
+            <div className="tg-chips" role="group" aria-label="Zona">
+              <button className={activeZone === null ? 'active' : ''} onClick={() => setZone(null)}>Hammasi</button>
+              {all.map((g) => (
+                <button key={g.zone} className={activeZone === g.zone ? 'active' : ''} onClick={() => setZone(g.zone)}>{g.zone}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {groups.length === 0 && <div className="orders-empty muted">Stol topilmadi</div>}
       {groups.map((g) => (
         <section key={g.zone} className="tg-zone">
           <h3 className="tg-zone-name">{g.zone}</h3>

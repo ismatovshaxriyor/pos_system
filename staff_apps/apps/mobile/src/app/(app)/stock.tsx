@@ -8,6 +8,7 @@ import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect } from '@/ui/forms';
 import { Button, Card, ErrorText, Eyebrow, Muted, Pill, Screen, Segmented, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 type Tab = 'purchases' | 'movements';
@@ -25,6 +26,7 @@ export default function StockScreen() {
   const allowed = isManager || user?.role === 'cashier';
   const hand = useHand();
   const { busy, error, run } = useManage();
+  useNotify(error, null);
   const [tab, setTab] = useState<Tab>('purchases');
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [purchasesNext, setPurchasesNext] = useState(false);
@@ -81,7 +83,6 @@ export default function StockScreen() {
       </View>
 
       {!allowed && <ErrorText>Bu bo'lim faqat menejer va kassir uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
 
       {allowed && (
         <Segmented<Tab>

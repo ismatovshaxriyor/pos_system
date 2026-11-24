@@ -1,6 +1,7 @@
 import { describeError, filterOrders, formatMoney, fullName, sortOpenOrders, stepSelection, tiyinToDecimal, toTiyin } from '@pos/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ColumnHandles } from '../components/ColumnHandles';
 import { DayEndSheet } from '../components/DayEndSheet';
 import { DebtSheet } from '../components/DebtSheet';
 import { Flap } from '../components/Flap';
@@ -41,6 +42,7 @@ export function HomeScreen() {
   const [shiftsOpen, setShiftsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   /** 'view' - oddiy hisobot; 'close' - kassani yopish (hisobot ichida tasdiq). */
   const [dayEnd, setDayEnd] = useState<null | 'view' | 'close'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export function HomeScreen() {
       {(error || actionError) && <div className="banner err">{actionError ?? error}</div>}
       {flash && !error && !actionError && <div className="banner err info">{flash}</div>}
 
-      <main className="main">
+      <main className="main" ref={mainRef}>
         <aside className="col-orders">
           <div className="col-new">
             <button
@@ -244,6 +246,7 @@ export function HomeScreen() {
             <div className="idle-hint">← To'lov uchun buyurtmani tanlang</div>
           </section>
         )}
+        <ColumnHandles showPay={!creating && current !== null} containerRef={mainRef} />
       </main>
 
       {menuOpen && data && (

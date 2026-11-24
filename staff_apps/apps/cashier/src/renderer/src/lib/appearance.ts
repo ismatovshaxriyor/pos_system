@@ -1,10 +1,13 @@
 import {
   DEFAULT_CASHIER_LAYOUT,
+  DEFAULT_TABLE_COLS,
   isCashierLayout,
+  isTableCols,
   isTextScale, isThemePref,
   resolveTheme,
   textScaleFactor,
   type CashierLayout,
+  type TableCols,
   type TextScale,
   type ThemePref,
 } from '@pos/design';
@@ -21,10 +24,12 @@ export interface Appearance {
   sound: boolean;
   /** Panellar joylashuvi (qo'lga moslash): o'ng / chap / ikki qo'l A / B. */
   layout: CashierLayout;
+  /** Stollar katakchalari: bir qatorda nechta (avto - panelga sig'gancha). */
+  tableCols: TableCols;
 }
 
 const KEY = 'pos.cashier.appearance.v1';
-const DEFAULTS: Appearance = { theme: 'auto', textScale: 'normal', reduceMotion: false, sound: true, layout: DEFAULT_CASHIER_LAYOUT };
+const DEFAULTS: Appearance = { theme: 'auto', textScale: 'normal', reduceMotion: false, sound: true, layout: DEFAULT_CASHIER_LAYOUT, tableCols: DEFAULT_TABLE_COLS };
 
 function read(): Appearance {
   try {
@@ -37,6 +42,7 @@ function read(): Appearance {
       reduceMotion: typeof p.reduceMotion === 'boolean' ? p.reduceMotion : DEFAULTS.reduceMotion,
       sound: typeof p.sound === 'boolean' ? p.sound : DEFAULTS.sound,
       layout: isCashierLayout(p.layout) ? p.layout : DEFAULTS.layout,
+      tableCols: isTableCols(p.tableCols) ? p.tableCols : DEFAULTS.tableCols,
     };
   } catch {
     return DEFAULTS;
@@ -54,6 +60,7 @@ export function applyAppearance(): void {
   root.style.setProperty('--text-scale', String(textScaleFactor(state.textScale)));
   root.dataset.motion = state.reduceMotion ? 'reduced' : 'full';
   root.dataset.layout = state.layout;
+  root.dataset.tcols = state.tableCols;
 }
 
 /** Ilova ishga tushganda bir marta. "Avto" rejim uchun har daqiqa soatni qayta tekshiradi (19:00 da o'zi tunga o'tadi). */

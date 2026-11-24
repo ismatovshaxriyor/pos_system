@@ -6,8 +6,9 @@ import { Alert, View } from 'react-native';
 import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
-import { ChipSelect, FormCard, SectionTitle, SwitchRow } from '@/ui/forms';
+import { ChipSelect, FormSheet, SectionTitle, SwitchRow, useHeld } from '@/ui/forms';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 interface Draft {
@@ -45,6 +46,8 @@ export default function PrintersScreen() {
   const [options, setOptions] = useState<PrinterCategoryOption[]>([]);
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
+  useNotify(error, info, draft !== null);
+  const shown = useHeld(draft);
   const [picking, setPicking] = useState<{ id: number; selected: number[] } | null>(null);
 
   const load = useCallback(async () => {
@@ -65,14 +68,14 @@ export default function PrintersScreen() {
     const port = Number(draft.port);
     if (!draft.name.trim() || !Number.isInteger(port) || port < 1 || port > 65535) return setError("Printer nomi va to'g'ri portni (odatda 9100) kiriting.");
     const body = { name: draft.name.trim(), ip_address: draft.ip.trim() || null, port, chars_per_line: draft.width, is_active: draft.active, is_cashier: draft.cashier };
-    const ok = await run(() => (draft.id ? pos.api.printers.update(draft.id, body) : pos.api.printers.create(body)), undefined, load);
+    const ok = await run(() => (draft.id ? pos.api.printers.update(draft.id, body) : pos.api.printers.create(body)), 'Printer saqlandi.', load);
     if (ok) setDraft(null);
   }
 
   function confirmDelete(p: Printer) {
     Alert.alert("Printerni o'chirish", `"${p.name}" va uning chop etish tarixi o'chiriladi. Bo'limlari printersiz qoladi.`, [
       { text: "Yo'q", style: 'cancel' },
-      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.printers.delete(p.id), undefined, load) },
+      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.printers.delete(p.id), "Printer o'chirildi.", load) },
     ]);
   }
 
@@ -87,23 +90,36 @@ export default function PrintersScreen() {
       </View>
 
       {!isManager && <ErrorText>Bu bo'lim faqat menejer uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
-      {info && <Muted>{info}</Muted>}
 
-      {isManager && !draft && <Button title="+ Yangi printer" onPress={() => setDraft({ name: '', ip: '', port: '9100', width: 48, active: true, cashier: false })} />}
-
-      {draft && (
-        <FormCard title={draft.id ? 'Printerni tahrirlash' : 'Yangi printer'}>
-          <Field label="Nomi (masalan: Oshxona, Bar, Kassa)" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} autoCapitalize="sentences" />
-          <Field label="IP manzil (bo'sh - virtual printer)" value={draft.ip} onChangeText={(ip) => setDraft({ ...draft, ip })} keyboardType="numbers-and-punctuation" placeholder="192.168.1.50" />
-          <Field label="Port" value={draft.port} onChangeText={(port) => setDraft({ ...draft, port: port.replace(/\D/g, '') })} keyboardType="number-pad" />
-          <ChipSelect label="Qog'oz kengligi" value={draft.width} options={WIDTHS} onChange={(width) => setDraft({ ...draft, width })} />
-          <SwitchRow label="Kassa printeri" hint="Hisob-chek (shot) va to'lov cheklari shu printerdan chiqadi." value={draft.cashier} onChange={(cashier) => setDraft({ ...draft, cashier })} />
-          <SwitchRow label="Faol" hint="O'chirilsa unga chek yuborilmaydi." value={draft.active} onChange={(active) => setDraft({ ...draft, active })} />
-          <Button title="Saqlash" loading={busy} onPress={() => void save()} />
-          <Button title="Bekor qilish" variant="ghost" disabled={busy} onPress={() => setDraft(null)} />
-        </FormCard>
+      {isManager && (
+        <Button
+          title="+ Yangi printer"
+          onPress={() => {
+            setError(null);
+            setDraft({ name: '', ip: '', port: '9100', width: 48, active: true, cashier: false });
+          }}
+        />
       )}
+
+      <FormSheet
+        visible={draft !== null}
+        title={shown?.id ? 'Printerni tahrirlash' : 'Yangi printer'}
+        busy={busy}
+        error={error}
+        onClose={() => setDraft(null)}
+        onSave={() => void save()}
+      >
+        {shown && (
+          <>
+          <Field label="Nomi (masalan: Oshxona, Bar, Kassa)" value={shown.name} onChangeText={(name) => setDraft({ ...shown, name })} autoCapitalize="sentences" />
+          <Field label="IP manzil (bo'sh - virtual printer)" value={shown.ip} onChangeText={(ip) => setDraft({ ...shown, ip })} keyboardType="numbers-and-punctuation" placeholder="192.168.1.50" />
+          <Field label="Port" value={shown.port} onChangeText={(port) => setDraft({ ...shown, port: port.replace(/\D/g, '') })} keyboardType="number-pad" />
+          <ChipSelect label="Qog'oz kengligi" value={shown.width} options={WIDTHS} onChange={(width) => setDraft({ ...shown, width })} />
+          <SwitchRow label="Kassa printeri" hint="Hisob-chek (shot) va to'lov cheklari shu printerdan chiqadi." value={shown.cashier} onChange={(cashier) => setDraft({ ...shown, cashier })} />
+          <SwitchRow label="Faol" hint="O'chirilsa unga chek yuborilmaydi." value={shown.active} onChange={(active) => setDraft({ ...shown, active })} />
+          </>
+        )}
+      </FormSheet>
 
       {isManager && printers === null && !error && <Muted>Yuklanmoqda...</Muted>}
       {printers?.length === 0 && <Muted>Hali printer yo'q.</Muted>}
@@ -158,7 +174,10 @@ export default function PrintersScreen() {
                   variant="ghost"
                   compact
                   disabled={busy}
-                  onPress={() => setDraft({ id: p.id, name: p.name, ip: p.ip_address ?? '', port: String(p.port), width: p.chars_per_line, active: p.is_active, cashier: p.is_cashier })}
+                  onPress={() => {
+                    setError(null);
+                    setDraft({ id: p.id, name: p.name, ip: p.ip_address ?? '', port: String(p.port), width: p.chars_per_line, active: p.is_active, cashier: p.is_cashier });
+                  }}
                 />
                 {p.ip_address && <Button title="Test chek" variant="ghost" compact disabled={busy} onPress={() => void run(() => pos.api.printers.testPrint(p.id), 'Test chek yuborildi.')} />}
                 <Button title="O'chirish" variant="danger" compact disabled={busy} onPress={() => confirmDelete(p)} />

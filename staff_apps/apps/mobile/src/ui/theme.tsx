@@ -1,9 +1,11 @@
 import {
   DEFAULT_HAND_LAYOUT,
   DEFAULT_MENU_STYLE,
+  DEFAULT_TABLE_COLS,
   handRules,
   isHandLayout,
   isMenuStyle,
+  isTableCols,
   isTextScale,
   isThemePref,
   paletteFor,
@@ -13,6 +15,7 @@ import {
   type HandRules,
   type MenuStyle,
   type Palette,
+  type TableCols,
   type TextScale,
   type ThemeName,
   type ThemePref,
@@ -29,6 +32,8 @@ export interface Appearance {
   hand: HandLayout;
   /** Buyurtma olishda menyu ko'rinishi: ro'yxat / ixcham / rasmli kartochkalar. */
   menuStyle: MenuStyle;
+  /** Bosh ekranda bir qatorda nechta stol: avto (telefonda 3, planshetda 4) yoki 2/3/4. */
+  tableCols: TableCols;
   /** Taom rasmlari ko'rinsinmi (sekin internet yoki ixcham ko'rinish uchun o'chirish mumkin). */
   showImages: boolean;
 }
@@ -39,6 +44,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   reduceMotion: false,
   hand: DEFAULT_HAND_LAYOUT,
   menuStyle: DEFAULT_MENU_STYLE,
+  tableCols: DEFAULT_TABLE_COLS,
   showImages: true,
 };
 
@@ -54,6 +60,7 @@ function parse(raw: string | null): Appearance {
       reduceMotion: v.reduceMotion === true,
       hand: isHandLayout(v.hand) ? v.hand : DEFAULT_APPEARANCE.hand,
       menuStyle: isMenuStyle(v.menuStyle) ? v.menuStyle : DEFAULT_APPEARANCE.menuStyle,
+      tableCols: isTableCols(v.tableCols) ? v.tableCols : DEFAULT_APPEARANCE.tableCols,
       showImages: typeof v.showImages === 'boolean' ? v.showImages : DEFAULT_APPEARANCE.showImages,
     };
   } catch {

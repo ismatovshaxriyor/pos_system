@@ -103,3 +103,22 @@ export const DEFAULT_MENU_STYLE: MenuStyle = 'list';
 export function isMenuStyle(v: unknown): v is MenuStyle {
   return MENU_STYLES.some((m) => m.id === v);
 }
+
+/**
+ * Stollar katakchalari: bir qatorda nechta stol (har qurilmada alohida).
+ * `auto` - ekran kengligiga qarab (telefonda 3, planshetda 4; kassada panelga sig'gancha).
+ */
+export type TableCols = 'auto' | '2' | '3' | '4';
+
+export const TABLE_COLS: readonly { id: TableCols; label: string }[] = [
+  { id: 'auto', label: 'Avto' },
+  { id: '2', label: '2' },
+  { id: '3', label: '3' },
+  { id: '4', label: '4' },
+];
+
+export const DEFAULT_TABLE_COLS: TableCols = 'auto';
+
+export function isTableCols(v: unknown): v is TableCols {
+  return TABLE_COLS.some((t) => t.id === v);
+}

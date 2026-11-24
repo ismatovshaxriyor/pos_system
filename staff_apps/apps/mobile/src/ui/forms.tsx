@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
-import type { ReactNode } from 'react';
-import { Switch, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { pickImage } from '@/lib/manage';
 import type { ImageUpload } from '@pos/shared';
-import { Button, Card, Muted, Txt } from '@/ui/kit';
+import { Button, Card, ErrorText, Muted, Txt } from '@/ui/kit';
 import { useTheme } from '@/ui/theme';
 
 /** Bitta qiymatni tanlash (chiplar): bo'lim, birlik, ta'minotchi kabilar uchun. */
@@ -109,5 +110,134 @@ export function FormCard({ title, children }: { title: string; children: ReactNo
       </Txt>
       {children}
     </Card>
+  );
+}
+
+/**
+ * Oxirgi bo'sh bo'lmagan qiymatni eslab qoladi. `FormSheet` yopilayotganda (pastga sirpanish animatsiyasi)
+ * forma tarkibi bo'sh qolib, "chaqnab" ketmasin deb, `draft` null bo'lgandan keyin ham oxirgisini beradi.
+ */
+export function useHeld<T>(value: T | null): T | null {
+  const ref = useRef<T | null>(value);
+  if (value !== null) ref.current = value;
+  return ref.current;
+}
+
+/**
+ * Tahrirlash/yaratish formasi uchun pastdan chiquvchi oyna. Ro'yxat orqada o'z joyida turadi, shuning
+ * uchun yopilgach foydalanuvchi o'sha joyda qoladi (forma ro'yxat tepasida chiqib, pastga scroll qildirmaydi).
+ * Sarlavha, xato va tugmalar scroll'dan tashqarida: pastga tushmasdan saqlash/yopish mumkin.
+ * Fon bosilganda yopilmaydi - yozilgan ma'lumot tasodifan yo'qolmasin.
+ */
+export function FormSheet({
+  visible,
+  title,
+  onClose,
+  onSave,
+  saveTitle = 'Saqlash',
+  closeTitle = 'Bekor qilish',
+  busy = false,
+  error,
+  children,
+}: {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  /** Berilmasa pastki "Saqlash" tugmasi chiqmaydi (masalan ro'yxat oynasi). */
+  onSave?: () => void;
+  saveTitle?: string;
+  closeTitle?: string;
+  busy?: boolean;
+  error?: string | null;
+  children: ReactNode;
+}) {
+  const { c, appearance } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  // Android'da Modal ichida oyna klaviatura chiqqanda kichraymaydi (asosiy ekrandagidek emas): klaviatura
+  // tugmalar va pastdagi maydonlarni yopib qo'yadi. Shuning uchun balandligini o'zimiz kuzatib, pastdan
+  // shuncha bo'sh joy qoldiramiz. iOS'da KeyboardAvoidingView buni o'zi qiladi.
+  const [kb, setKb] = useState(0);
+  // Tekshiruv xatosi maydonlar to'g'rilangandan keyin ham qotib qolmasin: foydalanuvchi oyna ichiga
+  // tegishi bilan yashiriladi. Xuddi shu xato qayta chiqsa (Saqlash qayta bosilganda) yana ko'rinadi.
+  const [seenError, setSeenError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!error) setSeenError(null);
+  }, [error]);
+  const shownError = error && error !== seenError ? error : null;
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKb(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKb(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType={appearance.reduceMotion ? 'none' : 'slide'}
+      onRequestClose={() => {
+        if (!busy) onClose();
+      }}
+    >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: c.dim, paddingBottom: kb }}>
+          <View
+            style={{
+              backgroundColor: c.paper,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxHeight: '92%',
+              paddingBottom: kb > 0 ? 12 : insets.bottom + 12,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Txt size={20} weight={600}>
+                  {title}
+                </Txt>
+              </View>
+              <Button title="Yopish" variant="ghost" compact disabled={busy} onPress={onClose} />
+            </View>
+            {shownError ? (
+              <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+                <ErrorText>{shownError}</ErrorText>
+              </View>
+            ) : null}
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 8, gap: 14 }}
+              keyboardShouldPersistTaps="handled"
+              onTouchStart={() => {
+                if (error) setSeenError(error);
+              }}
+            >
+              {children}
+            </ScrollView>
+            {onSave ? (
+              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Button title={closeTitle} variant="ghost" disabled={busy} onPress={onClose} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title={saveTitle}
+                    loading={busy}
+                    onPress={() => {
+                      setSeenError(null);
+                      onSave();
+                    }}
+                  />
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }

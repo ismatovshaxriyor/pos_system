@@ -3,13 +3,16 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { useShift } from '@/lib/shift';
-import { Button, Card, ErrorText, Pill, Txt } from '@/ui/kit';
+import { hhmm } from '@/lib/time';
+import { Button, Card, Pill, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useTheme } from '@/ui/theme';
 
 /** Bosh ekrandagi "Smena" kartasi: kelganini/ketganini belgilash (GPS bilan, restoran radiusi ichida). */
 export function ShiftCard() {
   const { c } = useTheme();
   const { status, error, busy, toggle } = useShift();
+  useNotify(error, null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
@@ -20,7 +23,7 @@ export function ShiftCard() {
   const on = status?.on_shift ?? false;
   const since = status?.attendance ? Date.parse(status.attendance.check_in) : NaN;
   const minutes = Number.isNaN(since) ? 0 : Math.max(0, Math.floor((now - since) / 60_000));
-  const sinceTime = Number.isNaN(since) ? '' : new Date(since).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  const sinceTime = Number.isNaN(since) ? '' : hhmm(since);
 
   return (
     <Card edge={on ? c.ok : c.edge} style={{ gap: 10 }}>
@@ -42,7 +45,6 @@ export function ShiftCard() {
         loading={busy}
         onPress={() => void toggle()}
       />
-      {error && <ErrorText>{error}</ErrorText>}
     </Card>
   );
 }

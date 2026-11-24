@@ -17,6 +17,7 @@ import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { FormCard, SwitchRow } from '@/ui/forms';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { CartSheet, MenuPicker } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
@@ -40,6 +41,7 @@ export default function TemplatesScreen() {
   const { busy, error, setError, run } = useManage();
   const [list, setList] = useState<OrderTemplate[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  useNotify(error, null);
 
   const load = useCallback(async () => setList(await pos.api.templates.list()), []);
   useRealtimeRefresh(['menu_changed'], load);
@@ -68,14 +70,14 @@ export default function TemplatesScreen() {
       sort_order: draft.sortOrder,
       items: draft.items.map((l) => ({ product_id: l.productId, quantity: l.quantity, note: l.note })),
     };
-    const ok = await run(() => (draft.id ? pos.api.templates.update(draft.id, body) : pos.api.templates.create(body)), undefined, load);
+    const ok = await run(() => (draft.id ? pos.api.templates.update(draft.id, body) : pos.api.templates.create(body)), 'Shablon saqlandi.', load);
     if (ok) setDraft(null);
   }
 
   function confirmDelete(t: OrderTemplate) {
     Alert.alert('Shablonni o‘chirish', `"${t.name}" o'chiriladi. Buyurtmalarga ta'sir qilmaydi.`, [
       { text: "Yo'q", style: 'cancel' },
-      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.templates.delete(t.id), undefined, load) },
+      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.templates.delete(t.id), "Shablon o'chirildi.", load) },
     ]);
   }
 
@@ -92,7 +94,6 @@ export default function TemplatesScreen() {
             onQty={(l, q) => setDraft((d) => d && { ...d, items: setQuantity(d.items, l.productId, l.note, q) })}
             onNote={(l, note) => setDraft((d) => d && { ...d, items: setLineNote(d.items, l.productId, l.note, note) })}
           >
-            {error && <ErrorText>{error}</ErrorText>}
             <Button title="Shablonni saqlash" loading={busy} disabled={draft.items.length === 0} onPress={() => void save()} />
           </CartSheet>
         ) : undefined
@@ -107,7 +108,6 @@ export default function TemplatesScreen() {
       </View>
 
       {!allowed && <ErrorText>Bu bo'lim faqat menejer uchun.</ErrorText>}
-      {!draft && error && <ErrorText>{error}</ErrorText>}
 
       {allowed && !draft && (
         <>

@@ -3,12 +3,15 @@ import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useBootstrap, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
+import { FormSheet, useHeld } from '@/ui/forms';
+import { Chip } from '@/ui/parts';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 interface TableDraft {
@@ -29,13 +32,27 @@ export default function FloorScreen() {
   const hand = useHand();
   const [tables, setTables] = useState<Table[] | null>(null);
   const [draft, setDraft] = useState<TableDraft | null>(null);
+  const shown = useHeld(draft);
   const [zoneDraft, setZoneDraft] = useState<{ id?: number; name: string } | null>(null);
   const [qrFor, setQrFor] = useState<number | null>(null);
   const [sharing, setSharing] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  useNotify(error, info, draft !== null || zoneDraft !== null);
 
   const zones: TableZone[] = data?.table_zones ?? [];
+  const [search, setSearch] = useState('');
+  // 'all' - hammasi, 'none' - zonasizlar, son - zona id
+  const [zoneFilter, setZoneFilter] = useState<'all' | 'none' | number>('all');
+  const visibleTables = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (tables ?? []).filter(
+      (t) =>
+        (zoneFilter === 'all' || (zoneFilter === 'none' ? !t.zone : t.zone?.id === zoneFilter)) &&
+        (!q || t.name.toLowerCase().includes(q)),
+    );
+  }, [tables, search, zoneFilter]);
 
   const load = useCallback(async () => {
     try {
@@ -50,12 +67,14 @@ export default function FloorScreen() {
     if (isManager) void load();
   }, [isManager, load]);
 
-  async function run(fn: () => Promise<unknown>) {
+  async function run(fn: () => Promise<unknown>, done?: string) {
     setBusy(true);
     setError(null);
+    setInfo(null);
     try {
       await fn();
       await Promise.all([load(), refresh()]);
+      if (done) setInfo(done);
       return true;
     } catch (e) {
       setError(describeError(e));
@@ -73,7 +92,7 @@ export default function FloorScreen() {
       return;
     }
     const body = { name: draft.name.trim(), capacity, zone_id: draft.zoneId };
-    const ok = await run(() => (draft.id ? pos.api.floor.updateTable(draft.id, body) : pos.api.floor.createTable(body)));
+    const ok = await run(() => (draft.id ? pos.api.floor.updateTable(draft.id, body) : pos.api.floor.createTable(body)), 'Stol saqlandi.');
     if (ok) setDraft(null);
   }
 
@@ -84,14 +103,14 @@ export default function FloorScreen() {
       setError('Zona nomini kiriting.');
       return;
     }
-    const ok = await run(() => (zoneDraft.id ? pos.api.floor.updateZone(zoneDraft.id, { name }) : pos.api.floor.createZone({ name })));
+    const ok = await run(() => (zoneDraft.id ? pos.api.floor.updateZone(zoneDraft.id, { name }) : pos.api.floor.createZone({ name })), 'Zona saqlandi.');
     if (ok) setZoneDraft(null);
   }
 
   function confirmDeleteTable(t: Table) {
     Alert.alert("Stolni o'chirish", `"${t.name}" o'chiriladi. Buyurtma tarixi bor stolni o'chirib bo'lmaydi - u holda "Yashirish"dan foydalaning.`, [
       { text: "Yo'q", style: 'cancel' },
-      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.floor.deleteTable(t.id)) },
+      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.floor.deleteTable(t.id), "Stol o'chirildi.") },
     ]);
   }
 
@@ -131,7 +150,7 @@ export default function FloorScreen() {
   function confirmDeleteZone(z: TableZone) {
     Alert.alert("Zonani o'chirish", `"${z.name}" zonasi o'chiriladi. Stollar o'chmaydi, zonasiz qoladi.`, [
       { text: "Yo'q", style: 'cancel' },
-      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.floor.deleteZone(z.id)) },
+      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.floor.deleteZone(z.id), "Zona o'chirildi.") },
     ]);
   }
 
@@ -146,37 +165,46 @@ export default function FloorScreen() {
       </View>
 
       {!isManager && <ErrorText>Bu bo'lim faqat menejer uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
 
-      {isManager && !draft && (
-        <Button title="+ Yangi stol" onPress={() => setDraft({ name: '', capacity: '4', zoneId: zones[0]?.id ?? null })} />
+      {isManager && (
+        <Button
+          title="+ Yangi stol"
+          onPress={() => {
+            setError(null);
+            setDraft({ name: '', capacity: '4', zoneId: zones[0]?.id ?? null });
+          }}
+        />
       )}
 
-      {draft && (
-        <Card>
-          <Txt size={17} weight={600}>
-            {draft.id ? 'Stolni tahrirlash' : 'Yangi stol'}
-          </Txt>
-          <Field label="Nomi (masalan: 5-stol)" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} autoCapitalize="sentences" />
+      <FormSheet
+        visible={draft !== null}
+        title={shown?.id ? 'Stolni tahrirlash' : 'Yangi stol'}
+        busy={busy}
+        error={error}
+        onClose={() => setDraft(null)}
+        onSave={() => void saveTable()}
+      >
+        {shown && (
+          <>
+          <Field label="Nomi (masalan: 5-stol)" value={shown.name} onChangeText={(name) => setDraft({ ...shown, name })} autoCapitalize="sentences" />
           <Field
             label="O'rinlar soni"
-            value={draft.capacity}
-            onChangeText={(capacity) => setDraft({ ...draft, capacity: capacity.replace(/\D/g, '') })}
+            value={shown.capacity}
+            onChangeText={(capacity) => setDraft({ ...shown, capacity: capacity.replace(/\D/g, '') })}
             keyboardType="number-pad"
           />
           <Txt size={14} weight={500} tone="muted">
             Zona
           </Txt>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Button title="Zonasiz" compact variant={draft.zoneId === null ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, zoneId: null })} />
+            <Button title="Zonasiz" compact variant={shown.zoneId === null ? 'primary' : 'ghost'} onPress={() => setDraft({ ...shown, zoneId: null })} />
             {zones.map((z) => (
-              <Button key={z.id} title={z.name} compact variant={draft.zoneId === z.id ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, zoneId: z.id })} />
+              <Button key={z.id} title={z.name} compact variant={shown.zoneId === z.id ? 'primary' : 'ghost'} onPress={() => setDraft({ ...shown, zoneId: z.id })} />
             ))}
           </View>
-          <Button title="Saqlash" loading={busy} onPress={() => void saveTable()} />
-          <Button title="Bekor qilish" variant="ghost" disabled={busy} onPress={() => setDraft(null)} />
-        </Card>
-      )}
+          </>
+        )}
+      </FormSheet>
 
       {isManager && (
         <Card>
@@ -207,7 +235,23 @@ export default function FloorScreen() {
 
       {isManager && tables === null && !error && <Muted>Yuklanmoqda...</Muted>}
 
-      {tables?.map((t) => (
+      {isManager && tables !== null && tables.length > 0 && (
+        <>
+          <Field label="Stol qidirish" value={search} onChangeText={setSearch} placeholder="Nomi bo'yicha" />
+          {(zones.length > 0 || tables.some((t) => !t.zone)) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Chip label="Hammasi" active={zoneFilter === 'all'} onPress={() => setZoneFilter('all')} />
+              {zones.map((z) => (
+                <Chip key={z.id} label={z.name} active={zoneFilter === z.id} onPress={() => setZoneFilter(z.id)} />
+              ))}
+              {tables.some((t) => !t.zone) && zones.length > 0 && <Chip label="Zonasiz" active={zoneFilter === 'none'} onPress={() => setZoneFilter('none')} />}
+            </View>
+          )}
+          {visibleTables.length === 0 && <Muted>Stol topilmadi.</Muted>}
+        </>
+      )}
+
+      {visibleTables.map((t) => (
         <Card key={t.id}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <Txt size={18} weight={600} style={{ flex: 1 }}>
@@ -224,7 +268,10 @@ export default function FloorScreen() {
               variant="ghost"
               compact
               disabled={busy}
-              onPress={() => setDraft({ id: t.id, name: t.name, capacity: String(t.capacity), zoneId: t.zone?.id ?? null })}
+              onPress={() => {
+                setError(null);
+                setDraft({ id: t.id, name: t.name, capacity: String(t.capacity), zoneId: t.zone?.id ?? null });
+              }}
             />
             <Button
               title={t.is_active ? 'Yashirish' : 'Qaytarish'}

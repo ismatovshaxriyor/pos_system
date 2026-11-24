@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
+import { hhmm } from '@/lib/time';
 import { Button, Card, ErrorText, Eyebrow, Muted, Pill, Screen, Segmented, Title, Txt } from '@/ui/kit';
 import { useHand, useTheme } from '@/ui/theme';
 
@@ -87,7 +88,7 @@ export default function AttendanceScreen() {
                 <Pill label={ROLE[a.user.role]} />
               </View>
               <Muted>
-                {new Date(a.check_in).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} dan beri ·{' '}
+                {hhmm(a.check_in)} dan beri ·{' '}
                 {elapsedLabel(a.check_in, Date.now())}
               </Muted>
             </Card>

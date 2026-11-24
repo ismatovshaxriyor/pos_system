@@ -1,4 +1,4 @@
-import { HAND_LAYOUTS, MENU_STYLES, type HandLayout, type MenuStyle, type TextScale, type ThemePref } from '@pos/design';
+import { HAND_LAYOUTS, MENU_STYLES, TABLE_COLS, type HandLayout, type MenuStyle, type TextScale, type ThemePref } from '@pos/design';
 import { Modal, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -197,6 +197,20 @@ export function SettingsSheet({
                 "Ikki qo'l · katta" tugmalari faqat "Ro'yxat" ko'rinishida ishlaydi.
               </Txt>
             )}
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <Txt size={17} weight={500}>
+              Stollar: bir qatorda
+            </Txt>
+            <Txt size={14} tone="muted">
+              Bosh ekranda nechta stol yonma-yon ko'rinsin. Avto: telefonda 3, planshetda 4
+            </Txt>
+            <Segmented
+              value={appearance.tableCols}
+              options={TABLE_COLS.map((t) => ({ value: t.id, label: t.label }))}
+              onChange={(tableCols) => setAppearance({ tableCols })}
+            />
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 56 }}>

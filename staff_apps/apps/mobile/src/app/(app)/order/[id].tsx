@@ -23,6 +23,7 @@ import { Alert, View } from 'react-native';
 import { useBootstrap, useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { CartSheet, ConfirmOrderSheet, MenuPicker, TemplateBar, TotalRow } from '@/ui/parts';
 import { useHand } from '@/ui/theme';
 
@@ -52,6 +53,7 @@ export default function OrderScreen() {
   const [cart, setCart] = useState<Cart>(emptyCart);
   const counts = useMemo(() => productCounts(cart), [cart]);
   const [info, setInfo] = useState<string | null>(null);
+  useNotify(error, info);
   const [discount, setDiscount] = useState<{ amount: string; reason: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -188,8 +190,6 @@ export default function OrderScreen() {
         onCancel={() => setConfirming(false)}
       />
       {order && <Pill label={STATUS_LABEL[order.status]} kind={order.status === 'completed' ? 'ok' : 'neutral'} />}
-      {error && <ErrorText>{error}</ErrorText>}
-      {info && <Muted>{info}</Muted>}
       {order && (order.guest_count > 0 || order.note) && (
         <Muted>{[order.guest_count > 0 ? `${order.guest_count} mehmon` : '', order.note].filter(Boolean).join(' · ')}</Muted>
       )}

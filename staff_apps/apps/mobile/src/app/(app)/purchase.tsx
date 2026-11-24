@@ -8,6 +8,7 @@ import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
 import { ChipSelect, FormCard, SectionTitle } from '@/ui/forms';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 interface Line {
@@ -25,6 +26,7 @@ export default function PurchaseScreen() {
   const allowed = user?.role === 'manager' || user?.role === 'cashier';
   const hand = useHand();
   const { busy, error, info, setError, run } = useManage();
+  useNotify(error, info);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState<number | null>(null);
@@ -65,7 +67,7 @@ export default function PurchaseScreen() {
       items.push({ ingredient_id: l.ingredientId, quantity: q, unit_cost: c });
     }
     if (new Set(items.map((x) => x.ingredient_id)).size !== items.length) return setError("Bir ingredient ikki marta kiritilgan - birlashtiring.");
-    const ok = await run(() => pos.api.inventory.purchase({ supplier_id: supplierId, note: note.trim(), items }), undefined, load);
+    const ok = await run(() => pos.api.inventory.purchase({ supplier_id: supplierId, note: note.trim(), items }), 'Kirim saqlandi.', load);
     if (ok) {
       setDone(`Kirim saqlandi: ${formatMoney(total)}`);
       setLines([{ ingredientId: null, quantity: '', unitCost: '' }]);
@@ -84,8 +86,6 @@ export default function PurchaseScreen() {
       </View>
 
       {!allowed && <ErrorText>Bu bo'lim faqat menejer va kassir uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
-      {info && <Muted>{info}</Muted>}
       {done && <Muted>{done}</Muted>}
 
       {allowed && (

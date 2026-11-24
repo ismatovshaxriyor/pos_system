@@ -7,6 +7,7 @@ import { useDevices } from '@/lib/devices';
 import { useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { Button, Card, ErrorText, Eyebrow, Muted, Pill, Screen, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand, useTheme } from '@/ui/theme';
 
 /**
@@ -20,6 +21,7 @@ export default function DevicesScreen() {
   const { pending, active, loaded, error, refresh } = useDevices(isManager, 10_000);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  useNotify(actionError, null);
   const { c } = useTheme();
   const hand = useHand();
 
@@ -61,7 +63,6 @@ export default function DevicesScreen() {
 
       {!isManager && <ErrorText>Bu bo'lim faqat menejer uchun.</ErrorText>}
       {error && <ErrorText>{error}</ErrorText>}
-      {actionError && <ErrorText>{actionError}</ErrorText>}
       {isManager && !loaded && !error && <Muted>Yuklanmoqda...</Muted>}
 
       {isManager && loaded && (

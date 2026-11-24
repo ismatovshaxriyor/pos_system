@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CASHIER_LAYOUTS,
   DEFAULT_MENU_STYLE,
+  DEFAULT_TABLE_COLS,
   HAND_LAYOUTS,
   isMenuStyle,
+  isTableCols,
+  TABLE_COLS,
   MENU_STYLES,
   cashierMirrorsActions,
   handRules,
@@ -52,5 +55,15 @@ describe('menyu uslublari', () => {
     expect(isMenuStyle('grid')).toBe(true);
     expect(isMenuStyle('table')).toBe(false);
     expect(isMenuStyle(undefined)).toBe(false);
+  });
+});
+
+describe('stollar ustunlari', () => {
+  it("avto + 2/3/4, standart avto, tekshiruv", () => {
+    expect(TABLE_COLS.map((t) => t.id)).toEqual(['auto', '2', '3', '4']);
+    expect(DEFAULT_TABLE_COLS).toBe('auto');
+    expect(isTableCols('3')).toBe(true);
+    expect(isTableCols(3)).toBe(false);
+    expect(isTableCols('5')).toBe(false);
   });
 });

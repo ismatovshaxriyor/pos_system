@@ -17,8 +17,9 @@ import { Alert, View } from 'react-native';
 import { useRealtimeRefresh, useSession } from '@/lib/hooks';
 import { useManage } from '@/lib/manage';
 import { pos } from '@/lib/pos';
-import { ChipSelect, FormCard, SwitchRow } from '@/ui/forms';
+import { ChipSelect, FormSheet, SwitchRow, useHeld } from '@/ui/forms';
 import { Button, Card, ErrorText, Eyebrow, Field, Muted, Pill, Screen, Segmented, Title, Txt } from '@/ui/kit';
+import { useNotify } from '@/ui/toast';
 import { useHand } from '@/ui/theme';
 
 type Filter = 'all' | 'low' | 'archived';
@@ -60,6 +61,8 @@ export default function InventoryScreen() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [action, setAction] = useState<Action | null>(null);
+  useNotify(error, info, action?.kind === 'edit');
+  const edit = useHeld(action?.kind === 'edit' ? action : null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
 
@@ -125,14 +128,14 @@ export default function InventoryScreen() {
       if (q === null || Number(q) <= 0) return setError("Yo'qotilgan miqdorni (0 dan katta) kiriting.");
       call = () => pos.api.inventory.adjust(action.id, { delta: `-${q}`, note: action.note.trim() || "Yo'qotish (isrof)" });
     }
-    const ok = await run(call, undefined, load);
+    const ok = await run(call, 'Saqlandi.', load);
     if (ok) setAction(null);
   }
 
   function confirmDelete(i: Ingredient) {
     Alert.alert("Ingredientni o'chirish", `"${i.name}" o'chiriladi. Retsept yoki tarixda ishlatilgan bo'lsa server rad etadi - u holda arxivlang.`, [
       { text: "Yo'q", style: 'cancel' },
-      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.inventory.deleteIngredient(i.id), undefined, load) },
+      { text: "O'chirish", style: 'destructive', onPress: () => void run(() => pos.api.inventory.deleteIngredient(i.id), "Ingredient o'chirildi.", load) },
     ]);
   }
 
@@ -147,8 +150,6 @@ export default function InventoryScreen() {
       </View>
 
       {!allowed && <ErrorText>Bu bo'lim faqat menejer va kassir uchun.</ErrorText>}
-      {error && <ErrorText>{error}</ErrorText>}
-      {info && <Muted>{info}</Muted>}
 
       {allowed && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -158,66 +159,76 @@ export default function InventoryScreen() {
         </View>
       )}
 
-      {allowed && !action && (
+      {allowed && (
         <Button
           title="+ Yangi ingredient"
           variant="ghost"
-          onPress={() => setAction(newIngredient())}
+          onPress={() => {
+            setError(null);
+            setAction(newIngredient());
+          }}
         />
       )}
 
-      {action?.kind === 'edit' && (
-        <FormCard title={action.id ? 'Ingredientni tahrirlash' : 'Yangi ingredient'}>
-          {!action.id && action.source === 'menu' ? (
+      <FormSheet
+        visible={action?.kind === 'edit'}
+        title={edit?.id ? 'Ingredientni tahrirlash' : 'Yangi ingredient'}
+        busy={busy}
+        error={error}
+        onClose={() => setAction(null)}
+        onSave={() => void submit()}
+      >
+        {edit && (
+          <>
+          {!edit.id && edit.source === 'menu' ? (
             <MenuProductPicker
               products={linkable}
-              query={action.query}
-              selected={action.productId}
-              onQuery={(query) => setAction({ ...action, query })}
-              onPick={(p) => setAction({ ...action, productId: p.id, name: p.name, unit: 'dona' })}
-              onOther={() => setAction({ ...action, source: 'custom', productId: null, name: action.query.trim(), unit: 'kg' })}
+              query={edit.query}
+              selected={edit.productId}
+              onQuery={(query) => setAction({ ...edit, query })}
+              onPick={(p) => setAction({ ...edit, productId: p.id, name: p.name, unit: 'dona' })}
+              onOther={() => setAction({ ...edit, source: 'custom', productId: null, name: edit.query.trim(), unit: 'kg' })}
             />
           ) : (
             <>
-              <Field label="Nomi" value={action.name} onChangeText={(name) => setAction({ ...action, name })} autoCapitalize="sentences" />
-              {!action.id && linkable.length > 0 && (
+              <Field label="Nomi" value={edit.name} onChangeText={(name) => setAction({ ...edit, name })} autoCapitalize="sentences" />
+              {!edit.id && linkable.length > 0 && (
                 <Button
                   title="← Menyudan tanlash"
                   variant="ghost"
                   compact
-                  onPress={() => setAction({ ...action, source: 'menu', productId: null, query: action.name, unit: 'dona' })}
+                  onPress={() => setAction({ ...edit, source: 'menu', productId: null, query: edit.name, unit: 'dona' })}
                 />
               )}
             </>
           )}
-          {action.productId !== null ? (
-            <Muted>Menyuda «{action.name}» 1 ta sotilsa, omborda 1 dona kamayadi.</Muted>
+          {edit.productId !== null ? (
+            <Muted>Menyuda «{edit.name}» 1 ta sotilsa, omborda 1 dona kamayadi.</Muted>
           ) : (
             <ChipSelect
               label="Birlik"
-              value={action.unit}
+              value={edit.unit}
               options={INGREDIENT_UNITS.map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
-              onChange={(unit) => setAction({ ...action, unit })}
+              onChange={(unit) => setAction({ ...edit, unit })}
             />
           )}
           <Field
-            label={`Minimal qoldiq (${action.unit}) - shundan kamaysa ogohlantiriladi`}
-            value={action.minStock}
-            onChangeText={(minStock) => setAction({ ...action, minStock })}
+            label={`Minimal qoldiq (${edit.unit}) - shundan kamaysa ogohlantiriladi`}
+            value={edit.minStock}
+            onChangeText={(minStock) => setAction({ ...edit, minStock })}
             keyboardType="decimal-pad"
             placeholder="0"
           />
           <ChipSelect
             label="Asosiy ta'minotchi"
-            value={action.supplierId}
+            value={edit.supplierId}
             options={[{ value: null as number | null, label: "Yo'q" }, ...suppliers.map((s) => ({ value: s.id as number | null, label: s.name }))]}
-            onChange={(supplierId) => setAction({ ...action, supplierId })}
+            onChange={(supplierId) => setAction({ ...edit, supplierId })}
           />
-          {action.id && <SwitchRow label="Faol" hint="O'chirilsa arxivga tushadi (ro'yxatda va kirimda ko'rinmaydi)." value={action.active} onChange={(active) => setAction({ ...action, active })} />}
-          <Button title="Saqlash" loading={busy} onPress={() => void submit()} />
-          <Button title="Bekor qilish" variant="ghost" disabled={busy} onPress={() => setAction(null)} />
-        </FormCard>
-      )}
+          {edit.id && <SwitchRow label="Faol" hint="O'chirilsa arxivga tushadi (ro'yxatda va kirimda ko'rinmaydi)." value={edit.active} onChange={(active) => setAction({ ...edit, active })} />}
+          </>
+        )}
+      </FormSheet>
 
       {allowed && (
         <>
@@ -288,7 +299,8 @@ export default function InventoryScreen() {
                   title="Tahrirlash"
                   compact
                   variant="ghost"
-                  onPress={() =>
+                  onPress={() => {
+                    setError(null);
                     setAction({
                       kind: 'edit',
                       id: i.id,
@@ -300,8 +312,8 @@ export default function InventoryScreen() {
                       source: 'custom',
                       productId: null,
                       query: '',
-                    })
-                  }
+                    });
+                  }}
                 />
                 {!i.is_active && (
                   <Button title="Qaytarish" compact variant="ghost" disabled={busy} onPress={() => void run(() => pos.api.inventory.updateIngredient(i.id, { is_active: true }), undefined, load)} />

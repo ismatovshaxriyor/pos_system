@@ -12,6 +12,7 @@ import { useServerRecovery, useSession } from '@/lib/hooks';
 import { pos } from '@/lib/pos';
 import { useAppUpdate } from '@/lib/update';
 import { FONT, ThemeProvider, useTheme } from '@/ui/theme';
+import { ToastProvider } from '@/ui/toast';
 import { UpdateBanner, UpdateRequired } from '@/ui/update';
 import { WaiterCallAlert } from '@/ui/waitercall';
 
@@ -32,7 +33,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <Shell />
+        <ToastProvider>
+          <Shell />
+        </ToastProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
